@@ -25,6 +25,8 @@ describe('Cashflow Page', () => {
     expect(screen.getByText('Gesamt Ausgaben')).toBeInTheDocument();
     expect(screen.getByText('Netto Cashflow')).toBeInTheDocument();
     expect(screen.getByText('Monatlich')).toBeInTheDocument();
+    expect(screen.getByText('Ø')).toBeInTheDocument();
+    expect(screen.getByText('pro Monat')).toBeInTheDocument();
   });
 
   it('highlights the current period column and renders jump to today button', async () => {
@@ -79,7 +81,6 @@ describe('Cashflow Page', () => {
 
     expect(screen.getByTestId('current-period-header')).toBeInTheDocument();
     expect(screen.getByText('Aktuell')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Heute/i })).toBeInTheDocument();
   });
 
   it('collapses past years by default and allows expanding on click', async () => {
@@ -147,8 +148,8 @@ describe('Cashflow Page', () => {
 
     render(<Cashflow />);
 
-    // 2023 sollte eingeklappt sein und "komprimiert" anzeigen
-    const collapseBtn2023 = screen.getByRole('button', { name: /2023.*komprimiert/i });
+    // 2023 sollte eingeklappt sein und die Jahressumme anzeigen
+    const collapseBtn2023 = screen.getByRole('button', { name: /2023/i });
     expect(collapseBtn2023).toBeInTheDocument();
     expect(screen.getByText('Jahressumme')).toBeInTheDocument();
 

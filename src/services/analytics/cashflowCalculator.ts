@@ -10,7 +10,12 @@ import {
   PeriodGranularity,
   Transaction,
 } from '@/types/finance';
-import { getPeriodKey, normalizeBudgetToGranularity } from '@/utils/dateUtils';
+import {
+  fillPeriodKeyRange,
+  getCurrentPeriodKey,
+  getPeriodKey,
+  normalizeBudgetToGranularity,
+} from '@/utils/dateUtils';
 
 export interface BucketPeriodCashflow {
   inbound: number;
@@ -64,15 +69,25 @@ export function calculateCashflowMatrix(
   buckets: Bucket[],
   transactions: Transaction[],
   granularity: PeriodGranularity,
-  selectedAccountId?: string
+  selectedAccountId?: string,
+  options?: { includeCurrentPeriod?: boolean; referenceDate?: Date | string | number }
 ): CashflowAnalysisResult {
   // 1. Transaktionen nach Konto filtern (falls angegeben)
   const filteredTx = selectedAccountId
     ? transactions.filter((t) => t.accountId === selectedAccountId)
     : transactions;
 
-  // 2. Perioden extrahieren
-  const periodKeys = extractPeriodKeys(filteredTx, granularity);
+  // 2. Perioden extrahieren und Lücken bis zum aktuellen Zeitraum schließen
+  const rawPeriodKeys = extractPeriodKeys(filteredTx, granularity);
+  const includeCurrent = options?.includeCurrentPeriod ?? false;
+  const currentKey = includeCurrent
+    ? getCurrentPeriodKey(granularity, options?.referenceDate)
+    : undefined;
+
+  const periodKeys =
+    rawPeriodKeys.length > 0 && includeCurrent
+      ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentKey)
+      : rawPeriodKeys;
 
   // 3. Direkte Transaktions-Summen pro Bucket und Periode berechnen
   const directSums = new Map<string, Record<string, { inbound: number; outbound: number }>>();

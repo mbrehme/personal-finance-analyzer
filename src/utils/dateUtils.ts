@@ -297,3 +297,75 @@ export function normalizeBudgetToGranularity(
       return monthlyEquivalent * 12;
   }
 }
+
+/**
+ * Füllt Lücken in einer Liste von Periodenschlüsseln lückenlos auf und erweitert
+ * diese optional bis zum aktuellen Zeitraum (oder einem angegebenen End-Zeitraum).
+ *
+ * @param {string[]} periodKeys - Vorhandene Periodenschlüssel (z. B. ['2026-01', '2026-07'])
+ * @param {PeriodGranularity} granularity - Die Zeit-Granularität ('monthly', 'quarterly', 'halfYearly', 'yearly')
+ * @param {string} [upToPeriodKey] - Optionaler End-Periodenschlüssel, bis zu dem aufgefüllt werden soll (z. B. '2026-09')
+ * @returns {string[]} Chronologisch sortierte, lückenlose Liste von Periodenschlüsseln
+ *
+ * @example
+ * ```ts
+ * fillPeriodKeyRange(['2026-01'], 'monthly', '2026-03');
+ * // => ['2026-01', '2026-02', '2026-03']
+ * ```
+ */
+export function fillPeriodKeyRange(
+  periodKeys: string[],
+  granularity: PeriodGranularity,
+  upToPeriodKey?: string
+): string[] {
+  if (periodKeys.length === 0) {
+    return upToPeriodKey ? [upToPeriodKey] : [];
+  }
+
+  const keySet = new Set<string>(periodKeys);
+
+  if (upToPeriodKey) {
+    keySet.add(upToPeriodKey);
+    const targetYear = getYearFromPeriodKey(upToPeriodKey);
+
+    const keysInTargetYear = periodKeys.filter(
+      (k) => getYearFromPeriodKey(k) === targetYear
+    );
+
+    if (keysInTargetYear.length > 0) {
+      if (granularity === 'monthly') {
+        const targetMonth = parseInt(upToPeriodKey.split('-')[1], 10);
+        const maxExistingMonth = Math.max(
+          ...keysInTargetYear.map((k) => parseInt(k.split('-')[1], 10))
+        );
+        if (maxExistingMonth < targetMonth) {
+          for (let m = maxExistingMonth + 1; m <= targetMonth; m++) {
+            keySet.add(`${targetYear}-${String(m).padStart(2, '0')}`);
+          }
+        }
+      } else if (granularity === 'quarterly') {
+        const targetQ = parseInt(upToPeriodKey.split('-')[1].replace('Q', ''), 10);
+        const maxExistingQ = Math.max(
+          ...keysInTargetYear.map((k) => parseInt(k.split('-')[1].replace('Q', ''), 10))
+        );
+        if (maxExistingQ < targetQ) {
+          for (let q = maxExistingQ + 1; q <= targetQ; q++) {
+            keySet.add(`${targetYear}-Q${q}`);
+          }
+        }
+      } else if (granularity === 'halfYearly') {
+        const targetH = parseInt(upToPeriodKey.split('-')[1].replace('H', ''), 10);
+        const maxExistingH = Math.max(
+          ...keysInTargetYear.map((k) => parseInt(k.split('-')[1].replace('H', ''), 10))
+        );
+        if (maxExistingH < targetH) {
+          for (let h = maxExistingH + 1; h <= targetH; h++) {
+            keySet.add(`${targetYear}-H${h}`);
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(keySet).sort();
+}

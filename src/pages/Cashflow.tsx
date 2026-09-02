@@ -23,7 +23,6 @@ import {
   ChevronDown,
   ArrowUpRight,
   ArrowDownRight,
-  Calendar,
 } from 'lucide-react';
 
 /**
@@ -139,13 +138,13 @@ export const Cashflow: React.FC = () => {
       buckets,
       transactions,
       granularity,
-      selectedAccountId !== 'all' ? selectedAccountId : undefined
+      selectedAccountId !== 'all' ? selectedAccountId : undefined,
+      { includeCurrentPeriod: true }
     );
   }, [buckets, transactions, granularity, selectedAccountId]);
 
   const currentPeriodKey = useMemo(() => getCurrentPeriodKey(granularity), [granularity]);
   const currentYear = useMemo(() => getYearFromPeriodKey(currentPeriodKey), [currentPeriodKey]);
-  const hasCurrentPeriod = matrix.periodKeys.includes(currentPeriodKey);
 
   // Status für eingeklappte Jahre (vergangene Jahre vor aktuellem Jahr standardmäßig eingeklappt)
   const [collapsedYears, setCollapsedYears] = useState<Set<string>>(() => {
@@ -307,11 +306,18 @@ export const Cashflow: React.FC = () => {
             )
           : undefined);
 
+      const periodCount = matrix.periodKeys.length;
+      const avgNet = periodCount > 0 ? row.totalNet / periodCount : 0;
+      const avgDiff =
+        targetBudget !== undefined && avgNet !== 0
+          ? Math.abs(avgNet) - targetBudget
+          : undefined;
+
       return (
         <React.Fragment key={row.bucket.id}>
-          <tr className="hover:bg-slate-50/80 group border-b border-slate-100 transition-colors text-xs">
-            {/* Bucket Name & Hierarchie */}
-            <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/90 py-2.5 px-4 whitespace-nowrap min-w-[240px] w-[240px] max-w-[240px] border-r-2 border-slate-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors">
+          <tr className="hover:bg-slate-50 group transition-colors text-xs">
+            {/* Bucket Name & Hierarchie (deutlich abgesetzte sticky Spalte) */}
+            <td className="sticky left-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-4 whitespace-nowrap min-w-[240px] w-[240px] max-w-[240px] border-b border-slate-200 border-r-2 border-slate-300 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors">
               <div className="flex items-center gap-2 truncate" style={{ paddingLeft: `${row.depth * 20}px` }}>
                 {row.hasChildren ? (
                   <button
@@ -339,7 +345,7 @@ export const Cashflow: React.FC = () => {
                     {row.bucket.name}
                   </span>
                   {targetBudget !== undefined && targetBudget > 0 && (
-                    <span className="text-[10px] text-slate-400 font-mono font-medium truncate">
+                    <span className="text-[10px] text-slate-500 font-mono font-medium truncate">
                       Soll: {targetBudget.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                     </span>
                   )}
@@ -348,7 +354,7 @@ export const Cashflow: React.FC = () => {
             </td>
 
             {/* Perioden Spalten (einzeln oder komprimiert) */}
-            {displayColumns.map((col) => {
+            {displayColumns.map((col, cIdx) => {
               let net = 0;
               let diffToBudget: number | undefined = undefined;
 
@@ -370,17 +376,22 @@ export const Cashflow: React.FC = () => {
                   diffToBudget = Math.abs(net) - budget;
                 }
               }
-              const borderRight = col.isLastInYear ? 'border-r-2 border-slate-300' : 'border-r border-slate-100';
+              const isLastCol = cIdx === displayColumns.length - 1;
+              const borderRight = isLastCol
+                ? ''
+                : col.isLastInYear
+                ? 'border-r-2 border-slate-300'
+                : 'border-r border-slate-100';
               const bgHighlight = col.isCurrent
                 ? 'bg-blue-50/50 border-x-2 border-blue-200/80 font-semibold'
                 : col.type === 'collapsed_year'
-                ? 'bg-slate-50/80 font-medium'
+                ? 'bg-slate-50 font-medium'
                 : '';
 
               return (
                 <td
                   key={col.id}
-                  className={`py-3 px-3 text-right whitespace-nowrap font-mono transition-colors ${borderRight} ${bgHighlight}`}
+                  className={`py-3 px-3 text-right whitespace-nowrap font-mono transition-colors border-b border-slate-100 ${borderRight} ${bgHighlight}`}
                 >
                   {net !== 0 ? (
                     <div>
@@ -418,6 +429,43 @@ export const Cashflow: React.FC = () => {
                 </td>
               );
             })}
+
+            {/* Sticky Durchschnitts-Spalte rechts (deutlich abgesetzt) */}
+            <td className="sticky right-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-3 text-right whitespace-nowrap font-mono border-b border-slate-200 border-l-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors">
+              {avgNet !== 0 ? (
+                <div>
+                  <span
+                    className={`font-bold ${
+                      avgNet < 0 ? 'text-slate-900' : 'text-emerald-600'
+                    }`}
+                  >
+                    {avgNet.toLocaleString('de-DE', {
+                      style: 'currency',
+                      currency: 'EUR',
+                    })}
+                  </span>
+
+                  {/* Budget Abweichung auf Durchschnittsbasis */}
+                  {avgDiff !== undefined && Math.abs(avgDiff) >= 0.01 && (
+                    <div
+                      className={`text-[10px] font-semibold font-mono ${
+                        (avgNet >= 0 ? avgDiff > 0 : avgDiff < 0)
+                          ? 'text-emerald-600'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {avgDiff.toLocaleString('de-DE', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        signDisplay: 'always',
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <span className="text-slate-300">-</span>
+              )}
+            </td>
           </tr>
 
           {!isCollapsed && children.map((c) => renderTreeRow(c))}
@@ -428,6 +476,12 @@ export const Cashflow: React.FC = () => {
     const rootRows = childrenMap.get(null) || [];
     return rootRows.map((r) => renderTreeRow(r));
   };
+
+  const totalAvgNet = useMemo(() => {
+    return matrix.periodKeys.length > 0
+      ? matrix.totalRow.totalNet / matrix.periodKeys.length
+      : 0;
+  }, [matrix.periodKeys.length, matrix.totalRow.totalNet]);
 
   return (
     <div className="space-y-6">
@@ -460,19 +514,6 @@ export const Cashflow: React.FC = () => {
 
           {/* Granularitäts-Umschalter */}
           <PeriodSelector value={granularity} onChange={setGranularity} />
-
-          {/* Button: Zu aktuellem Zeitraum springen */}
-          {hasCurrentPeriod && (
-            <button
-              type="button"
-              onClick={scrollToCurrentPeriod}
-              title="Zum aktuellen Zeitraum scrollen"
-              className="px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Heute</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -525,24 +566,27 @@ export const Cashflow: React.FC = () => {
 
       {/* Matrix Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div ref={tableContainerRef} className="overflow-x-auto scroll-smooth">
-          <table className="w-full text-left border-collapse">
+        <div ref={tableContainerRef} className="overflow-x-auto scroll-smooth no-scrollbar">
+          <table className="w-full text-left border-separate border-spacing-0">
             <thead>
               {/* Zeile 1: Übergeordnete Jahres-Gruppen mit Auf-/Zuklappen */}
-              <tr className="bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <tr className="bg-slate-200 text-slate-800 text-xs font-bold uppercase tracking-wider">
                 <th
                   rowSpan={2}
-                  className="sticky left-0 z-30 py-3 px-4 min-w-[240px] w-[240px] max-w-[240px] text-left border-r-2 border-slate-300 bg-slate-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]"
+                  className="sticky left-0 z-30 py-3 px-4 min-w-[240px] w-[240px] max-w-[240px] text-left border-r-2 border-b-2 border-slate-300 bg-slate-200 text-slate-900 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]"
                 >
                   Bucket
                 </th>
-                {yearGroups.map((group) => {
+                {yearGroups.map((group, gIdx) => {
                   const isCurrentYear = group.year === currentYear;
+                  const isLastGroup = gIdx === yearGroups.length - 1;
                   return (
                     <th
                       key={group.year}
                       colSpan={group.colSpan}
-                      className={`py-2 px-3 text-center border-r-2 border-slate-300 transition-colors ${
+                      className={`py-2 px-3 text-center border-b-2 border-slate-300 transition-colors ${
+                        isLastGroup ? '' : 'border-r-2 border-slate-300'
+                      } ${
                         isCurrentYear
                           ? 'bg-blue-100/70 text-blue-900 font-extrabold'
                           : 'bg-slate-100/90 text-slate-700'
@@ -554,20 +598,20 @@ export const Cashflow: React.FC = () => {
                           onClick={() => toggleYearCollapse(group.year)}
                           title={
                             group.isCollapsed
-                              ? `${group.year} aufklappen`
+                              ? `${group.year} aufklappen (${group.periodKeys.length} ${granularity === 'monthly' ? 'Monate' : 'Perioden'})`
                               : `${group.year} einklappen`
                           }
-                          className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded hover:bg-slate-200/80 transition-colors text-xs font-bold"
+                          className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-md hover:bg-slate-200 transition-colors text-xs font-bold text-slate-700 hover:text-slate-900 group cursor-pointer"
                         >
                           {group.isCollapsed ? (
-                            <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 transition-colors flex-shrink-0" />
                           ) : (
-                            <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 transition-colors flex-shrink-0" />
                           )}
                           <span>{group.year}</span>
                           {group.isCollapsed && (
-                            <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
-                              komprimiert ({group.periodKeys.length})
+                            <span className="text-[10px] font-semibold text-slate-500 bg-slate-200/90 px-1.5 py-0.5 rounded-full leading-none">
+                              {group.periodKeys.length}
                             </span>
                           )}
                         </button>
@@ -577,12 +621,28 @@ export const Cashflow: React.FC = () => {
                     </th>
                   );
                 })}
+
+                {/* Sticky Spalte rechts für Durchschnitt - durchgängiger border-l-2 */}
+                <th
+                  rowSpan={2}
+                  className="sticky right-0 z-30 py-3 px-3 min-w-[110px] w-[110px] max-w-[110px] text-center border-l-2 border-b-2 border-slate-300 bg-slate-200 text-slate-900 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)]"
+                >
+                  <div className="flex flex-col items-center justify-center">
+                    <span className="text-base font-extrabold text-slate-900">Ø</span>
+                    <span className="text-[10px] font-semibold text-slate-600 normal-case">
+                      pro {granularity === 'monthly' ? 'Monat' : granularity === 'quarterly' ? 'Quartal' : granularity === 'halfYearly' ? 'Halbjahr' : 'Jahr'}
+                    </span>
+                  </div>
+                </th>
               </tr>
 
               {/* Zeile 2: Einzelne Unterperioden (Monate/Quartale) oder Jahressumme */}
-              <tr className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
-                {displayColumns.map((col) => {
-                  const borderRight = col.isLastInYear
+              <tr className="bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+                {displayColumns.map((col, cIdx) => {
+                  const isLastCol = cIdx === displayColumns.length - 1;
+                  const borderRight = isLastCol
+                    ? ''
+                    : col.isLastInYear
                     ? 'border-r-2 border-slate-300'
                     : 'border-r border-slate-100';
                   return (
@@ -590,7 +650,7 @@ export const Cashflow: React.FC = () => {
                       key={col.id}
                       ref={col.isCurrent ? currentPeriodHeaderRef : undefined}
                       data-testid={col.isCurrent ? 'current-period-header' : undefined}
-                      className={`py-2 px-3 text-right min-w-[100px] transition-colors ${borderRight} ${
+                      className={`py-2 px-3 text-right min-w-[100px] border-b-2 border-slate-300 transition-colors ${borderRight} ${
                         col.isCurrent
                           ? 'bg-blue-100/90 text-blue-950 font-extrabold shadow-inner'
                           : col.type === 'collapsed_year'
@@ -617,7 +677,7 @@ export const Cashflow: React.FC = () => {
               ) : (
                 <tr>
                   <td
-                    colSpan={displayColumns.length + 1}
+                    colSpan={displayColumns.length + 2}
                     className="py-12 text-center text-slate-400 text-sm"
                   >
                     Noch keine Daten für diesen Zeitraum vorhanden.
@@ -628,11 +688,11 @@ export const Cashflow: React.FC = () => {
             {/* Gesamtsummenzeile */}
             {displayColumns.length > 0 && (
               <tfoot>
-                <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300 text-xs">
-                  <td className="sticky left-0 z-10 bg-slate-100 py-3.5 px-4 text-slate-900 font-bold border-r-2 border-slate-300 min-w-[240px] w-[240px] max-w-[240px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]">
+                <tr className="bg-slate-200 font-extrabold border-t-2 border-slate-300 text-xs">
+                  <td className="sticky left-0 z-20 bg-slate-200 py-3.5 px-4 text-slate-900 font-extrabold border-r-2 border-t-2 border-slate-300 min-w-[240px] w-[240px] max-w-[240px] shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]">
                     Netto-Gesamtergebnis
                   </td>
-                  {displayColumns.map((col) => {
+                  {displayColumns.map((col, cIdx) => {
                     let net = 0;
                     if (col.type === 'period') {
                       net = matrix.totalRow.periods[col.id]?.net || 0;
@@ -643,20 +703,23 @@ export const Cashflow: React.FC = () => {
                       );
                     }
 
-                    const borderRight = col.isLastInYear
+                    const isLastCol = cIdx === displayColumns.length - 1;
+                    const borderRight = isLastCol
+                      ? ''
+                      : col.isLastInYear
                       ? 'border-r-2 border-slate-300'
                       : 'border-r border-slate-200';
                     const highlightClass = col.isCurrent
-                      ? 'bg-blue-100/90 border-x-2 border-blue-400'
+                      ? 'bg-blue-100 border-x-2 border-blue-400'
                       : col.type === 'collapsed_year'
-                      ? 'bg-slate-200/50 text-slate-800'
-                      : '';
+                      ? 'bg-slate-200 text-slate-800'
+                      : 'bg-slate-200';
 
                     return (
                       <td
                         key={col.id}
-                        className={`py-3.5 px-3 text-right font-mono font-bold transition-colors ${borderRight} ${highlightClass} ${
-                          net >= 0 ? 'text-emerald-600' : 'text-slate-900'
+                        className={`py-3.5 px-3 text-right font-mono font-extrabold transition-colors border-t-2 border-slate-300 ${borderRight} ${highlightClass} ${
+                          net >= 0 ? 'text-emerald-700' : 'text-slate-900'
                         }`}
                       >
                         {net.toLocaleString('de-DE', {
@@ -666,6 +729,17 @@ export const Cashflow: React.FC = () => {
                       </td>
                     );
                   })}
+
+                  {/* Sticky Durchschnitts-Spalte rechts */}
+                  <td className="sticky right-0 z-20 bg-slate-200 py-3.5 px-3 text-right font-mono font-extrabold border-l-2 border-t-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)]">
+                    <span className={totalAvgNet >= 0 ? 'text-emerald-700' : 'text-slate-900'}>
+                      {totalAvgNet.toLocaleString('de-DE', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        signDisplay: 'always',
+                      })}
+                    </span>
+                  </td>
                 </tr>
               </tfoot>
             )}

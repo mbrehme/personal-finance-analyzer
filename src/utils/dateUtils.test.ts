@@ -15,6 +15,7 @@ import {
   getCurrentPeriodKey,
   getYearFromPeriodKey,
   formatSubPeriodLabel,
+  fillPeriodKeyRange,
 } from './dateUtils';
 import { ISODateString } from '@/types/finance';
 
@@ -145,6 +146,40 @@ describe('dateUtils', () => {
       expect(formatSubPeriodLabel('2024-Q3', 'quarterly')).toBe('Q3');
       expect(formatSubPeriodLabel('2024-H2', 'halfYearly')).toBe('H2');
       expect(formatSubPeriodLabel('2024', 'yearly')).toBe('2024');
+    });
+  });
+
+  describe('fillPeriodKeyRange', () => {
+    it('returns empty array when no keys and no upToKey are provided', () => {
+      expect(fillPeriodKeyRange([], 'monthly')).toEqual([]);
+    });
+
+    it('returns upToKey if periodKeys is empty', () => {
+      expect(fillPeriodKeyRange([], 'monthly', '2026-09')).toEqual(['2026-09']);
+    });
+
+    it('fills gap between latest month in target year and upToPeriodKey', () => {
+      const keys = ['2026-06', '2026-07'];
+      const result = fillPeriodKeyRange(keys, 'monthly', '2026-09');
+      expect(result).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+    });
+
+    it('does not create intermediate empty years', () => {
+      const keys = ['2023-05', '2026-07'];
+      const result = fillPeriodKeyRange(keys, 'monthly', '2026-09');
+      expect(result).toEqual(['2023-05', '2026-07', '2026-08', '2026-09']);
+    });
+
+    it('fills quarterly and halfYearly ranges up to upToPeriodKey', () => {
+      expect(fillPeriodKeyRange(['2026-Q1'], 'quarterly', '2026-Q3')).toEqual([
+        '2026-Q1',
+        '2026-Q2',
+        '2026-Q3',
+      ]);
+      expect(fillPeriodKeyRange(['2026-H1'], 'halfYearly', '2026-H2')).toEqual([
+        '2026-H1',
+        '2026-H2',
+      ]);
     });
   });
 });

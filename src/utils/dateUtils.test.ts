@@ -35,9 +35,23 @@ describe('dateUtils', () => {
       expect(toISODateString(d)).toBe('2026-09-02');
     });
 
-    it('parses German date format DD.MM.YYYY', () => {
+    it('parses German date format DD.MM.YYYY and 2-digit year DD.MM.YY', () => {
       expect(toISODateString('15.03.2026')).toBe('2026-03-15');
       expect(toISODateString('1.5.2026')).toBe('2026-05-01');
+      expect(toISODateString('20.07.26')).toBe('2026-07-20');
+      expect(toISODateString('01.01.24')).toBe('2024-01-01');
+    });
+
+    it('parses slash and dash date formats with 2-digit or 4-digit years', () => {
+      expect(toISODateString('20/07/26')).toBe('2026-07-20');
+      expect(toISODateString('20/07/2026')).toBe('2026-07-20');
+      expect(toISODateString('20-07-26')).toBe('2026-07-20');
+      expect(toISODateString('20-07-2026')).toBe('2026-07-20');
+    });
+
+    it('parses ISO date strings with timestamps', () => {
+      expect(toISODateString('2026-07-20T14:30:00.000Z')).toBe('2026-07-20');
+      expect(toISODateString('2026-07-20 09:15:00')).toBe('2026-07-20');
     });
 
     it('passes through valid ISO date string', () => {

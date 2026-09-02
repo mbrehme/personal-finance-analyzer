@@ -24,30 +24,109 @@ export function isValidDateString(dateStr: string): dateStr is ISODateString {
 }
 
 /**
- * Wandelt ein Date-Objekt, einen Zeitstempel oder einen Datumsstring sicher in einen `ISODateString` um.
+ * Wandelt ein Date-Objekt, einen Zeitstempel oder einen Datumsstring sicher in einen `ISODateString` (YYYY-MM-DD) um.
+ * Unterstützt u.a. 4-stellige und 2-stellige Jahresformate (z. B. '20.07.26', '20.07.2026', '20/07/26', '2026-07-20T12:00:00').
  */
 export function toISODateString(dateInput: Date | string | number): ISODateString {
-  if (typeof dateInput === 'string' && isValidDateString(dateInput)) {
-    return dateInput;
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) {
+      throw new Error(`Ungültiges Datum: ${dateInput}`);
+    }
+    const year = dateInput.getFullYear();
+    const month = String(dateInput.getMonth() + 1).padStart(2, '0');
+    const day = String(dateInput.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}` as ISODateString;
   }
 
-  // Parse deutsches Format DD.MM.YYYY
-  if (typeof dateInput === 'string' && /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(dateInput)) {
-    const [day, month, year] = dateInput.split('.');
-    const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    if (isValidDateString(iso)) {
-      return iso;
+  if (typeof dateInput === 'number') {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) {
+      throw new Error(`Ungültiges Datum: ${dateInput}`);
+    }
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}` as ISODateString;
+  }
+
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+
+    if (isValidDateString(trimmed)) {
+      return trimmed;
+    }
+
+    // ISO Datum mit Zeitanteil (z. B. "2026-07-20T12:00:00Z" oder "2026-07-20 10:00:00")
+    const isoWithTimeMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoWithTimeMatch) {
+      const isoCandidate = `${isoWithTimeMatch[1]}-${isoWithTimeMatch[2]}-${isoWithTimeMatch[3]}`;
+      if (isValidDateString(isoCandidate)) {
+        return isoCandidate;
+      }
+    }
+
+    // Format DD.MM.YYYY oder DD.MM.YY (z. B. "20.07.26", "20.07.2026", "1.7.26")
+    const dotMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+    if (dotMatch) {
+      const [, day, month, rawYear] = dotMatch;
+      const fullYear =
+        rawYear.length === 2
+          ? Number(rawYear) < 70
+            ? `20${rawYear}`
+            : `19${rawYear}`
+          : rawYear;
+      const iso = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      if (isValidDateString(iso)) {
+        return iso;
+      }
+    }
+
+    // Format DD/MM/YYYY oder DD/MM/YY (z. B. "20/07/26", "20/07/2026")
+    const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (slashMatch) {
+      const [, day, month, rawYear] = slashMatch;
+      const fullYear =
+        rawYear.length === 2
+          ? Number(rawYear) < 70
+            ? `20${rawYear}`
+            : `19${rawYear}`
+          : rawYear;
+      const iso = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      if (isValidDateString(iso)) {
+        return iso;
+      }
+    }
+
+    // Format DD-MM-YYYY oder DD-MM-YY (z. B. "20-07-2026", "20-07-26")
+    const dashMatch = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{2}|\d{4})$/);
+    if (dashMatch) {
+      const [, day, month, rawYear] = dashMatch;
+      const fullYear =
+        rawYear.length === 2
+          ? Number(rawYear) < 70
+            ? `20${rawYear}`
+            : `19${rawYear}`
+          : rawYear;
+      const iso = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      if (isValidDateString(iso)) {
+        return iso;
+      }
+    }
+
+    // Fallback: Date.parse
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const iso = `${year}-${month}-${day}`;
+      if (isValidDateString(iso)) {
+        return iso;
+      }
     }
   }
 
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) {
-    throw new Error(`Ungültiges Datum: ${dateInput}`);
-  }
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}` as ISODateString;
+  throw new Error(`Ungültiges Datum: ${dateInput}`);
 }
 
 /**

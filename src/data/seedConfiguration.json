@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-09-02T18:47:00.000Z",
+  "exportedAt": "2026-09-02T19:02:00.000Z",
   "accounts": [
     {
       "id": "acc-giro-main",
@@ -365,7 +365,7 @@
       "parentId": "b-einkaufen",
       "color": "#34d399",
       "icon": "ShoppingBag",
-      "regexPattern": "ALDI|KAUFLAND|E.CENTER|STEINECKE|LPG|Supermarkt|Rewe|Edeka|Lidl",
+      "regexPattern": "Edeka|EDEKA|NAH...GUT|NAH.GUT|SCHAEFERS|Ullrich|CITYMARKT|REWE|Lidl|ALDI|KAUFLAND|E_CENTER|STEINECKE|LPG|Supermaerkte|GO.ASIA|Picnic GmbH|CITY.MARKT|YARAS|Fleischerei|NETTO|Kaufland",
       "targetBudget": {
         "period": "monthly",
         "amount": 400
@@ -378,7 +378,7 @@
       "parentId": "b-einkaufen",
       "color": "#6ee7b7",
       "icon": "ShoppingBag",
-      "regexPattern": ".Drogerie.Markt|MCPAPER|Rossmann|Drogerie|DROGERIE",
+      "regexPattern": "DM.Drogerie.Markt|MCPAPER|Rossmann|Drogerie|DROGERIE",
       "targetBudget": {
         "period": "monthly",
         "amount": 200
@@ -426,7 +426,7 @@
       "parentId": "b-shopping",
       "color": "#c4b5fd",
       "icon": "Tag",
-      "regexPattern": "Hennes.+Mauritz|SCHUH|Outfittery|Uniqlo|Vinted|DEICHMANN",
+      "regexPattern": "KiK.Fil|Hennes.+Mauritz|SCHUH|Outfittery|Uniqlo|Vinted|DEICHMANN",
       "targetBudget": {
         "period": "monthly",
         "amount": 150
@@ -439,7 +439,7 @@
       "parentId": "b-shopping",
       "color": "#ddd6fe",
       "icon": "Tag",
-      "regexPattern": "Zalando|Hornbach|Triple A Sales GmbH|Digistore24|Thalia",
+      "regexPattern": "E-Commerce|Zalando|Hornbach|Triple A Sales GmbH|Digistore24|Thalia|DECATHLON",
       "order": 2
     },
 
@@ -483,7 +483,7 @@
       "parentId": "b-freizeit-unterhaltung",
       "color": "#818cf8",
       "icon": "Film",
-      "regexPattern": "Netflix|RTL\\+|RTL Interactive",
+      "regexPattern": "Netflix|RTL interactive GmbH",
       "targetBudget": {
         "period": "monthly",
         "amount": 19.99
@@ -544,7 +544,7 @@
       "parentId": "b-freizeit-unterhaltung",
       "color": "#818cf8",
       "icon": "Tag",
-      "regexPattern": "Zoologischer|BBB|Eventim|GetYourGuide|AQUAFANTASY|Theater",
+      "regexPattern": "Ticket|Eintritt|GRUEN.BERLIN|Zoologischer|BBB|Eventim|GetYourGuide|AQUAFANTASY|Therme|Museen|Berliner Bader-Betriebe",
       "targetBudget": {
         "period": "monthly",
         "amount": 50
@@ -566,7 +566,7 @@
       "parentId": "b-restaurants-bars",
       "color": "#fbbf24",
       "icon": "Utensils",
-      "regexPattern": "RESTAURANT|Subway|DINER|DOENER|baecker|Marche|gourmet|Burger",
+      "regexPattern": "Restaurant|RESTAURANT|Bar|BAR|PIZZERIA|MCDONALDS|MC.DONALDS|MCD|Burger.King|Bistro|BURGER|GOURMET|Subway|DINER|DOENER|baecker|Marche|gourmet|Burger|BackWerk|toogoodtogo|Cafe|Pizza|EISMANUFAKTUR|STRAND|CAFE|CUCCIS|Restauran|Ditsch|Kebap|GOLGATHA",
       "targetBudget": {
         "period": "monthly",
         "amount": 50
@@ -592,7 +592,7 @@
       "parentId": "b-restaurants-bars",
       "color": "#fde68a",
       "icon": "Coffee",
-      "regexPattern": "kiosk|SPAETKAUF|SHELL|Top.Tank.Berlin|Spati|Aral",
+      "regexPattern": "AUTOMATEN|Automaten|NYX|kiosk|SPAETKAUF|SHELL|Top.Tank.Berlin|Spati|Aral|SCOOM|BerlinManGmbH",
       "targetBudget": {
         "period": "monthly",
         "amount": 10

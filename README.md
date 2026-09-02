@@ -59,6 +59,9 @@ personal-finance-analyzer/
 ├── .husky/
 │   ├── commit-msg             # Validiert Commit-Messages gegen Conventional Commits
 │   └── pre-commit             # Führt 'pnpm test' vor jedem Commit aus
+├── docs/                      # Architekturentscheidungen (ADRs) & Feature-Pläne
+│   ├── architecture/          # Langfristige Architekturentscheidungen (ADRs)
+│   └── plans/                 # Konkrete Feature-Pläne (active/ & archive/)
 ├── public/                    # Statische Assets
 ├── src/
 │   ├── components/            # Wiederverwendbare UI-Komponenten
@@ -78,6 +81,7 @@ personal-finance-analyzer/
 │   ├── index.css              # Tailwind CSS Direktiven
 │   └── vite-env.d.ts          # Vite TypeScript Deklarationen
 ├── .versionrc.json            # Konfiguration für Changelog & Release-Kategorien
+├── AGENTS.md                  # Anweisungen & Entwicklungs-Workflow für AI-Coding-Agenten
 ├── commitlint.config.js       # Conventional Commits Linter-Regeln
 ├── index.html                 # HTML Entry Point
 ├── package.json               # Abhängigkeiten und NPM Scripts
@@ -98,6 +102,16 @@ Der Alias `@/*` verweist direkt auf das Verzeichnis `src/` (konfiguriert in `tsc
 import { Button } from '@/components/Button';
 import { financeService } from '@/services/api';
 ```
+
+---
+
+## 📚 Architektur & Feature-Planung (`docs/`)
+
+Das Repository verwaltet Architekturentscheidungen und künftige Feature-Planungen strukturiert im Ordner `docs/`:
+
+* **`docs/architecture/`**: Dokumentiert langfristige Entscheidungen als **ADRs** (Architecture Decision Records) mit [Vorlage](docs/architecture/template.md) und Historie (z. B. `0001-frontend-architecture-and-stack.md`).
+* **`docs/plans/active/`**: Aktuelle Feature-Pläne, die gerade vom Agenten / Entwickler umgesetzt werden.
+* **`docs/plans/archive/`**: Erfolgreich umgesetzte und archivierte Feature-Pläne.
 
 ---
 

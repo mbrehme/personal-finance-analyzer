@@ -8,6 +8,7 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
 import { Bucket } from '@/types/finance';
+import { normalizeBudgetToGranularity } from '@/utils/dateUtils';
 import { IconRenderer } from '@/components/IconRenderer';
 import { BucketModal } from '@/components/modals/BucketModal';
 import {
@@ -245,7 +246,17 @@ export const BucketsConfig: React.FC = () => {
   };
 
   /* ================== RENDER BUCKET ROW ================== */
-  const renderBucketRow = (bucket: Bucket, depth: number): React.ReactNode => {
+  const getSubtreeMonthlyBudget = (bucketId: string): number => {
+    const children = childrenMap.get(bucketId) || [];
+    if (children.length === 0) {
+      const b = buckets.find((item) => item.id === bucketId);
+      if (!b?.targetBudget) return 0;
+      return normalizeBudgetToGranularity(b.targetBudget.amount, b.targetBudget.period, 'monthly');
+    }
+    return children.reduce((sum, child) => sum + getSubtreeMonthlyBudget(child.id), 0);
+  };
+
+  const renderBucketRow = (bucket: Bucket, depth = 0) => {
     const children = childrenMap.get(bucket.id) || [];
     const hasChildren = children.length > 0;
     const isCollapsed = collapsedBuckets.has(bucket.id);
@@ -283,7 +294,8 @@ export const BucketsConfig: React.FC = () => {
           } ${dropHighlightClass}`}
           title="Klicken zum Bearbeiten &bull; Ziehen zum Umsortieren / Unterordnen"
         >
-          <td className="py-3 px-4">
+          {/* Bucket Name */}
+          <td className="py-3 px-4 w-[280px] shrink-0">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 24}px` }}>
               {/* Drag Handle */}
               <div
@@ -309,32 +321,32 @@ export const BucketsConfig: React.FC = () => {
                 <div className="w-6" />
               )}
               <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white group-hover:scale-105 transition-transform"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-white group-hover:scale-105 transition-transform shrink-0"
                 style={{ backgroundColor: bucket.color || '#64748b' }}
               >
                 <IconRenderer name={bucket.icon} className="w-4 h-4" />
               </div>
-              <span className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">
+              <span className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 transition-colors truncate">
                 {bucket.name}
               </span>
             </div>
           </td>
 
-          {/* Regex Spalte */}
+          {/* Regex Spalte - Flexible Spalte mit Word-Break */}
           <td className="py-3 px-4 text-xs font-mono text-slate-600">
             {bucket.regexPattern ? (
-              <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded border border-slate-200">
+              <span className="inline-block bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 break-all leading-relaxed whitespace-normal font-mono text-[11px] shadow-sm max-w-full">
                 {bucket.regexPattern}
               </span>
             ) : hasChildren ? (
-              <span className="text-slate-400 italic">Roll-Up aus Unter-Buckets</span>
+              <span className="text-slate-400 italic text-[11px]">Roll-Up aus Unter-Buckets</span>
             ) : (
               <span className="text-slate-300">-</span>
             )}
           </td>
 
           {/* Soll-Budget */}
-          <td className="py-3 px-4 text-xs text-slate-700">
+          <td className="py-3 px-4 text-xs text-slate-700 w-[180px] shrink-0 whitespace-nowrap">
             {bucket.targetBudget ? (
               <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
                 {bucket.targetBudget.amount.toLocaleString('de-DE', {
@@ -343,13 +355,28 @@ export const BucketsConfig: React.FC = () => {
                 })}{' '}
                 / {bucket.targetBudget.period === 'monthly' ? 'Monat' : bucket.targetBudget.period}
               </span>
+            ) : hasChildren ? (
+              (() => {
+                const subtreeMonthly = getSubtreeMonthlyBudget(bucket.id);
+                return subtreeMonthly > 0 ? (
+                  <span className="font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200 text-[11px]">
+                    {subtreeMonthly.toLocaleString('de-DE', {
+                      style: 'currency',
+                      currency: 'EUR',
+                    })}{' '}
+                    / Monat (Summe)
+                  </span>
+                ) : (
+                  <span className="text-slate-400">Kein Budget</span>
+                );
+              })()
             ) : (
               <span className="text-slate-400">Kein Budget</span>
             )}
           </td>
 
           {/* Manuelle Overrides */}
-          <td className="py-3 px-4 text-xs text-slate-600">
+          <td className="py-3 px-4 text-xs text-slate-600 w-[160px] shrink-0 whitespace-nowrap">
             {bucket.manualTransactionIds && bucket.manualTransactionIds.length > 0 ? (
               <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full font-medium">
                 {bucket.manualTransactionIds.length} Buchung(en)
@@ -396,10 +423,10 @@ export const BucketsConfig: React.FC = () => {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-              <th className="py-3 px-4">Bucket Name</th>
+              <th className="py-3 px-4 w-[280px]">Bucket Name</th>
               <th className="py-3 px-4">Regex-Muster (Leafs)</th>
-              <th className="py-3 px-4">Soll-Budget</th>
-              <th className="py-3 px-4">Manuelle Overrides</th>
+              <th className="py-3 px-4 w-[180px] whitespace-nowrap">Soll-Budget</th>
+              <th className="py-3 px-4 w-[160px] whitespace-nowrap">Manuelle Overrides</th>
             </tr>
           </thead>
           <tbody>

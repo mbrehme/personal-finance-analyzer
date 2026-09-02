@@ -187,11 +187,40 @@ export const financeDB = {
   },
 
   /* ================== TRANSACTIONS ================== */
-  async getTransactions(): Promise<Transaction[]> {
+  /**
+   * Lädt alle Transaktionen. Standardmäßig über den 'valueDate'-Index
+   * der IndexedDB absteigend sortiert ('prev' = neueste Buchungen zuerst).
+   *
+   * @param direction 'prev' für absteigend (neueste zuerst), 'next' für aufsteigend
+   * @returns Promise mit Transaktionsliste
+   */
+  async getTransactions(direction: IDBCursorDirection = 'prev'): Promise<Transaction[]> {
     if (!isIndexedDBAvailable()) {
-      return Array.from(memoryStore.transactions.values());
+      return Array.from(memoryStore.transactions.values()).sort((a, b) =>
+        direction === 'prev'
+          ? b.valueDate.localeCompare(a.valueDate)
+          : a.valueDate.localeCompare(b.valueDate)
+      );
     }
-    return performStoreOperation<Transaction[]>(STORES.TRANSACTIONS, 'readonly', (store) => store.getAll());
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.TRANSACTIONS, 'readonly');
+      const store = tx.objectStore(STORES.TRANSACTIONS);
+      const index = store.index('valueDate');
+      const results: Transaction[] = [];
+      const req = index.openCursor(null, direction);
+
+      req.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          results.push(cursor.value);
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      req.onerror = () => reject(req.error);
+    });
   },
 
   async saveTransaction(tx: Transaction): Promise<void> {

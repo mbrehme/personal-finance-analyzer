@@ -51,16 +51,30 @@ describe('financeDB Storage Layer', () => {
     expect(buckets).toHaveLength(0);
   });
 
-  it('handles batch transaction saving and clearing', async () => {
+  it('handles batch transaction saving, descending date ordering and clearing', async () => {
     const transactions: Transaction[] = [
       {
         id: 'tx-1',
+        accountId: 'acc-1',
+        valueDate: '2026-08-01',
+        bookingDate: '2026-08-01',
+        issuer: 'AG',
+        receiver: 'Me',
+        subject: 'Gehalt August',
+        type: 'inbound',
+        iban: 'DE00',
+        value: 3000,
+        bucketId: 'b-salary',
+        assignmentSource: 'auto_regex',
+      },
+      {
+        id: 'tx-2',
         accountId: 'acc-1',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
         issuer: 'AG',
         receiver: 'Me',
-        subject: 'Gehalt',
+        subject: 'Gehalt September',
         type: 'inbound',
         iban: 'DE00',
         value: 3000,
@@ -71,7 +85,10 @@ describe('financeDB Storage Layer', () => {
 
     await financeDB.saveTransactions(transactions);
     let txs = await financeDB.getTransactions();
-    expect(txs).toHaveLength(1);
+    expect(txs).toHaveLength(2);
+    // Standardmäßig absteigend sortiert (neueste zuerst)
+    expect(txs[0].id).toBe('tx-2');
+    expect(txs[1].id).toBe('tx-1');
 
     await financeDB.clearTransactions();
     txs = await financeDB.getTransactions();

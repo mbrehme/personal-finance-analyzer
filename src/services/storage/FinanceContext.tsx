@@ -91,7 +91,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       setAccounts(loadedAccounts);
       setBuckets(loadedBuckets);
-      setTransactions(loadedTransactions);
+      setTransactions(loadedTransactions.sort((a, b) => b.valueDate.localeCompare(a.valueDate)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Finanzdaten.');
     } finally {
@@ -238,7 +238,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (toInsert.length > 0) {
       await financeDB.saveTransactions(toInsert);
-      setTransactions((prev) => [...prev, ...toInsert]);
+      setTransactions((prev) =>
+        [...prev, ...toInsert].sort((a, b) => b.valueDate.localeCompare(a.valueDate))
+      );
     }
 
     return toInsert.length;

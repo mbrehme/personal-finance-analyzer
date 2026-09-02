@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { Bucket, PeriodGranularity } from '@/types/finance';
 import { IconRenderer } from '../IconRenderer';
 import { EntityVisualFields } from '../EntityVisualFields';
+import { MoneyInput } from '../MoneyInput';
 import { X, AlertCircle, Trash2 } from 'lucide-react';
 
 export interface BucketModalProps {
@@ -245,15 +246,13 @@ export const BucketModal: React.FC<BucketModalProps> = ({
               <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                    Zielbetrag (€)
+                    Zielbetrag
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <MoneyInput
                     value={budgetAmount}
-                    onChange={(e) => setBudgetAmount(parseFloat(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={setBudgetAmount}
+                    min={0}
+                    placeholder="0.00"
                   />
                 </div>
                 <div>

@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { Account, BalanceEntry, Bucket, ISODateString } from '@/types/finance';
 import { IconRenderer } from '../IconRenderer';
 import { EntityVisualFields } from '../EntityVisualFields';
+import { MoneyInput } from '../MoneyInput';
 import { X, Plus, Trash2, Calendar } from 'lucide-react';
 import { toISODateString } from '@/utils/dateUtils';
 
@@ -217,23 +218,20 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white"
                 />
               </div>
-              <div className="col-span-3">
-                <input
-                  type="number"
-                  step="0.01"
+              <div className="col-span-4">
+                <MoneyInput
                   value={newEntryAmount}
-                  onChange={(e) => setNewEntryAmount(parseFloat(e.target.value) || 0)}
-                  placeholder="Betrag"
-                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white"
+                  onChange={setNewEntryAmount}
+                  placeholder="0.00"
                 />
               </div>
-              <div className="col-span-4">
+              <div className="col-span-3">
                 <input
                   type="text"
                   value={newEntryNote}
                   onChange={(e) => setNewEntryNote(e.target.value)}
                   placeholder="Notiz (z. B. Start)"
-                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="col-span-1 flex justify-end">

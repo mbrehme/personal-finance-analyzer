@@ -40,4 +40,41 @@ describe('BucketModal', () => {
       })
     );
   });
+
+  it('handles target budget input with MoneyInput', async () => {
+    const handleSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <BucketModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSave={handleSave}
+        existingBuckets={[]}
+      />
+    );
+
+    expect(screen.getByText('Neuen Bucket anlegen')).toBeInTheDocument();
+
+    const nameInput = screen.getByPlaceholderText('z. B. Miete, Lebensmittel, Gehalt');
+    fireEvent.change(nameInput, { target: { value: 'Urlaub' } });
+
+    const budgetCheckbox = screen.getByRole('checkbox');
+    fireEvent.click(budgetCheckbox);
+
+    const budgetInput = screen.getByDisplayValue('100');
+    fireEvent.change(budgetInput, { target: { value: '500' } });
+
+    const submitBtn = screen.getByText('Bucket anlegen');
+    fireEvent.submit(submitBtn.closest('form')!);
+
+    expect(handleSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Urlaub',
+        targetBudget: {
+          amount: 500,
+          period: 'monthly',
+        },
+      })
+    );
+  });
 });

@@ -1,0 +1,873 @@
+{
+  "version": 1,
+  "exportedAt": "2026-09-02T18:45:00.000Z",
+  "accounts": [
+    {
+      "id": "acc-giro-main",
+      "name": "Haupt-Girokonto",
+      "color": "#3b82f6",
+      "icon": "Landmark",
+      "bucketIds": [],
+      "balanceEntries": [
+        {
+          "id": "be-seed-1",
+          "date": "2026-08-01",
+          "amount": 3500,
+          "note": "Eröffnungssaldo"
+        }
+      ]
+    }
+  ],
+  "buckets": [
+    {
+      "id": "b-einnahmen",
+      "name": "Einnahmen",
+      "parentId": null,
+      "color": "#10b981",
+      "icon": "TrendingUp",
+      "order": 0
+    },
+    {
+      "id": "b-einnahmen-martin",
+      "name": "Einnahmen > Martin",
+      "parentId": "b-einnahmen",
+      "color": "#34d399",
+      "icon": "DollarSign",
+      "regexPattern": "Eingang.+Martin.+Lohn.+Gehalt",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 6728
+      },
+      "order": 0
+    },
+    {
+      "id": "b-einnahmen-denise",
+      "name": "Einnahmen > Denise",
+      "parentId": "b-einnahmen",
+      "color": "#6ee7b7",
+      "icon": "DollarSign",
+      "regexPattern": "Eingang.+Denise.+Lohn",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 3470
+      },
+      "order": 1
+    },
+    {
+      "id": "b-einnahmen-kinder",
+      "name": "Einnahmen > Kinder",
+      "parentId": "b-einnahmen",
+      "color": "#a7f3d0",
+      "icon": "Baby",
+      "regexPattern": "KG039005FK788164",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 500
+      },
+      "order": 2
+    },
+    {
+      "id": "b-kredite",
+      "name": "Kredite",
+      "parentId": null,
+      "color": "#ef4444",
+      "icon": "CreditCard",
+      "order": 1
+    },
+    {
+      "id": "b-kredite-maria",
+      "name": "Maria",
+      "parentId": "b-kredite",
+      "color": "#f87171",
+      "icon": "CreditCard",
+      "regexPattern": "Tilgung Wohnungskredit Ratenzahlung",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 840
+      },
+      "order": 0
+    },
+    {
+      "id": "b-kredite-kfw-denise",
+      "name": "KFW Denise",
+      "parentId": "b-kredite",
+      "color": "#fca5a5",
+      "icon": "Building",
+      "regexPattern": "STUDIENKREDIT",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 210.68
+      },
+      "order": 1
+    },
+    {
+      "id": "b-kredite-wohnungsdarlehen",
+      "name": "Wohnungsdarlehen",
+      "parentId": "b-kredite",
+      "color": "#fecaca",
+      "icon": "Home",
+      "regexPattern": "Rechnung Darl.-Leistung",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 3285
+      },
+      "order": 2
+    },
+    {
+      "id": "b-wohnung-haushalt",
+      "name": "Wohnung & Haushalt",
+      "parentId": null,
+      "color": "#f97316",
+      "icon": "Home",
+      "order": 2
+    },
+    {
+      "id": "b-wh-hausgeld",
+      "name": "Hausgeld",
+      "parentId": "b-wohnung-haushalt",
+      "color": "#fb923c",
+      "icon": "Building",
+      "regexPattern": "Hausgeld",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 404.41
+      },
+      "order": 0
+    },
+    {
+      "id": "b-wh-abgaben",
+      "name": "Abgaben & Steuern",
+      "parentId": "b-wohnung-haushalt",
+      "color": "#fdba74",
+      "icon": "Landmark",
+      "regexPattern": "GRUNDST",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 43.16
+      },
+      "order": 1
+    },
+    {
+      "id": "b-wh-strom",
+      "name": "Strom",
+      "parentId": "b-wohnung-haushalt",
+      "color": "#fde047",
+      "icon": "Zap",
+      "regexPattern": "Strom",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 93
+      },
+      "order": 2
+    },
+    {
+      "id": "b-wh-telefon",
+      "name": "Internet / (Mobil)Telefon",
+      "parentId": "b-wohnung-haushalt",
+      "color": "#fed7aa",
+      "icon": "Smartphone",
+      "regexPattern": "Telekom",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 236.79
+      },
+      "order": 3
+    },
+    {
+      "id": "b-wh-einrichtung",
+      "name": "Einrichtung (Leasing)",
+      "parentId": "b-wohnung-haushalt",
+      "color": "#ffedd5",
+      "icon": "Package",
+      "regexPattern": "BlueMovement|bluemovement|BSH DE",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 26
+      },
+      "order": 4
+    },
+    {
+      "id": "b-wh-rundfunk",
+      "name": "Rundfunk",
+      "parentId": "b-wohnung-haushalt",
+      "color": "#fdba74",
+      "icon": "Tv",
+      "regexPattern": "Rundfunk",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 13.77
+      },
+      "order": 5
+    },
+    {
+      "id": "b-wh-sevcan",
+      "name": "Sevcan",
+      "parentId": "b-wohnung-haushalt",
+      "color": "#fed7aa",
+      "icon": "Home",
+      "regexPattern": "Sevcan",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 225
+      },
+      "order": 6
+    },
+    {
+      "id": "b-versicherungen",
+      "name": "Versicherungen",
+      "parentId": null,
+      "color": "#3b82f6",
+      "icon": "Shield",
+      "order": 3
+    },
+    {
+      "id": "b-vers-kranken",
+      "name": "Krankenversicherung",
+      "parentId": "b-versicherungen",
+      "color": "#60a5fa",
+      "icon": "HeartPulse",
+      "regexPattern": "BKK|Bkk",
+      "order": 0
+    },
+    {
+      "id": "b-vers-rechtsschutz",
+      "name": "Rechtsschutz",
+      "parentId": "b-versicherungen",
+      "color": "#93c5fd",
+      "icon": "Shield",
+      "regexPattern": "Rechtsschutz",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 26.55
+      },
+      "order": 1
+    },
+    {
+      "id": "b-vers-hausrat",
+      "name": "Hausrat",
+      "parentId": "b-versicherungen",
+      "color": "#bfdbfe",
+      "icon": "Home",
+      "regexPattern": "Hausratvers",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 19.1
+      },
+      "order": 2
+    },
+    {
+      "id": "b-vers-zahn",
+      "name": "Zahnversicherung",
+      "parentId": "b-versicherungen",
+      "color": "#60a5fa",
+      "icon": "HeartPulse",
+      "regexPattern": "KRANKEN KK-5258-0840|DKV",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 34.52
+      },
+      "order": 3
+    },
+    {
+      "id": "b-vers-haftpflicht",
+      "name": "Haftpflicht",
+      "parentId": "b-versicherungen",
+      "color": "#93c5fd",
+      "icon": "Shield",
+      "regexPattern": "Haftpflicht|HAFTPFLICHT",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 9.68
+      },
+      "order": 4
+    },
+    {
+      "id": "b-vers-bu",
+      "name": "Berufsunfähigkeit",
+      "parentId": "b-versicherungen",
+      "color": "#3b82f6",
+      "icon": "Shield",
+      "regexPattern": "R70148266.2",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 221.3
+      },
+      "order": 5
+    },
+    {
+      "id": "b-kinder",
+      "name": "Kinder",
+      "parentId": null,
+      "color": "#ec4899",
+      "icon": "Baby",
+      "order": 4
+    },
+    {
+      "id": "b-kinder-kiga",
+      "name": "Kindergarten",
+      "parentId": "b-kinder",
+      "color": "#f472b6",
+      "icon": "GraduationCap",
+      "regexPattern": "Kindertagesstaetten|Kita",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 46
+      },
+      "order": 0
+    },
+    {
+      "id": "b-kinder-freizeit",
+      "name": "Freizeit Kinder (Sport, Musik, Tanzen, Bibliothek)",
+      "parentId": "b-kinder",
+      "color": "#f9a8d4",
+      "icon": "Music",
+      "regexPattern": "Sportverein|Musikschule|Landesbibliothek",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 17.5
+      },
+      "order": 1
+    },
+    {
+      "id": "b-kinder-sonstiges",
+      "name": "Sonstiges",
+      "parentId": "b-kinder",
+      "color": "#fbcfe8",
+      "icon": "Tag",
+      "regexPattern": "tonies",
+      "order": 2
+    },
+    {
+      "id": "b-einkaufen",
+      "name": "Einkaufen",
+      "parentId": null,
+      "color": "#10b981",
+      "icon": "ShoppingBag",
+      "order": 5
+    },
+    {
+      "id": "b-einkauf-lebensmittel",
+      "name": "Lebensmittel",
+      "parentId": "b-einkaufen",
+      "color": "#34d399",
+      "icon": "ShoppingBag",
+      "regexPattern": "ALDI|KAUFLAND|E.CENTER|STEINECKE|LPG|Supermarkt|Rewe|Edeka|Lidl",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 400
+      },
+      "order": 0
+    },
+    {
+      "id": "b-einkauf-drogerie",
+      "name": "Drogerieartikel / Schreibwaren",
+      "parentId": "b-einkaufen",
+      "color": "#6ee7b7",
+      "icon": "ShoppingBag",
+      "regexPattern": ".Drogerie.Markt|MCPAPER|Rossmann|Drogerie|DROGERIE",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 200
+      },
+      "order": 1
+    },
+    {
+      "id": "b-einkauf-medikamente",
+      "name": "Medikamente",
+      "parentId": "b-einkaufen",
+      "color": "#a7f3d0",
+      "icon": "HeartPulse",
+      "regexPattern": "Apotheke|APOTHEKE",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 100
+      },
+      "order": 2
+    },
+    {
+      "id": "b-shopping",
+      "name": "Shopping",
+      "parentId": null,
+      "color": "#8b5cf6",
+      "icon": "Tag",
+      "order": 6
+    },
+    {
+      "id": "b-shop-amazon",
+      "name": "Amazon",
+      "parentId": "b-shopping",
+      "color": "#a78bfa",
+      "icon": "Package",
+      "regexPattern": "AMAZON|AMZN",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 8.99
+      },
+      "order": 0
+    },
+    {
+      "id": "b-shop-kleidung",
+      "name": "Kleidung",
+      "parentId": "b-shopping",
+      "color": "#c4b5fd",
+      "icon": "Tag",
+      "regexPattern": "Hennes.+Mauritz|SCHUH|Outfittery|Uniqlo|Vinted|DEICHMANN",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 150
+      },
+      "order": 1
+    },
+    {
+      "id": "b-shop-sonstiges",
+      "name": "Sonstiges",
+      "parentId": "b-shopping",
+      "color": "#ddd6fe",
+      "icon": "Tag",
+      "regexPattern": "Zalando|Hornbach|Triple A Sales GmbH|Digistore24|Thalia",
+      "order": 2
+    },
+    {
+      "id": "b-freizeit-unterhaltung",
+      "name": "Freizeit & Unterhaltung",
+      "parentId": null,
+      "color": "#6366f1",
+      "icon": "Film",
+      "order": 7
+    },
+    {
+      "id": "b-fz-zattoo",
+      "name": "Entertainment: Fernsehen (Zattoo)",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#818cf8",
+      "icon": "Tv",
+      "regexPattern": "Zattoo",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 9.99
+      },
+      "order": 0
+    },
+    {
+      "id": "b-fz-googleone",
+      "name": "Entertainment: Google One (Family)",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#a5b4fc",
+      "icon": "Zap",
+      "regexPattern": "Google.One",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 8.25
+      },
+      "order": 1
+    },
+    {
+      "id": "b-fz-netflix",
+      "name": "Streaming: Netflix / RTL",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#818cf8",
+      "icon": "Film",
+      "regexPattern": "Netflix|RTL interactive GmbH",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 19.99
+      },
+      "order": 2
+    },
+    {
+      "id": "b-fz-youtube",
+      "name": "Streaming: Youtube",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#c7d2fe",
+      "icon": "Film",
+      "regexPattern": "YouTube",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 0.99
+      },
+      "order": 3
+    },
+    {
+      "id": "b-fz-spotify",
+      "name": "Streaming: Spotify (Family)",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#818cf8",
+      "icon": "Music",
+      "regexPattern": "Spotify",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 17.99
+      },
+      "order": 4
+    },
+    {
+      "id": "b-fz-audible",
+      "name": "Entertainment: Audible",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#a5b4fc",
+      "icon": "BookOpen",
+      "regexPattern": "Audible",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 9.95
+      },
+      "order": 5
+    },
+    {
+      "id": "b-fz-ondemand",
+      "name": "On-Demand (In-App-Käufe)",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#c7d2fe",
+      "icon": "Gamepad2",
+      "regexPattern": "Google.Play|Google.TV|GOOGLE...TV|Nintendo",
+      "order": 6
+    },
+    {
+      "id": "b-fz-tickets",
+      "name": "Tickets",
+      "parentId": "b-freizeit-unterhaltung",
+      "color": "#818cf8",
+      "icon": "Tag",
+      "regexPattern": "Zoologischer|BBB|Eventim|GetYourGuide|AQUAFANTASY|Theater",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 50
+      },
+      "order": 7
+    },
+    {
+      "id": "b-restaurants-bars",
+      "name": "Restaurants & Bars",
+      "parentId": null,
+      "color": "#f59e0b",
+      "icon": "Utensils",
+      "order": 8
+    },
+    {
+      "id": "b-gastro-restaurant",
+      "name": "Restaurant",
+      "parentId": "b-restaurants-bars",
+      "color": "#fbbf24",
+      "icon": "Utensils",
+      "regexPattern": "RESTAURANT|Subway|DINER|DOENER|baecker|Marche|gourmet|Burger",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 50
+      },
+      "order": 0
+    },
+    {
+      "id": "b-gastro-lieferung",
+      "name": "Lieferservice",
+      "parentId": "b-restaurants-bars",
+      "color": "#fcd34d",
+      "icon": "Package",
+      "regexPattern": "Takeaway|Lieferando",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 50
+      },
+      "order": 1
+    },
+    {
+      "id": "b-gastro-kiosk",
+      "name": "Sonstiges (z.B. Automaten / Kiosk)",
+      "parentId": "b-restaurants-bars",
+      "color": "#fde68a",
+      "icon": "Coffee",
+      "regexPattern": "kiosk|SPAETKAUF|SHELL|Top.Tank.Berlin|Spati|Aral",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 10
+      },
+      "order": 2
+    },
+    {
+      "id": "b-verkehr-mobilitaet",
+      "name": "Verkehr & Mobilität",
+      "parentId": null,
+      "color": "#0ea5e9",
+      "icon": "Car",
+      "order": 9
+    },
+    {
+      "id": "b-mob-oepnv",
+      "name": "ÖPNV",
+      "parentId": "b-verkehr-mobilitaet",
+      "color": "#38bdf8",
+      "icon": "Truck",
+      "regexPattern": "Abo 309084850|S-Bahn Berlin GmbH|DB Vertrieb GmbH",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 49
+      },
+      "order": 0
+    },
+    {
+      "id": "b-mob-taxi",
+      "name": "Taxi / Uber",
+      "parentId": "b-verkehr-mobilitaet",
+      "color": "#7dd3fc",
+      "icon": "Car",
+      "regexPattern": "UBER|Uber|TAXIBER",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 20
+      },
+      "order": 1
+    },
+    {
+      "id": "b-mob-mietwagen",
+      "name": "Mietwagen",
+      "parentId": "b-verkehr-mobilitaet",
+      "color": "#bae6fd",
+      "icon": "Car",
+      "regexPattern": "Tankstelle",
+      "order": 2
+    },
+    {
+      "id": "b-mob-sharing",
+      "name": "Sharing",
+      "parentId": "b-verkehr-mobilitaet",
+      "color": "#e0f2fe",
+      "icon": "Zap",
+      "regexPattern": "MILES|Bolt|BOLT.EU|VOI.DE",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 10
+      },
+      "order": 3
+    },
+    {
+      "id": "b-sonstiges",
+      "name": "Sonstiges",
+      "parentId": null,
+      "color": "#64748b",
+      "icon": "Folder",
+      "order": 10
+    },
+    {
+      "id": "b-sonst-bank",
+      "name": "Bank",
+      "parentId": "b-sonstiges",
+      "color": "#94a3b8",
+      "icon": "Landmark",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 9
+      },
+      "order": 0
+    },
+    {
+      "id": "b-sonst-domains",
+      "name": "Domains",
+      "parentId": "b-sonstiges",
+      "color": "#cbd5e1",
+      "icon": "Zap",
+      "regexPattern": "domain",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 3.33
+      },
+      "order": 1
+    },
+    {
+      "id": "b-sonst-kryo",
+      "name": "Kryo",
+      "parentId": "b-sonstiges",
+      "color": "#94a3b8",
+      "icon": "HeartPulse",
+      "regexPattern": "Kryo",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 41.67
+      },
+      "order": 2
+    },
+    {
+      "id": "b-sonst-github",
+      "name": "Github",
+      "parentId": "b-sonstiges",
+      "color": "#cbd5e1",
+      "icon": "Folder",
+      "regexPattern": "GitHub",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 4
+      },
+      "order": 3
+    },
+    {
+      "id": "b-sonst-openai",
+      "name": "OpenAI",
+      "parentId": "b-sonstiges",
+      "color": "#94a3b8",
+      "icon": "Sparkles",
+      "regexPattern": "OPENAI",
+      "order": 4
+    },
+    {
+      "id": "b-sonst-mcaffee",
+      "name": "McAfee",
+      "parentId": "b-sonstiges",
+      "color": "#cbd5e1",
+      "icon": "Shield",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 10.83
+      },
+      "order": 5
+    },
+    {
+      "id": "b-sonst-geschenke",
+      "name": "Geschenke",
+      "parentId": "b-sonstiges",
+      "color": "#94a3b8",
+      "icon": "Gift",
+      "order": 6
+    },
+    {
+      "id": "b-sonst-lastpass",
+      "name": "LastPass",
+      "parentId": "b-sonstiges",
+      "color": "#cbd5e1",
+      "icon": "Key",
+      "regexPattern": "LASTPASS",
+      "order": 7
+    },
+    {
+      "id": "b-sonst-unassigned",
+      "name": "Sonstiges (Nicht Zugeordnet)",
+      "parentId": "b-sonstiges",
+      "color": "#e2e8f0",
+      "icon": "Tag",
+      "order": 8
+    },
+    {
+      "id": "b-taschengelder",
+      "name": "Taschengelder",
+      "parentId": null,
+      "color": "#a855f7",
+      "icon": "Wallet",
+      "order": 11
+    },
+    {
+      "id": "b-taschengeld-martin",
+      "name": "Martin",
+      "parentId": "b-taschengelder",
+      "color": "#c084fc",
+      "icon": "Wallet",
+      "regexPattern": "Denise Gül Brehme.+Taschengeld",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 300
+      },
+      "order": 0
+    },
+    {
+      "id": "b-taschengeld-denise",
+      "name": "Denise",
+      "parentId": "b-taschengelder",
+      "color": "#d8b4fe",
+      "icon": "Wallet",
+      "regexPattern": "Martin Brehme.+Taschengeld",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 300
+      },
+      "order": 1
+    },
+    {
+      "id": "b-ruecklagen",
+      "name": "Rücklagen",
+      "parentId": null,
+      "color": "#0284c7",
+      "icon": "PiggyBank",
+      "order": 12
+    },
+    {
+      "id": "b-rueck-reaktor",
+      "name": "Reaktor Berlin Kredit",
+      "parentId": "b-ruecklagen",
+      "color": "#38bdf8",
+      "icon": "Landmark",
+      "regexPattern": "Rücklage: Reaktor Berlin",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 859.17
+      },
+      "order": 0
+    },
+    {
+      "id": "b-rueck-dez-jan",
+      "name": "Dez - Jan",
+      "parentId": "b-ruecklagen",
+      "color": "#7dd3fc",
+      "icon": "Clock",
+      "regexPattern": "Ausgang.+Geschenke",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 208.33
+      },
+      "order": 1
+    },
+    {
+      "id": "b-rueck-kinder",
+      "name": "Kinder",
+      "parentId": "b-ruecklagen",
+      "color": "#bae6fd",
+      "icon": "Baby",
+      "order": 2
+    },
+    {
+      "id": "b-rueck-wohnung",
+      "name": "Wohnung",
+      "parentId": "b-ruecklagen",
+      "color": "#e0f2fe",
+      "icon": "Home",
+      "order": 3
+    },
+    {
+      "id": "b-rueck-urlaub",
+      "name": "Urlaub",
+      "parentId": "b-ruecklagen",
+      "color": "#38bdf8",
+      "icon": "Plane",
+      "regexPattern": "Rücklage: Urlaub",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 250
+      },
+      "order": 4
+    },
+    {
+      "id": "b-rueck-gesundheit",
+      "name": "Gesundheit",
+      "parentId": "b-ruecklagen",
+      "color": "#7dd3fc",
+      "icon": "HeartPulse",
+      "order": 5
+    },
+    {
+      "id": "b-rueck-rente",
+      "name": "Rente",
+      "parentId": "b-ruecklagen",
+      "color": "#bae6fd",
+      "icon": "Clock",
+      "order": 6
+    },
+    {
+      "id": "b-rueck-buffer",
+      "name": "Aufbau Buffer",
+      "parentId": "b-ruecklagen",
+      "color": "#0284c7",
+      "icon": "PiggyBank",
+      "regexPattern": "Aufbau Buffer",
+      "targetBudget": {
+        "period": "monthly",
+        "amount": 1700
+      },
+      "order": 7
+    }
+  ]
+}

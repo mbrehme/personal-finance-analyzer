@@ -50,70 +50,13 @@ export interface FinanceContextType {
   resetWorkspace: () => Promise<void>;
 }
 
+import seedConfigurationJson from '@/data/seedConfiguration.json';
+
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-const SEED_ACCOUNTS: Account[] = [
-  {
-    id: 'acc-giro-main',
-    name: 'Haupt-Girokonto',
-    color: '#3b82f6',
-    icon: 'Landmark',
-    bucketIds: ['b-living', 'b-rent', 'b-groceries', 'b-salary', 'b-leisure'],
-    balanceEntries: [
-      {
-        id: 'be-seed-1',
-        date: '2026-08-01',
-        amount: 3500,
-        note: 'Eröffnungssaldo',
-      },
-    ],
-  },
-];
-
-const SEED_BUCKETS: Bucket[] = [
-  {
-    id: 'b-living',
-    name: 'Wohnen & Fixkosten',
-    parentId: null,
-    color: '#f59e0b',
-    icon: 'Home',
-    targetBudget: { period: 'monthly', amount: 1400 },
-  },
-  {
-    id: 'b-rent',
-    name: 'Miete & Nebenkosten',
-    parentId: 'b-living',
-    color: '#fbbf24',
-    icon: 'Key',
-    regexPattern: 'Miete|Vermieter|Hausverwaltung|Stadtwerke',
-  },
-  {
-    id: 'b-groceries',
-    name: 'Lebensmittel & Haushalt',
-    parentId: null,
-    color: '#10b981',
-    icon: 'ShoppingBag',
-    regexPattern: 'Rewe|Edeka|Aldi|Lidl|Kaufland|dm-drogerie|Rossmann',
-    targetBudget: { period: 'monthly', amount: 500 },
-  },
-  {
-    id: 'b-leisure',
-    name: 'Freizeit & Gastronomie',
-    parentId: null,
-    color: '#ec4899',
-    icon: 'Coffee',
-    regexPattern: 'Restaurant|Cafe|Kino|Spotify|Netflix|Amazon Prime',
-    targetBudget: { period: 'monthly', amount: 300 },
-  },
-  {
-    id: 'b-salary',
-    name: 'Gehalt & Einkommen',
-    parentId: null,
-    color: '#22c55e',
-    icon: 'DollarSign',
-    regexPattern: 'Gehalt|Lohn|Arbeitgeber|Bonus',
-  },
-];
+const SEED_CONFIG = seedConfigurationJson as unknown as FinanceConfigExport;
+const SEED_ACCOUNTS: Account[] = SEED_CONFIG.accounts;
+const SEED_BUCKETS: Bucket[] = SEED_CONFIG.buckets;
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -132,11 +75,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (loadedAccounts.length === 0 && loadedBuckets.length === 0) {
         // Erstmaliges Seeden
+        const seededAccounts: Account[] = [
+          {
+            ...SEED_ACCOUNTS[0],
+            bucketIds: SEED_BUCKETS.map((b) => b.id),
+          },
+        ];
         await Promise.all([
-          ...SEED_ACCOUNTS.map((a) => financeDB.saveAccount(a)),
+          ...seededAccounts.map((a) => financeDB.saveAccount(a)),
           ...SEED_BUCKETS.map((b) => financeDB.saveBucket(b)),
         ]);
-        loadedAccounts = SEED_ACCOUNTS;
+        loadedAccounts = seededAccounts;
         loadedBuckets = SEED_BUCKETS;
       }
 

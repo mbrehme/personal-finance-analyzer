@@ -21,7 +21,7 @@ describe('BucketsConfig Subpage', () => {
     expect(title).toBeInTheDocument();
     expect(screen.getByText('Neuer Bucket')).toBeInTheDocument();
 
-    const dragHandles = screen.getAllByTitle('Ziehen zum Umsortieren / Unterordnen');
+    const dragHandles = await screen.findAllByTitle('Ziehen zum Umsortieren / Unterordnen');
     expect(dragHandles.length).toBeGreaterThan(0);
   });
 });

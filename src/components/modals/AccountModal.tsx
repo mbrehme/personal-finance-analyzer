@@ -7,7 +7,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Account, BalanceEntry, Bucket, ISODateString } from '@/types/finance';
-import { AVAILABLE_ICONS, IconRenderer } from '../IconRenderer';
+import { IconRenderer } from '../IconRenderer';
+import { EntityVisualFields } from '../EntityVisualFields';
 import { X, Plus, Trash2, Calendar } from 'lucide-react';
 import { toISODateString } from '@/utils/dateUtils';
 
@@ -19,12 +20,6 @@ export interface AccountModalProps {
   existingBuckets: Bucket[];
 }
 
-const COLOR_PALETTE = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
-  '#64748b', '#14b8a6', '#6366f1', '#0ea5e9',
-];
-
 export const AccountModal: React.FC<AccountModalProps> = ({
   isOpen,
   onClose,
@@ -33,7 +28,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   existingBuckets,
 }) => {
   const [name, setName] = useState('');
-  const [color, setColor] = useState(COLOR_PALETTE[0]);
+  const [description, setDescription] = useState('');
+  const [color, setColor] = useState('#3b82f6');
   const [icon, setIcon] = useState('Landmark');
   const [bucketIds, setBucketIds] = useState<string[]>([]);
   const [balanceEntries, setBalanceEntries] = useState<BalanceEntry[]>([]);
@@ -47,13 +43,15 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   useEffect(() => {
     if (account) {
       setName(account.name);
-      setColor(account.color || COLOR_PALETTE[0]);
+      setDescription(account.description || '');
+      setColor(account.color || '#3b82f6');
       setIcon(account.icon || 'Landmark');
       setBucketIds(account.bucketIds || []);
       setBalanceEntries(account.balanceEntries || []);
     } else {
       setName('');
-      setColor(COLOR_PALETTE[0]);
+      setDescription('');
+      setColor('#3b82f6');
       setIcon('Landmark');
       setBucketIds([]);
       setBalanceEntries([]);
@@ -95,6 +93,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       const payload = {
         ...(account ? { id: account.id } : {}),
         name: name.trim(),
+        description: description.trim() || undefined,
         color,
         icon,
         bucketIds,
@@ -115,7 +114,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <IconRenderer name={icon} style={{ color }} className="w-6 h-6" />
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm"
+              style={{ backgroundColor: color || '#3b82f6' }}
+            >
+              <IconRenderer name={icon} className="w-4 h-4" />
+            </div>
             {account ? 'Konto bearbeiten' : 'Neues Konto anlegen'}
           </h3>
           <button
@@ -127,62 +131,19 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         </div>
 
         <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-          {/* Basis-Informationen */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Kontoname *
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="z. B. Girokonto ING, Tagesgeld DKB, Depot"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-          </div>
-
-          {/* Farbe & Icon */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Farbe
-              </label>
-              <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-lg bg-slate-50">
-                {COLOR_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setColor(c)}
-                    style={{ backgroundColor: c }}
-                    className={`w-6 h-6 rounded-full transition-transform ${
-                      color === c ? 'scale-125 ring-2 ring-offset-1 ring-blue-500' : 'hover:opacity-80'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Icon
-              </label>
-              <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-lg bg-slate-50 max-h-24 overflow-y-auto">
-                {AVAILABLE_ICONS.map((ic) => (
-                  <button
-                    key={ic}
-                    type="button"
-                    onClick={() => setIcon(ic)}
-                    className={`p-1.5 rounded-md transition-colors ${
-                      icon === ic ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    <IconRenderer name={ic} className="w-4 h-4" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Einheitliche EntityVisualMetadata Felder: Color, Icon, Title & Description */}
+          <EntityVisualFields
+            name={name}
+            setName={setName}
+            color={color}
+            setColor={setColor}
+            icon={icon}
+            setIcon={setIcon}
+            description={description}
+            setDescription={setDescription}
+            nameLabel="Kontoname *"
+            namePlaceholder="z. B. Girokonto ING, Tagesgeld DKB, Depot"
+          />
 
           {/* Zugeordnete Buckets */}
           <div>

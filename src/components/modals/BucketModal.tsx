@@ -7,7 +7,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bucket, PeriodGranularity } from '@/types/finance';
-import { AVAILABLE_ICONS, IconRenderer } from '../IconRenderer';
+import { IconRenderer } from '../IconRenderer';
+import { EntityVisualFields } from '../EntityVisualFields';
 import { X, AlertCircle, Trash2 } from 'lucide-react';
 
 export interface BucketModalProps {
@@ -19,12 +20,6 @@ export interface BucketModalProps {
   existingBuckets: Bucket[];
 }
 
-const COLOR_PALETTE = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
-  '#64748b', '#d97706', '#14b8a6', '#6366f1',
-];
-
 export const BucketModal: React.FC<BucketModalProps> = ({
   isOpen,
   onClose,
@@ -34,9 +29,10 @@ export const BucketModal: React.FC<BucketModalProps> = ({
   existingBuckets,
 }) => {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [parentId, setParentId] = useState<string | null>(null);
   const [regexPattern, setRegexPattern] = useState('');
-  const [color, setColor] = useState(COLOR_PALETTE[0]);
+  const [color, setColor] = useState('#3b82f6');
   const [icon, setIcon] = useState('Folder');
   const [hasBudget, setHasBudget] = useState(false);
   const [budgetAmount, setBudgetAmount] = useState<number>(100);
@@ -48,9 +44,10 @@ export const BucketModal: React.FC<BucketModalProps> = ({
   useEffect(() => {
     if (bucket) {
       setName(bucket.name);
+      setDescription(bucket.description || '');
       setParentId(bucket.parentId);
       setRegexPattern(bucket.regexPattern || '');
-      setColor(bucket.color || COLOR_PALETTE[0]);
+      setColor(bucket.color || '#3b82f6');
       setIcon(bucket.icon || 'Folder');
       if (bucket.targetBudget) {
         setHasBudget(true);
@@ -61,9 +58,10 @@ export const BucketModal: React.FC<BucketModalProps> = ({
       }
     } else {
       setName('');
+      setDescription('');
       setParentId(null);
       setRegexPattern('');
-      setColor(COLOR_PALETTE[0]);
+      setColor('#3b82f6');
       setIcon('Folder');
       setHasBudget(false);
       setBudgetAmount(100);
@@ -100,6 +98,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
       const payload = {
         ...(bucket ? { id: bucket.id, manualTransactionIds: bucket.manualTransactionIds } : {}),
         name: name.trim(),
+        description: description.trim() || undefined,
         parentId: parentId || null,
         regexPattern: isParentWithChildren ? undefined : regexPattern.trim() || undefined,
         color,
@@ -144,7 +143,12 @@ export const BucketModal: React.FC<BucketModalProps> = ({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <IconRenderer name={icon} style={{ color }} className="w-6 h-6" />
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm"
+              style={{ backgroundColor: color || '#3b82f6' }}
+            >
+              <IconRenderer name={icon} className="w-4 h-4" />
+            </div>
             {bucket ? 'Bucket bearbeiten' : 'Neuen Bucket anlegen'}
           </h3>
           <button
@@ -157,19 +161,19 @@ export const BucketModal: React.FC<BucketModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Bucket-Name *
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="z. B. Miete, Lebensmittel, Gehalt"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-          </div>
+          {/* Einheitliche EntityVisualMetadata Felder: Color, Icon, Title & Description */}
+          <EntityVisualFields
+            name={name}
+            setName={setName}
+            color={color}
+            setColor={setColor}
+            icon={icon}
+            setIcon={setIcon}
+            description={description}
+            setDescription={setDescription}
+            nameLabel="Bucket-Name *"
+            namePlaceholder="z. B. Miete, Lebensmittel, Gehalt"
+          />
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
@@ -222,48 +226,6 @@ export const BucketModal: React.FC<BucketModalProps> = ({
               Dieser Bucket besitzt untergeordnete Kinder. Regex-Regeln werden ausschließlich auf Kinder-Buckets angewendet.
             </div>
           )}
-
-          {/* Farbe & Icon */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Farbe
-              </label>
-              <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-lg bg-slate-50">
-                {COLOR_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setColor(c)}
-                    style={{ backgroundColor: c }}
-                    className={`w-6 h-6 rounded-full transition-transform ${
-                      color === c ? 'scale-125 ring-2 ring-offset-1 ring-blue-500' : 'hover:opacity-80'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Icon
-              </label>
-              <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-lg bg-slate-50 max-h-24 overflow-y-auto">
-                {AVAILABLE_ICONS.map((ic) => (
-                  <button
-                    key={ic}
-                    type="button"
-                    onClick={() => setIcon(ic)}
-                    className={`p-1.5 rounded-md transition-colors ${
-                      icon === ic ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    <IconRenderer name={ic} className="w-4 h-4" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
 
           {/* Soll-Budget */}
           <div className="pt-2 border-t border-slate-100">

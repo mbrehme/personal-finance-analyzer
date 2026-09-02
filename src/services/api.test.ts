@@ -14,7 +14,9 @@ describe('financeService', () => {
     expect(Array.isArray(transactions)).toBe(true);
     expect(transactions.length).toBeGreaterThan(0);
     expect(transactions[0]).toHaveProperty('id');
+    expect(transactions[0]).toHaveProperty('description');
     expect(transactions[0]).toHaveProperty('amount');
+    expect(transactions[0]).toHaveProperty('type');
   });
 });
 

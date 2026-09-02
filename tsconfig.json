@@ -13,6 +13,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Explicit ambient types for rich IDE hover documentation */
+    "types": [
+      "vite/client",
+      "vitest/globals",
+      "@testing-library/jest-dom/vitest"
+    ],
+
     /* Linting / Strictness */
     "strict": true,
     "noUnusedLocals": true,

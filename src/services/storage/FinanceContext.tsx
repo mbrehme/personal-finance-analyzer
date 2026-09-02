@@ -12,6 +12,7 @@ import {
   Bucket,
   FinanceConfigExport,
   Transaction,
+  sortTransactionsDesc,
 } from '@/types/finance';
 import { financeDB } from './db';
 import { matchTransaction, reMatchAllTransactions } from '../matcher/regexMatcher';
@@ -91,7 +92,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       setAccounts(loadedAccounts);
       setBuckets(loadedBuckets);
-      setTransactions(loadedTransactions.sort((a, b) => b.valueDate.localeCompare(a.valueDate)));
+      setTransactions(sortTransactionsDesc(loadedTransactions));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Finanzdaten.');
     } finally {
@@ -238,9 +239,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (toInsert.length > 0) {
       await financeDB.saveTransactions(toInsert);
-      setTransactions((prev) =>
-        [...prev, ...toInsert].sort((a, b) => b.valueDate.localeCompare(a.valueDate))
-      );
+      setTransactions((prev) => sortTransactionsDesc([...prev, ...toInsert]));
     }
 
     return toInsert.length;

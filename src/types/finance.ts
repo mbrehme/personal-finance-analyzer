@@ -137,6 +137,12 @@ export interface Transaction {
    * - 'unassigned': Noch keinem Bucket zugeordnet
    */
   assignmentSource: BucketAssignmentSource;
+  /** Dateiname der ursprünglichen CSV-Importdatei */
+  importFilename?: string;
+  /** Zeilenindex der Transaktion in der Importdatei zur Erhaltung der CSV-Reihenfolge */
+  importIndex?: number;
+  /** Import-Zeitpunkt als ISO-String */
+  importedAt?: string;
 }
 
 /**
@@ -172,6 +178,41 @@ export interface TransactionFilterOptions {
   searchTerm?: string;
   minValue?: number;
   maxValue?: number;
+}
+
+/**
+ * Sortiert eine Liste von Transaktionen deterministisch und konsistent absteigend nach Datum (neueste zuerst),
+ * wobei für Buchungen des gleichen Tages die Reihenfolge aus dem CSV-Import (importIndex) erhalten bleibt.
+ *
+ * @param {Transaction[]} txList - Die zu sortierenden Transaktionen
+ * @returns {Transaction[]} Eine neue sortierte Liste von Transaktionen
+ */
+export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
+  return [...txList].sort((a, b) => {
+    // 1. Primär: Valuta- / Wertstellungsdatum absteigend (neueste Tage zuerst)
+    const dateComp = b.valueDate.localeCompare(a.valueDate);
+    if (dateComp !== 0) return dateComp;
+
+    // 2. Sekundär: Import-Zeitpunkt (falls aus unterschiedlichen Import-Dateien)
+    if (a.importedAt && b.importedAt && a.importedAt !== b.importedAt) {
+      return b.importedAt.localeCompare(a.importedAt);
+    }
+
+    // 3. Tertiär: Zeilen-Reihenfolge innerhalb derselben CSV-Datei (importIndex)
+    if (a.importIndex !== undefined && b.importIndex !== undefined) {
+      return a.importIndex - b.importIndex;
+    }
+
+    // 4. Buchungstag falls abweichend
+    const bookComp = (b.bookingDate || b.valueDate).localeCompare(a.bookingDate || a.valueDate);
+    if (bookComp !== 0) return bookComp;
+
+    // 5. Betrag (höhere Beträge zuerst)
+    if (b.value !== a.value) return b.value - a.value;
+
+    // 6. Deterministischer Tie-Breaker: Transaktions-ID
+    return b.id.localeCompare(a.id);
+  });
 }
 
 /**

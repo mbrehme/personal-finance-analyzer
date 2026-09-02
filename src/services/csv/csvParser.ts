@@ -245,12 +245,23 @@ export function generateTransactionId(
 
 /**
  * Konvertiert die geparsten CSV-Zeilen anhand des Mappings in typisierte `Transaction`-Objekte.
+ *
+ * @param {Record<string, string>[]} rows - Geparste CSV-Zeilen
+ * @param {CsvColumnMapping} mapping - Spaltenzuordnung
+ * @param {string} accountId - Zielkonto-ID
+ * @param {string} [filename] - Optionaler Dateiname der Import-CSV
+ * @param {string} [importedAt] - Optionaler Zeitstempel des Imports
+ * @returns {Transaction[]} Typisierte Transaktionsobjekte mit importIndex
  */
 export function convertRowsToTransactions(
   rows: Record<string, string>[],
   mapping: CsvColumnMapping,
-  accountId: string
+  accountId: string,
+  filename?: string,
+  importedAt?: string
 ): Transaction[] {
+  const timestamp = importedAt || new Date().toISOString();
+
   return rows.map((row, index) => {
     const rawValDate = row[mapping.valueDateColumn] || '';
     const rawBookDate = mapping.bookingDateColumn ? row[mapping.bookingDateColumn] : rawValDate;
@@ -292,6 +303,9 @@ export function convertRowsToTransactions(
       value,
       bucketId: null,
       assignmentSource: 'unassigned',
+      importFilename: filename || undefined,
+      importIndex: index,
+      importedAt: timestamp,
     };
   });
 }

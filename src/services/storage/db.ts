@@ -5,10 +5,16 @@
  * @module services/storage/db
  */
 
-import { Account, Bucket, Transaction, FinanceConfigExport } from '@/types/finance';
+import {
+  Account,
+  Bucket,
+  Transaction,
+  FinanceConfigExport,
+  sortTransactionsDesc,
+} from '@/types/finance';
 
 const DB_NAME = 'personal_finance_analyzer_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   ACCOUNTS: 'accounts',
@@ -54,6 +60,7 @@ function openDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const upgradeTx = (event.target as IDBOpenDBRequest).transaction!;
 
       if (!db.objectStoreNames.contains(STORES.ACCOUNTS)) {
         db.createObjectStore(STORES.ACCOUNTS, { keyPath: 'id' });
@@ -63,10 +70,20 @@ function openDB(): Promise<IDBDatabase> {
         db.createObjectStore(STORES.BUCKETS, { keyPath: 'id' });
       }
 
+      let txStore: IDBObjectStore;
       if (!db.objectStoreNames.contains(STORES.TRANSACTIONS)) {
-        const txStore = db.createObjectStore(STORES.TRANSACTIONS, { keyPath: 'id' });
+        txStore = db.createObjectStore(STORES.TRANSACTIONS, { keyPath: 'id' });
+      } else {
+        txStore = upgradeTx.objectStore(STORES.TRANSACTIONS);
+      }
+
+      if (!txStore.indexNames.contains('accountId')) {
         txStore.createIndex('accountId', 'accountId', { unique: false });
+      }
+      if (!txStore.indexNames.contains('bucketId')) {
         txStore.createIndex('bucketId', 'bucketId', { unique: false });
+      }
+      if (!txStore.indexNames.contains('valueDate')) {
         txStore.createIndex('valueDate', 'valueDate', { unique: false });
       }
     };
@@ -189,37 +206,38 @@ export const financeDB = {
   /* ================== TRANSACTIONS ================== */
   /**
    * Lädt alle Transaktionen. Standardmäßig über den 'valueDate'-Index
-   * der IndexedDB absteigend sortiert ('prev' = neueste Buchungen zuerst).
+   * der IndexedDB und deterministisch absteigend nach Datum sortiert (neueste zuerst).
    *
-   * @param direction 'prev' für absteigend (neueste zuerst), 'next' für aufsteigend
    * @returns Promise mit Transaktionsliste
    */
-  async getTransactions(direction: IDBCursorDirection = 'prev'): Promise<Transaction[]> {
+  async getTransactions(): Promise<Transaction[]> {
     if (!isIndexedDBAvailable()) {
-      return Array.from(memoryStore.transactions.values()).sort((a, b) =>
-        direction === 'prev'
-          ? b.valueDate.localeCompare(a.valueDate)
-          : a.valueDate.localeCompare(b.valueDate)
-      );
+      return sortTransactionsDesc(Array.from(memoryStore.transactions.values()));
     }
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.TRANSACTIONS, 'readonly');
       const store = tx.objectStore(STORES.TRANSACTIONS);
-      const index = store.index('valueDate');
-      const results: Transaction[] = [];
-      const req = index.openCursor(null, direction);
+      let results: Transaction[] = [];
 
-      req.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-        if (cursor) {
-          results.push(cursor.value);
-          cursor.continue();
-        } else {
-          resolve(results);
-        }
-      };
-      req.onerror = () => reject(req.error);
+      if (store.indexNames.contains('valueDate')) {
+        const index = store.index('valueDate');
+        const req = index.openCursor(null, 'prev');
+        req.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+          if (cursor) {
+            results.push(cursor.value);
+            cursor.continue();
+          } else {
+            resolve(sortTransactionsDesc(results));
+          }
+        };
+        req.onerror = () => reject(req.error);
+      } else {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(sortTransactionsDesc(req.result));
+        req.onerror = () => reject(req.error);
+      }
     });
   },
 

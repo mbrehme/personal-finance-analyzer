@@ -100,7 +100,8 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
       const transactions = convertRowsToTransactions(
         parseResult.rows,
         mapping,
-        effectiveAccountId
+        effectiveAccountId,
+        fileName
       );
 
       const count = await onImport(transactions);

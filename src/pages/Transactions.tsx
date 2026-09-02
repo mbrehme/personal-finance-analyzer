@@ -11,6 +11,7 @@ import {
   TransactionType,
   ISODateString,
   buildCompoundSearchField,
+  sortTransactionsDesc,
 } from '@/types/finance';
 import { IconRenderer } from '@/components/IconRenderer';
 import { CsvImportModal } from '@/components/modals/CsvImportModal';
@@ -177,7 +178,7 @@ export const Transactions: React.FC = () => {
   const filteredTransactions = useMemo(() => {
     const { searchTerm, accountId, bucketId, type, startDate, endDate } = appliedFilters;
 
-    return transactions.filter((tx) => {
+    const matches = transactions.filter((tx) => {
       // 1. Account Filter
       if (accountId !== 'all' && tx.accountId !== accountId) {
         return false;
@@ -226,7 +227,9 @@ export const Transactions: React.FC = () => {
       }
 
       return true;
-    }).sort((a, b) => b.valueDate.localeCompare(a.valueDate));
+    });
+
+    return sortTransactionsDesc(matches);
   }, [transactions, appliedFilters]);
 
   // Reset Lazy Loading wenn angewandte Filter geändert werden

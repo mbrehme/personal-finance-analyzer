@@ -2,10 +2,11 @@
  * @file Configuration.tsx
  * @description Konfigurationsansicht zur Verwaltung von hierarchischen Buckets
  * (Regex, Budgets, Icons), Konten mit Stichtags-Salden und JSON Import/Export.
+ * Unterstützt Drag-and-Drop zur Anpassung der Reihenfolge und der Eltern-Kind-Hierarchie.
  * @module pages/Configuration
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
 import { Bucket, Account } from '@/types/finance';
 import { IconRenderer } from '@/components/IconRenderer';
@@ -24,7 +25,30 @@ import {
   Landmark,
   ShieldCheck,
   RotateCcw,
+  GripVertical,
+  CornerDownRight,
 } from 'lucide-react';
+
+/**
+ * Rekursive Ermittlung aller Nachkommen (IDs) eines Buckets zur Verhinderung von Zyklen.
+ */
+function getDescendantBucketIds(bucketId: string, allBuckets: Bucket[]): Set<string> {
+  const descendants = new Set<string>();
+  const queue = [bucketId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    const children = allBuckets.filter((b) => b.parentId === currentId);
+    for (const child of children) {
+      if (!descendants.has(child.id)) {
+        descendants.add(child.id);
+        queue.push(child.id);
+      }
+    }
+  }
+
+  return descendants;
+}
 
 export const Configuration: React.FC = () => {
   const {
@@ -33,9 +57,11 @@ export const Configuration: React.FC = () => {
     addBucket,
     updateBucket,
     deleteBucket,
+    reorderBuckets,
     addAccount,
     updateAccount,
     deleteAccount,
+    reorderAccounts,
     exportConfiguration,
     importConfiguration,
     resetWorkspace,
@@ -50,6 +76,16 @@ export const Configuration: React.FC = () => {
 
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+
+  // Bucket Drag & Drop State
+  const [draggedBucketId, setDraggedBucketId] = useState<string | null>(null);
+  const [dropTargetBucketId, setDropTargetBucketId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'inside' | 'after' | null>(null);
+  const [isOverRootDropzone, setIsOverRootDropzone] = useState(false);
+
+  // Account Drag & Drop State
+  const [draggedAccountId, setDraggedAccountId] = useState<string | null>(null);
+  const [dropTargetAccountId, setDropTargetAccountId] = useState<string | null>(null);
 
   const toggleCollapse = (bucketId: string) => {
     setCollapsedBuckets((prev) => {
@@ -93,31 +129,279 @@ export const Configuration: React.FC = () => {
     reader.readAsText(file);
   };
 
-  // Bucket Baumstruktur aufbauen
-  const childrenMap = new Map<string | null, Bucket[]>();
-  buckets.forEach((b) => {
-    const list = childrenMap.get(b.parentId) || [];
-    list.push(b);
-    childrenMap.set(b.parentId, list);
-  });
+  // Sortierte Buckets & Baumstruktur aufbauen
+  const childrenMap = useMemo(() => {
+    const map = new Map<string | null, Bucket[]>();
+    buckets.forEach((b) => {
+      const list = map.get(b.parentId) || [];
+      list.push(b);
+      map.set(b.parentId, list);
+    });
 
+    // Jede Liste nach 'order' sortieren
+    map.forEach((list) => {
+      list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    });
+
+    return map;
+  }, [buckets]);
+
+  // Nachkommen des aktuell gezogenen Buckets (zur Zyklusvermeidung)
+  const invalidDropTargets = useMemo(() => {
+    if (!draggedBucketId) return new Set<string>();
+    const invalid = getDescendantBucketIds(draggedBucketId, buckets);
+    invalid.add(draggedBucketId);
+    return invalid;
+  }, [draggedBucketId, buckets]);
+
+  /* ================== BUCKET DRAG & DROP HANDLERS ================== */
+  const handleBucketDragStart = (e: React.DragEvent, bucketId: string) => {
+    setDraggedBucketId(bucketId);
+    e.dataTransfer.setData('text/plain', bucketId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleBucketDragOver = (e: React.DragEvent, targetBucket: Bucket) => {
+    if (!draggedBucketId || invalidDropTargets.has(targetBucket.id)) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relativeY = (e.clientY - rect.top) / rect.height;
+
+    let pos: 'before' | 'inside' | 'after' = 'inside';
+    if (relativeY < 0.28) {
+      pos = 'before';
+    } else if (relativeY > 0.72) {
+      pos = 'after';
+    } else {
+      pos = 'inside';
+    }
+
+    setDropTargetBucketId(targetBucket.id);
+    setDropPosition(pos);
+  };
+
+  const handleBucketDragLeave = (e: React.DragEvent, targetBucketId: string) => {
+    if (dropTargetBucketId === targetBucketId) {
+      // Nur zurücksetzen, wenn wirklich aus dem Element herausgefahren
+      const related = e.relatedTarget as Node | null;
+      if (!e.currentTarget.contains(related)) {
+        setDropTargetBucketId(null);
+        setDropPosition(null);
+      }
+    }
+  };
+
+  const handleBucketDrop = async (e: React.DragEvent, targetBucket: Bucket) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!draggedBucketId || invalidDropTargets.has(targetBucket.id) || !dropPosition) {
+      handleBucketDragEnd();
+      return;
+    }
+
+    const dragged = buckets.find((b) => b.id === draggedBucketId);
+    if (!dragged) {
+      handleBucketDragEnd();
+      return;
+    }
+
+    let updatedBuckets: Bucket[] = [];
+
+    if (dropPosition === 'inside') {
+      // Bucket wird Kind des Ziel-Buckets
+      const siblings = (childrenMap.get(targetBucket.id) || []).filter(
+        (b) => b.id !== dragged.id
+      );
+      const newOrder = siblings.length;
+
+      updatedBuckets = buckets.map((b) => {
+        if (b.id === dragged.id) {
+          return {
+            ...b,
+            parentId: targetBucket.id,
+            order: newOrder,
+          };
+        }
+        return b;
+      });
+    } else {
+      // Bucket wird Geschwister vor/nach dem Ziel-Bucket
+      const parentId = targetBucket.parentId;
+      const currentSiblings = (childrenMap.get(parentId) || []).filter(
+        (b) => b.id !== dragged.id
+      );
+      const targetIndex = currentSiblings.findIndex((b) => b.id === targetBucket.id);
+
+      const insertIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
+      const newSiblings = [...currentSiblings];
+      newSiblings.splice(insertIndex, 0, { ...dragged, parentId });
+
+      // Neue Sortierreihenfolge zuweisen
+      const siblingOrderMap = new Map<string, number>();
+      newSiblings.forEach((b, idx) => siblingOrderMap.set(b.id, idx));
+
+      updatedBuckets = buckets.map((b) => {
+        if (siblingOrderMap.has(b.id)) {
+          return {
+            ...b,
+            parentId,
+            order: siblingOrderMap.get(b.id)!,
+          };
+        }
+        return b;
+      });
+    }
+
+    await reorderBuckets(updatedBuckets);
+    handleBucketDragEnd();
+  };
+
+  const handleRootDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!draggedBucketId) {
+      handleBucketDragEnd();
+      return;
+    }
+
+    const dragged = buckets.find((b) => b.id === draggedBucketId);
+    if (!dragged) {
+      handleBucketDragEnd();
+      return;
+    }
+
+    // Bucket auf Root-Ebene (parentId: null) ganz ans Ende setzen
+    const rootSiblings = (childrenMap.get(null) || []).filter((b) => b.id !== dragged.id);
+    const newOrder = rootSiblings.length;
+
+    const updatedBuckets = buckets.map((b) => {
+      if (b.id === dragged.id) {
+        return {
+          ...b,
+          parentId: null,
+          order: newOrder,
+        };
+      }
+      return b;
+    });
+
+    await reorderBuckets(updatedBuckets);
+    handleBucketDragEnd();
+  };
+
+  const handleBucketDragEnd = () => {
+    setDraggedBucketId(null);
+    setDropTargetBucketId(null);
+    setDropPosition(null);
+    setIsOverRootDropzone(false);
+  };
+
+  /* ================== ACCOUNT DRAG & DROP HANDLERS ================== */
+  const sortedAccounts = useMemo(() => {
+    return [...accounts].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [accounts]);
+
+  const handleAccountDragStart = (e: React.DragEvent, accountId: string) => {
+    setDraggedAccountId(accountId);
+    e.dataTransfer.setData('text/plain', accountId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleAccountDragOver = (e: React.DragEvent, targetAccountId: string) => {
+    if (!draggedAccountId || draggedAccountId === targetAccountId) return;
+    e.preventDefault();
+    setDropTargetAccountId(targetAccountId);
+  };
+
+  const handleAccountDrop = async (e: React.DragEvent, targetAccount: Account) => {
+    e.preventDefault();
+    if (!draggedAccountId || draggedAccountId === targetAccount.id) {
+      handleAccountDragEnd();
+      return;
+    }
+
+    const draggedIndex = sortedAccounts.findIndex((a) => a.id === draggedAccountId);
+    const targetIndex = sortedAccounts.findIndex((a) => a.id === targetAccount.id);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      handleAccountDragEnd();
+      return;
+    }
+
+    const reordered = [...sortedAccounts];
+    const [moved] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    const updated = reordered.map((acc, index) => ({
+      ...acc,
+      order: index,
+    }));
+
+    await reorderAccounts(updated);
+    handleAccountDragEnd();
+  };
+
+  const handleAccountDragEnd = () => {
+    setDraggedAccountId(null);
+    setDropTargetAccountId(null);
+  };
+
+  /* ================== RENDER BUCKET ROW ================== */
   const renderBucketRow = (bucket: Bucket, depth: number): React.ReactNode => {
     const children = childrenMap.get(bucket.id) || [];
     const hasChildren = children.length > 0;
     const isCollapsed = collapsedBuckets.has(bucket.id);
+    const isDraggingThis = draggedBucketId === bucket.id;
+    const isTarget = dropTargetBucketId === bucket.id;
+    const isInvalidTarget = draggedBucketId ? invalidDropTargets.has(bucket.id) : false;
+
+    // Dynamische Klassen für Drop-Zonen Indikatoren
+    let dropHighlightClass = '';
+    if (isTarget && !isInvalidTarget) {
+      if (dropPosition === 'before') {
+        dropHighlightClass = 'border-t-2 border-t-blue-600 bg-blue-50/40';
+      } else if (dropPosition === 'after') {
+        dropHighlightClass = 'border-b-2 border-b-blue-600 bg-blue-50/40';
+      } else if (dropPosition === 'inside') {
+        dropHighlightClass = 'bg-blue-100/70 ring-2 ring-blue-500 ring-inset';
+      }
+    }
 
     return (
       <React.Fragment key={bucket.id}>
         <tr
+          draggable
+          onDragStart={(e) => handleBucketDragStart(e, bucket.id)}
+          onDragOver={(e) => handleBucketDragOver(e, bucket)}
+          onDragLeave={(e) => handleBucketDragLeave(e, bucket.id)}
+          onDrop={(e) => handleBucketDrop(e, bucket)}
+          onDragEnd={handleBucketDragEnd}
           onClick={() => {
             setEditingBucket(bucket);
             setIsBucketModalOpen(true);
           }}
-          className="hover:bg-blue-50/60 cursor-pointer transition-colors border-b border-slate-100 group"
-          title="Klicken zum Bearbeiten"
+          className={`hover:bg-blue-50/60 cursor-pointer transition-all border-b border-slate-100 group ${
+            isDraggingThis ? 'opacity-40 bg-slate-100' : ''
+          } ${dropHighlightClass}`}
+          title="Klicken zum Bearbeiten &bull; Ziehen zum Umsortieren / Unterordnen"
         >
           <td className="py-3 px-4">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 24}px` }}>
+              {/* Drag Handle */}
+              <div
+                className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 p-0.5 -ml-1 rounded transition-colors"
+                onClick={(e) => e.stopPropagation()}
+                title="Ziehen zum Umsortieren / Unterordnen"
+              >
+                <GripVertical className="w-4 h-4" />
+              </div>
+
               {hasChildren ? (
                 <button
                   type="button"
@@ -151,7 +435,7 @@ export const Configuration: React.FC = () => {
                 {bucket.regexPattern}
               </span>
             ) : hasChildren ? (
-              <span className="text-slate-400 italic">Roll-Up aus Unterkategorien</span>
+              <span className="text-slate-400 italic">Roll-Up aus Unter-Buckets</span>
             ) : (
               <span className="text-slate-300">-</span>
             )}
@@ -175,7 +459,7 @@ export const Configuration: React.FC = () => {
           {/* Manuelle Overrides */}
           <td className="py-3 px-4 text-xs text-slate-600">
             {bucket.manualTransactionIds && bucket.manualTransactionIds.length > 0 ? (
-              <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+              <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full font-medium">
                 {bucket.manualTransactionIds.length} Buchung(en)
               </span>
             ) : (
@@ -202,7 +486,7 @@ export const Configuration: React.FC = () => {
             Konfiguration
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Verwalte hierarchische Buckets, Regex-Muster, Soll-Budgets und Konten.
+            Verwalte hierarchische Buckets, Regex-Muster, Soll-Budgets und Konten. Klicke auf eine Zeile zum Bearbeiten oder nutze Drag & Drop zum Sortieren & Unterordnen.
           </p>
         </div>
 
@@ -254,7 +538,7 @@ export const Configuration: React.FC = () => {
           }`}
         >
           <Layers className="w-4 h-4" />
-          Buckets & Kategorien ({buckets.length})
+          Buckets ({buckets.length})
         </button>
 
         <button
@@ -273,11 +557,16 @@ export const Configuration: React.FC = () => {
 
       {/* TAB 1: BUCKETS */}
       {activeTab === 'buckets' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden space-y-2">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-              Kategorien-Baumtabelle
-            </h2>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                Bucket-Baumtabelle
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Ziehe Zeilen per Drag & Drop oben/unten zum Sortieren oder in die Mitte, um sie unterzuordnen.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -314,6 +603,26 @@ export const Configuration: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Root Level Dropzone (um Kind-Buckets wieder zu Top-Level zu machen) */}
+          {draggedBucketId && (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsOverRootDropzone(true);
+              }}
+              onDragLeave={() => setIsOverRootDropzone(false)}
+              onDrop={handleRootDrop}
+              className={`m-4 p-4 rounded-xl border-2 border-dashed text-center transition-all flex items-center justify-center gap-2 text-xs font-semibold ${
+                isOverRootDropzone
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 scale-[1.01]'
+                  : 'border-slate-300 bg-slate-50/60 text-slate-500'
+              }`}
+            >
+              <CornerDownRight className="w-4 h-4" />
+              Hier ablegen, um Bucket auf die oberste Ebene (Top-Level) zu verschieben
+            </div>
+          )}
         </div>
       )}
 
@@ -321,9 +630,14 @@ export const Configuration: React.FC = () => {
       {activeTab === 'accounts' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-              Verwaltete Konten ({accounts.length})
-            </h2>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                Verwaltete Konten ({accounts.length})
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Ziehe Konten-Karten per Drag & Drop, um deren Reihenfolge anzupassen.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -337,99 +651,135 @@ export const Configuration: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {accounts.map((acc) => (
-              <div
-                key={acc.id}
-                className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-slate-300 transition-all space-y-4"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm"
-                      style={{ backgroundColor: acc.color || '#3b82f6' }}
-                    >
-                      <IconRenderer name={acc.icon} className="w-5 h-5" />
+          <div className="flex flex-col gap-3">
+            {sortedAccounts.map((acc) => {
+              const isDraggingThis = draggedAccountId === acc.id;
+              const isTarget = dropTargetAccountId === acc.id;
+
+              return (
+                <div
+                  key={acc.id}
+                  draggable
+                  onDragStart={(e) => handleAccountDragStart(e, acc.id)}
+                  onDragOver={(e) => handleAccountDragOver(e, acc.id)}
+                  onDragLeave={() => {
+                    if (dropTargetAccountId === acc.id) setDropTargetAccountId(null);
+                  }}
+                  onDrop={(e) => handleAccountDrop(e, acc)}
+                  onDragEnd={handleAccountDragEnd}
+                  onClick={() => {
+                    setEditingAccount(acc);
+                    setIsAccountModalOpen(true);
+                  }}
+                  className={`bg-white p-4 sm:p-5 rounded-2xl shadow-sm border transition-all cursor-pointer group ${
+                    isDraggingThis ? 'opacity-40 scale-[0.99] border-slate-200' : 'hover:border-blue-400 hover:shadow-md'
+                  } ${
+                    isTarget ? 'border-t-4 border-t-blue-600 bg-blue-50/40 border-slate-200' : 'border-slate-200'
+                  }`}
+                  title="Klicken zum Bearbeiten &bull; Ziehen zum Umsortieren"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {/* Linker Bereich: Drag Handle + Icon + Name + IBAN */}
+                    <div className="flex items-center gap-3 min-w-[240px]">
+                      <div
+                        className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 p-1 rounded transition-colors -ml-1"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Ziehen zum Umsortieren"
+                      >
+                        <GripVertical className="w-5 h-5" />
+                      </div>
+
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform"
+                        style={{ backgroundColor: acc.color || '#3b82f6' }}
+                      >
+                        <IconRenderer name={acc.icon} className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {acc.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-mono">
+                          {acc.iban || 'Keine IBAN angegeben'} ({acc.currency})
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900">{acc.name}</h3>
-                      <p className="text-xs text-slate-500 font-mono">
-                        {acc.iban || 'Keine IBAN angegeben'} ({acc.currency})
-                      </p>
+
+                    {/* Mittlerer Bereich: Verknüpfte Buckets */}
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Zugeordnete Buckets ({acc.bucketIds.length})
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                        {acc.bucketIds.length > 0 ? (
+                          acc.bucketIds.map((bId) => {
+                            const b = buckets.find((item) => item.id === bId);
+                            if (!b) return null;
+                            return (
+                              <span
+                                key={b.id}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                              >
+                                <IconRenderer name={b.icon} style={{ color: b.color }} className="w-3 h-3" />
+                                {b.name}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Alle Buckets zugelassen</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Rechter Bereich: Saldo & Aktionen */}
+                    <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 min-w-[220px]">
+                      <div className="text-left sm:text-right">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center sm:justify-end gap-1 mb-0.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          {acc.balanceEntries.length} Salden
+                        </div>
+                        <div className="font-mono font-bold text-slate-900 text-sm">
+                          {acc.balanceEntries.length > 0
+                            ? acc.balanceEntries[acc.balanceEntries.length - 1].amount.toLocaleString('de-DE', {
+                                style: 'currency',
+                                currency: acc.currency,
+                              })
+                            : '0,00 €'}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingAccount(acc);
+                            setIsAccountModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Bearbeiten"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Konto "${acc.name}" wirklich löschen?`)) {
+                              deleteAccount(acc.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Löschen"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingAccount(acc);
-                        setIsAccountModalOpen(true);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                      title="Bearbeiten"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Konto "${acc.name}" wirklich löschen?`)) {
-                          deleteAccount(acc.id);
-                        }
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                      title="Löschen"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
-
-                {/* Verknüpfte Buckets */}
-                <div>
-                  <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Zugeordnete Buckets ({acc.bucketIds.length})
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    {acc.bucketIds.length > 0 ? (
-                      acc.bucketIds.map((bId) => {
-                        const b = buckets.find((item) => item.id === bId);
-                        if (!b) return null;
-                        return (
-                          <span
-                            key={b.id}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
-                          >
-                            <IconRenderer name={b.icon} style={{ color: b.color }} className="w-3 h-3" />
-                            {b.name}
-                          </span>
-                        );
-                      })
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">Alle Buckets zugelassen</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Stichtags-Salden Übersicht */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 flex items-center gap-1">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    {acc.balanceEntries.length} Stichtags-Saldo/Salden hinterlegt
-                  </span>
-                  {acc.balanceEntries.length > 0 && (
-                    <span className="font-bold text-slate-800">
-                      Letzter Stand:{' '}
-                      {acc.balanceEntries[acc.balanceEntries.length - 1].amount.toLocaleString('de-DE', {
-                        style: 'currency',
-                        currency: acc.currency,
-                      })}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

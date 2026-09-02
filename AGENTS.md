@@ -14,6 +14,7 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 
 ### 2. Implementierungsphase
 * **Tech-Stack:** React 18, TypeScript (strikter Modus), Vite, Tailwind CSS.
+* **Terminologie:** Verwende **ausschließlich den Begriff "Bucket" bzw. "Buckets"** (niemals "Kategorie" oder "Kategorien").
 * **Path-Alias:** Verwende für alle relativen Modulimporte den konfigurierten Alias `@/*` (z. B. `import { Button } from '@/components/Button'`).
 * **Struktur:**
   - `src/components/`: Wiederverwendbare UI-Komponenten.
@@ -28,7 +29,8 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 * Geteilte Matcher und Mocks liegen in `src/test/setup.ts`.
 
 ### 4. Commits & Releasing
-* **Conventional Commits Pflicht:** Alle Commits müssen dem Conventional Commits Schema folgen (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc.).
+* **Kein automatisches Staging & keine automatischen Commits (Wichtig):** Agenten dürfen **weder eigenständig stagen (`git add`) noch committen (`git commit`)**. Sämtliche Änderungen verbleiben vollständig ungestaged direkt im Arbeitsverzeichnis (Working Tree), damit der Entwickler alle Diffs und Änderungen im Detail nachvollziehen, selbst auswählen und committen kann.
+* **Conventional Commits Pflicht:** Falls ein Commit explizit vom Entwickler angefordert wird, müssen alle Commits strikt dem Conventional Commits Schema folgen (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc.).
 * Git-Hooks (`husky`) prüfen Commit-Nachrichten automatisch über `commitlint`.
 * Releases werden mit `pnpm release` (SemVer + Changelog-Generierung) verwaltet.
 

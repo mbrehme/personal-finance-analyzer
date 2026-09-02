@@ -8,8 +8,8 @@
 ---
 
 ## 1. Kontext & Problemstellung
-Der Personal Finance Analyzer soll private Banktransaktionen, Konten und Kategorien (Buckets) verwalten und analysieren.
-Als Kernanforderung gilt: Sämtliche Finanzdaten verbleiben zu 100% lokal im Browser des Nutzers (Local-First), ohne dass Daten an externe Server übertragen werden. Zudem müssen Buchungen flexibel und fehlertolerant per Regex und Freitext kategorisierbar sein, manuelle Eingriffe persistent geschützt werden und Kontostände exakt über historische Stichtage rekonstruierbar sein.
+Der Personal Finance Analyzer soll private Banktransaktionen, Konten und Buckets verwalten und analysieren.
+Als Kernanforderung gilt: Sämtliche Finanzdaten verbleiben zu 100% lokal im Browser des Nutzers (Local-First), ohne dass Daten an externe Server übertragen werden. Zudem müssen Buchungen flexibel und fehlertolerant per Regex und Freitext Buckets zugeordnet werden können, manuelle Eingriffe persistent geschützt werden und Kontostände exakt über historische Stichtage rekonstruierbar sein.
 
 ## 2. Betrachtete Optionen / Alternativen
 * **Option A: Reine In-Memory/LocalStorage-Lösung**

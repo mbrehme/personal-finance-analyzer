@@ -51,11 +51,13 @@ export interface EntityVisualMetadata {
   icon?: string;
   /** Optionale Beschreibung / Notiz */
   description?: string;
+  /** Optionale Sortierreihenfolge / Position in Listen & Bäumen */
+  order?: number;
 }
 
 /**
- * Hierarchischer Bucket zur Kategorisierung und Clusterung von Transaktionen.
- * Besitzt keinen festen Typ (Ausgabe/Einnahme) – dies ergibt sich aus den zugeordneten Transaktionen.
+ * Hierarchischer Bucket zur Strukturierung und Zuordnung von Transaktionen.
+ * Buckets besitzen keinen festen Typ (income/expense/transfer) – dies ergibt sich aus den zugeordneten Transaktionen.
  */
 export interface Bucket extends EntityVisualMetadata {
   /** Eindeutige ID des Buckets */

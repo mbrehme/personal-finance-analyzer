@@ -38,7 +38,7 @@ export const Home: React.FC = () => {
           </h1>
 
           <p className="text-lg text-slate-600 sm:text-xl leading-relaxed">
-            Importiere Bankumsätze, erstelle intelligente Regex-Kategorien mit Soll-Budgets
+            Importiere Bankumsätze, erstelle intelligente Regex-Buckets mit Soll-Budgets
             und verfolge deine Cashflows und Kontostände in Echtzeit – vollständig lokal.
           </p>
 

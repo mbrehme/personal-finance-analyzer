@@ -23,17 +23,19 @@ export interface FinanceContextType {
   loading: boolean;
   error: string | null;
 
-  // Account Operations
-  addAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
-  updateAccount: (account: Account) => Promise<void>;
-  deleteAccount: (accountId: string) => Promise<void>;
-  addBalanceEntry: (accountId: string, entry: Omit<BalanceEntry, 'id'>) => Promise<void>;
-  deleteBalanceEntry: (accountId: string, entryId: string) => Promise<void>;
-
   // Bucket Operations
   addBucket: (bucket: Omit<Bucket, 'id'>) => Promise<Bucket>;
   updateBucket: (bucket: Bucket) => Promise<void>;
   deleteBucket: (bucketId: string) => Promise<void>;
+  reorderBuckets: (updatedBuckets: Bucket[]) => Promise<void>;
+
+  // Account Operations
+  addAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
+  updateAccount: (account: Account) => Promise<void>;
+  deleteAccount: (accountId: string) => Promise<void>;
+  reorderAccounts: (updatedAccounts: Account[]) => Promise<void>;
+  addBalanceEntry: (accountId: string, entry: Omit<BalanceEntry, 'id'>) => Promise<void>;
+  deleteBalanceEntry: (accountId: string, entryId: string) => Promise<void>;
 
   // Transaction Operations
   importTransactions: (newTransactions: Transaction[]) => Promise<number>;
@@ -176,6 +178,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAccounts((prev) => prev.filter((a) => a.id !== accountId));
   };
 
+  const reorderAccounts = async (updatedAccounts: Account[]): Promise<void> => {
+    await financeDB.saveAccounts(updatedAccounts);
+    setAccounts(updatedAccounts);
+  };
+
   const addBalanceEntry = async (
     accountId: string,
     entryData: Omit<BalanceEntry, 'id'>
@@ -235,6 +242,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBuckets(updatedBuckets);
 
     // Re-Matching
+    const updatedTxs = reMatchAllTransactions(transactions, updatedBuckets);
+    await financeDB.saveTransactions(updatedTxs);
+    setTransactions(updatedTxs);
+  };
+
+  const reorderBuckets = async (updatedBuckets: Bucket[]): Promise<void> => {
+    await financeDB.saveBuckets(updatedBuckets);
+    setBuckets(updatedBuckets);
+
+    // Re-matching falls sich Hierarchien geändert haben
     const updatedTxs = reMatchAllTransactions(transactions, updatedBuckets);
     await financeDB.saveTransactions(updatedTxs);
     setTransactions(updatedTxs);
@@ -384,11 +401,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addAccount,
         updateAccount,
         deleteAccount,
+        reorderAccounts,
         addBalanceEntry,
         deleteBalanceEntry,
         addBucket,
         updateBucket,
         deleteBucket,
+        reorderBuckets,
         importTransactions,
         assignTransactionBucket,
         deleteTransaction,

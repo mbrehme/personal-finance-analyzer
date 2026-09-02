@@ -124,6 +124,21 @@ export const financeDB = {
     await performStoreOperation(STORES.ACCOUNTS, 'readwrite', (store) => store.put(account));
   },
 
+  async saveAccounts(accounts: Account[]): Promise<void> {
+    if (!isIndexedDBAvailable()) {
+      accounts.forEach((a) => memoryStore.accounts.set(a.id, a));
+      return;
+    }
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORES.ACCOUNTS, 'readwrite');
+      const store = tx.objectStore(STORES.ACCOUNTS);
+      accounts.forEach((a) => store.put(a));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
   async deleteAccount(accountId: string): Promise<void> {
     if (!isIndexedDBAvailable()) {
       memoryStore.accounts.delete(accountId);

@@ -91,4 +91,35 @@ describe('FinanceContext', () => {
     const updatedBucket = result.current.buckets.find((b) => b.id === targetBucket.id);
     expect(updatedBucket?.manualTransactionIds).toContain('tx-test-assign');
   });
+
+  it('reorders buckets and accounts successfully', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Reorder Buckets
+    const initialBuckets = [...result.current.buckets];
+    const reversedBuckets = initialBuckets.map((b, idx) => ({
+      ...b,
+      order: initialBuckets.length - idx,
+    }));
+
+    await act(async () => {
+      await result.current.reorderBuckets(reversedBuckets);
+    });
+
+    expect(result.current.buckets[0].order).toBe(initialBuckets.length);
+
+    // Reorder Accounts
+    const initialAccounts = [...result.current.accounts];
+    const reorderedAccounts = initialAccounts.map((a, idx) => ({
+      ...a,
+      order: idx + 5,
+    }));
+
+    await act(async () => {
+      await result.current.reorderAccounts(reorderedAccounts);
+    });
+
+    expect(result.current.accounts[0].order).toBe(5);
+  });
 });

@@ -254,7 +254,7 @@ export const Cashflow: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                <th className="py-3.5 px-4 min-w-[220px]">Kategorie / Bucket</th>
+                <th className="py-3.5 px-4 min-w-[220px]">Bucket</th>
                 <th className="py-3.5 px-3 text-right">Soll / Periode</th>
                 {matrix.periodKeys.map((pKey) => (
                   <th key={pKey} className="py-3.5 px-4 text-right min-w-[120px]">

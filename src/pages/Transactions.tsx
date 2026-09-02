@@ -221,8 +221,10 @@ export const Transactions: React.FC = () => {
               onChange={(e) => setSelectedBucketId(e.target.value)}
               className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="all">Alle Buckets</option>
-              <option value="uncategorized">Ohne Bucket (Unkategorisiert)</option>
+              <option value="all">Alle Zuweisungen</option>
+              <option value="assigned">Zugewiesen</option>
+              <option value="uncategorized">Ohne Bucket (Unzugewiesen)</option>
+              <option value="manual">Manuell überschrieben</option>
               {buckets.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}

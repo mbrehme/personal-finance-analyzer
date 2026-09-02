@@ -18,7 +18,21 @@ describe('Configuration Page', () => {
     );
 
     expect(await screen.findByText('Konfiguration')).toBeInTheDocument();
-    expect(screen.getByText(/Buckets & Kategorien/i)).toBeInTheDocument();
+    expect(screen.getByText(/Buckets \(\d+\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Konten & Salden/i)).toBeInTheDocument();
+  });
+
+  it('renders draggable bucket rows with drag handles', async () => {
+    render(
+      <FinanceProvider>
+        <Configuration />
+      </FinanceProvider>
+    );
+
+    const bucketTitle = await screen.findByText('Bucket-Baumtabelle');
+    expect(bucketTitle).toBeInTheDocument();
+
+    const dragHandles = screen.getAllByTitle('Ziehen zum Umsortieren / Unterordnen');
+    expect(dragHandles.length).toBeGreaterThan(0);
   });
 });

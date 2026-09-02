@@ -112,7 +112,8 @@ export function calculateAllBalances(
 ): BalanceAnalysisResult {
   const periodKeys = extractPeriodKeys(transactions, granularity);
 
-  const rows: AccountBalanceRow[] = accounts.map((acc) =>
+  const sortedAccounts = [...accounts].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const rows: AccountBalanceRow[] = sortedAccounts.map((acc) =>
     calculateBalanceTimeline(acc, transactions, periodKeys, granularity)
   );
 

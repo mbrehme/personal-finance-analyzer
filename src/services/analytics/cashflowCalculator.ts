@@ -115,6 +115,11 @@ export function calculateCashflowMatrix(
     childrenMap.set(b.parentId, list);
   });
 
+  // Nach 'order' sortieren
+  childrenMap.forEach((list) => {
+    list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  });
+
   const getSubtreeBucketIds = (bucketId: string): string[] => {
     const ids = [bucketId];
     const children = childrenMap.get(bucketId) || [];

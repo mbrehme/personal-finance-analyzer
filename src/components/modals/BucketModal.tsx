@@ -193,7 +193,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
           {!isParentWithChildren ? (
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Automatisches Regex-Muster
+                Regex
               </label>
               <input
                 type="text"

@@ -57,7 +57,7 @@ export const MoneyInput: React.FC<MoneyInputProps> = ({
         value={value === 0 ? '' : value}
         onChange={handleChange}
         placeholder={placeholder}
-        className="w-full pl-8 pr-3 py-1.5 font-mono text-sm font-semibold text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all placeholder:text-slate-300 placeholder:font-normal [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        className="w-full h-10 pl-8 pr-3 font-mono text-sm font-semibold text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all placeholder:text-slate-300 placeholder:font-normal [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
     </div>
   );

@@ -183,7 +183,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
             <select
               value={parentId || ''}
               onChange={(e) => setParentId(e.target.value || null)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+              className="w-full h-10 px-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white shadow-sm"
             >
               <option value="">Keiner (Top-Level Bucket)</option>
               {availableParents.map((p) => (
@@ -205,7 +205,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
                 value={regexPattern}
                 onChange={(e) => handleRegexChange(e.target.value)}
                 placeholder="z. B. Rewe|Edeka|Aldi|Lidl"
-                className={`w-full px-3 py-2 font-mono text-xs border rounded-lg focus:outline-none focus:ring-2 ${
+                className={`w-full h-10 px-3.5 font-mono text-sm border rounded-xl focus:outline-none focus:ring-2 shadow-sm ${
                   regexError
                     ? 'border-red-500 focus:ring-red-400'
                     : 'border-slate-300 focus:ring-blue-500'
@@ -223,7 +223,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
               )}
             </div>
           ) : (
-            <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-800 border border-amber-200">
+            <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-800 border border-amber-200">
               Dieser Bucket besitzt untergeordnete Kinder. Regex-Regeln werden ausschließlich auf Kinder-Buckets angewendet.
             </div>
           )}
@@ -243,7 +243,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
             </div>
 
             {hasBudget && (
-              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                     Zielbetrag
@@ -262,7 +262,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
                   <select
                     value={budgetPeriod}
                     onChange={(e) => setBudgetPeriod(e.target.value as PeriodGranularity)}
-                    className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-10 px-3.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                   >
                     <option value="monthly">Monatlich</option>
                     <option value="quarterly">Quartal</option>

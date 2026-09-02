@@ -243,7 +243,7 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Optionale Notiz, Zweck oder Details..."
-            className="w-full h-9 px-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-slate-700 shadow-sm placeholder:text-slate-400"
+            className="w-full h-10 px-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 shadow-sm placeholder:text-slate-400"
           />
         </div>
       )}

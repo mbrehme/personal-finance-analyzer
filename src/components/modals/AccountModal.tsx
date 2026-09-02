@@ -209,13 +209,13 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             )}
 
             {/* Saldo-Hinzufügen Zeile */}
-            <div className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            <div className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
               <div className="col-span-4">
                 <input
                   type="date"
                   value={newEntryDate}
                   onChange={(e) => setNewEntryDate(e.target.value as ISODateString)}
-                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white"
+                  className="w-full h-10 px-3 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-sans"
                 />
               </div>
               <div className="col-span-4">
@@ -231,16 +231,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   value={newEntryNote}
                   onChange={(e) => setNewEntryNote(e.target.value)}
                   placeholder="Notiz (z. B. Start)"
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-10 px-3.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm placeholder:text-slate-400"
                 />
               </div>
               <div className="col-span-1 flex justify-end">
                 <button
                   type="button"
                   onClick={handleAddBalanceEntry}
-                  className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                  className="w-10 h-10 flex items-center justify-center text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shadow-sm"
+                  title="Saldo-Eintrag hinzufügen"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 </button>
               </div>
             </div>

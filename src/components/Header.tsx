@@ -1,8 +1,22 @@
+/**
+ * @file Header.tsx
+ * @description Hauptnavigation der Anwendung mit Brand, Routen-Links und Umgebungs-Badge.
+ * @module components/Header
+ */
+
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Wallet, LayoutDashboard, Home } from 'lucide-react';
 
+/**
+ * Header-Komponente der Anwendung.
+ * Zeigt die Navigation und bei Non-Production-Deployments (Stage, PR Preview) ein optisches Badge an.
+ *
+ * @returns {JSX.Element} Die gerenderte Header-Leiste
+ */
 export const Header: React.FC = () => {
+  const env = import.meta.env.VITE_APP_ENV;
+
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
       isActive
@@ -17,11 +31,25 @@ export const Header: React.FC = () => {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
             <Wallet className="h-5 w-5" />
           </div>
-          <div>
+          <div className="flex items-center gap-2">
             <span className="text-base font-bold text-slate-900">FinanceFlow</span>
-            <span className="ml-2 hidden rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 sm:inline">
+            <span className="hidden rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 sm:inline">
               Analyzer
             </span>
+            {env && env !== 'production' && (
+              <span
+                data-testid="env-badge"
+                className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${
+                  env === 'stage'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : env === 'preview'
+                    ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                    : 'bg-blue-100 text-blue-800 border border-blue-300'
+                }`}
+              >
+                {env === 'preview' ? 'PR Preview' : env}
+              </span>
+            )}
           </div>
         </div>
 

@@ -1,0 +1,68 @@
+# ==============================================================================
+# Netlify Configuration - Personal Finance Analyzer
+# ==============================================================================
+
+[build]
+  command = "pnpm build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9"
+
+# SPA-Routing: Alle Routen an /index.html weiterleiten (HTTP 200),
+# damit React Router das Client-Side-Routing übernehmen kann.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Security- und Best-Practice Header
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Cache-Control für versionierte Build-Assets (Vite hashed files)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Cache-Control für HTML (immer frisch validieren)
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# ==============================================================================
+# Deploy Contexts (Environments)
+# ==============================================================================
+
+# 1. Production Context (Branch: main)
+[context.production]
+  command = "pnpm build"
+  [context.production.environment]
+    VITE_APP_ENV = "production"
+
+# 2. Stage Context (Branch: stage)
+[context.stage]
+  command = "pnpm build"
+  [context.stage.environment]
+    VITE_APP_ENV = "stage"
+
+# 3. Pull Request Previews (Jeder PR erhält eine eigene Deploy Preview URL)
+[context.deploy-preview]
+  command = "pnpm build"
+  [context.deploy-preview.environment]
+    VITE_APP_ENV = "preview"
+
+# 4. Feature Branch Deploys
+[context.branch-deploy]
+  command = "pnpm build"
+  [context.branch-deploy.environment]
+    VITE_APP_ENV = "branch"
+

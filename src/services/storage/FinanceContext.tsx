@@ -23,6 +23,9 @@ export interface FinanceContextType {
   transactions: Transaction[];
   loading: boolean;
   error: string | null;
+  needsReMatch: boolean;
+  reMatching: boolean;
+  setNeedsReMatch: (val: boolean) => void;
 
   // Bucket Operations
   addBucket: (bucket: Omit<Bucket, 'id'>) => Promise<Bucket>;
@@ -64,6 +67,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [needsReMatch, setNeedsReMatch] = useState(false);
+  const [reMatching, setReMatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Initiales Laden aus IndexedDB / Seeden bei erstem Start
@@ -176,11 +181,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await financeDB.saveBucket(newBucket);
     const updatedBuckets = [...buckets, newBucket];
     setBuckets(updatedBuckets);
-
-    // Re-matching für alle nicht manuellen Transaktionen
-    const updatedTxs = reMatchAllTransactions(transactions, updatedBuckets);
-    await financeDB.saveTransactions(updatedTxs);
-    setTransactions(updatedTxs);
+    setNeedsReMatch(true);
 
     return newBucket;
   };
@@ -189,21 +190,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await financeDB.saveBucket(updated);
     const updatedBuckets = buckets.map((b) => (b.id === updated.id ? updated : b));
     setBuckets(updatedBuckets);
-
-    // Re-Matching
-    const updatedTxs = reMatchAllTransactions(transactions, updatedBuckets);
-    await financeDB.saveTransactions(updatedTxs);
-    setTransactions(updatedTxs);
+    setNeedsReMatch(true);
   };
 
   const reorderBuckets = async (updatedBuckets: Bucket[]): Promise<void> => {
     await financeDB.saveBuckets(updatedBuckets);
     setBuckets(updatedBuckets);
-
-    // Re-matching falls sich Hierarchien geändert haben
-    const updatedTxs = reMatchAllTransactions(transactions, updatedBuckets);
-    await financeDB.saveTransactions(updatedTxs);
-    setTransactions(updatedTxs);
+    setNeedsReMatch(true);
   };
 
   const deleteBucket = async (bucketId: string): Promise<void> => {
@@ -218,7 +211,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         : t
     );
     await financeDB.saveTransactions(updatedTxs);
-    setTransactions(updatedTxs);
+    setTransactions(sortTransactionsDesc(updatedTxs));
+    setNeedsReMatch(true);
   };
 
   /* ================== TRANSACTIONS ================== */
@@ -292,7 +286,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
 
     await financeDB.saveTransactions(updatedTxs);
-    setTransactions(updatedTxs);
+    setTransactions(sortTransactionsDesc(updatedTxs));
   };
 
   const deleteTransaction = async (transactionId: string): Promise<void> => {
@@ -306,9 +300,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const triggerReMatch = async (): Promise<void> => {
-    const updatedTxs = reMatchAllTransactions(transactions, buckets);
-    await financeDB.saveTransactions(updatedTxs);
-    setTransactions(updatedTxs);
+    try {
+      setReMatching(true);
+      const updatedTxs = reMatchAllTransactions(transactions, buckets);
+      await financeDB.saveTransactions(updatedTxs);
+      setTransactions(sortTransactionsDesc(updatedTxs));
+      setNeedsReMatch(false);
+    } finally {
+      setReMatching(false);
+    }
   };
 
   /* ================== EXPORT & IMPORT ================== */
@@ -327,11 +327,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await financeDB.importConfiguration(parsed);
     setAccounts(parsed.accounts);
     setBuckets(parsed.buckets);
-
-    // Transaktionen gegen neu importierte Konfiguration matchen
-    const updatedTxs = reMatchAllTransactions(transactions, parsed.buckets);
-    await financeDB.saveTransactions(updatedTxs);
-    setTransactions(updatedTxs);
+    setNeedsReMatch(true);
   };
 
   const resetWorkspace = async (): Promise<void> => {
@@ -347,6 +343,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         transactions,
         loading,
         error,
+        needsReMatch,
+        reMatching,
+        setNeedsReMatch,
         addAccount,
         updateAccount,
         deleteAccount,

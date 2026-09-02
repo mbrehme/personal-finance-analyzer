@@ -21,7 +21,6 @@ import {
   Search,
   Filter,
   UploadCloud,
-  Sparkles,
   Trash2,
   Lock,
   Bot,
@@ -98,7 +97,7 @@ export const Transactions: React.FC = () => {
     assignTransactionBucket,
     deleteTransaction,
     clearTransactions,
-    triggerReMatch,
+    reMatching,
   } = useFinance();
 
   // Entwurfs-Filter State (Eingaben)
@@ -132,7 +131,6 @@ export const Transactions: React.FC = () => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [reMatching, setReMatching] = useState(false);
 
   // Schnelle Lookups per Map
   const accountsMap = useMemo(() => {
@@ -272,15 +270,6 @@ export const Transactions: React.FC = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  const handleReMatch = async () => {
-    try {
-      setReMatching(true);
-      await triggerReMatch();
-    } finally {
-      setReMatching(false);
-    }
-  };
-
   // Manuelles Anwenden der Filter
   const handleApplyFilters = () => {
     setAppliedFilters({
@@ -381,17 +370,6 @@ export const Transactions: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleReMatch}
-            disabled={reMatching || transactions.length === 0}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 rounded-lg transition-colors border border-slate-200"
-            title="Regex-Regeln neu auf alle automatischen Transaktionen anwenden"
-          >
-            <Sparkles className={`w-4 h-4 text-amber-500 ${reMatching ? 'animate-spin' : ''}`} />
-            {reMatching ? 'Matche...' : 'Neu matchen'}
-          </button>
-
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}

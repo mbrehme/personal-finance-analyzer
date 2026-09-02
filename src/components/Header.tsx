@@ -7,15 +7,20 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useFinance } from '@/services/storage/FinanceContext';
 import {
   Wallet,
   Layers,
   Receipt,
   TrendingUp,
   Shield,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
+  const { needsReMatch, reMatching, triggerReMatch, transactions } = useFinance();
+
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
       isActive
@@ -31,10 +36,11 @@ export const Header: React.FC = () => {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
             <Wallet className="h-5 w-5" />
           </div>
-          <div>
+          <div className="flex items-center gap-2">
             <span className="text-base font-bold text-slate-900">Finance Analyzer</span>
-            <span className="ml-2 hidden rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 sm:inline">
-              Local-First
+            <span className="hidden rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-semibold text-emerald-700 sm:inline-flex items-center gap-1">
+              <Shield className="h-3 w-3 text-emerald-600" />
+              100% Client-Side
             </span>
           </div>
         </NavLink>
@@ -62,12 +68,43 @@ export const Header: React.FC = () => {
           </NavLink>
         </nav>
 
-        {/* Local Privacy Badge */}
-        <div className="hidden lg:flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-            <Shield className="h-3.5 w-3.5 text-emerald-600" />
-            100% Client-Side
-          </span>
+        {/* Header Actions */}
+        <div className="flex items-center gap-3">
+          {/* Globaler Neu-Matchen Knopf */}
+          <button
+            type="button"
+            onClick={triggerReMatch}
+            disabled={reMatching || transactions.length === 0}
+            title={
+              needsReMatch
+                ? 'Regeln oder Buckets wurden angepasst. Klicke hier, um alle Buchungen neu zuzuordnen.'
+                : 'Regex-Regeln und Bucket-Zuweisungen auf alle Buchungen anwenden'
+            }
+            className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${
+              needsReMatch
+                ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-md ring-2 ring-amber-400/50'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 shadow-sm disabled:opacity-40'
+            }`}
+          >
+            {reMatching ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-current" />
+            ) : (
+              <Sparkles
+                className={`w-3.5 h-3.5 ${
+                  needsReMatch ? 'text-amber-100 animate-bounce' : 'text-amber-500'
+                }`}
+              />
+            )}
+            <span>{reMatching ? 'Matche...' : 'Neu matchen'}</span>
+
+            {/* Pulsierender Indikator bei Änderungsbedarf */}
+            {needsReMatch && !reMatching && (
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-80"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              </span>
+            )}
+          </button>
         </div>
       </div>
     </header>

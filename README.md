@@ -133,6 +133,9 @@ pnpm test
 
 # Tests im interaktiven Watch-Modus ausführen:
 pnpm test:watch
+
+# Test-Coverage (Codeabdeckung) im Terminal & als HTML-Report ausgeben:
+pnpm test:coverage
 ```
 
 ---

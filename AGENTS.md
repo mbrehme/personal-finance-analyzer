@@ -22,6 +22,7 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 * **Dokumentation:** Schreibe für alle exportierten Komponenten, Hilfsfunktionen, Interfaces und Service-Methoden vollständige **JSDoc/TSDoc-Kommentare** (inkl. `@param`, `@returns`, `@example`).
 
 ### 3. Testing-Phase (Co-Location)
+* Es sollen immer Tests geschrieben werden
 * Tests werden **immer als Co-Located Files** direkt neben der Quellcode-Datei abgelegt (`Button.test.tsx` neben `Button.tsx`, `api.test.ts` neben `api.ts`).
 * Test-Stack: **`vitest`** mit **`happy-dom`** und **`@testing-library/react`**.
 * Geteilte Matcher und Mocks liegen in `src/test/setup.ts`.
@@ -45,6 +46,7 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 | `pnpm dev` | Startet den Vite Entwicklungsserver (`http://localhost:5173`) |
 | `pnpm test` | Führt alle Tests einmalig aus |
 | `pnpm test:watch` | Startet Vitest im interaktiven Watch-Modus |
+| `pnpm test:coverage` | Berechnet Codeabdeckung & generiert HTML/Terminal-Report |
 | `pnpm build` | Führt den TypeScript-Check (`tsc`) und den Vite-Build aus |
 | `pnpm commit` | Interaktiver Commit-Assistent (Conventional Commits) |
 | `pnpm release` | Erstellt einen automatischen SemVer-Release inkl. `CHANGELOG.md` |

@@ -12,6 +12,7 @@ import { calculateAllBalances } from '@/services/analytics/balanceCalculator';
 import { PeriodSelector } from '@/components/PeriodSelector';
 import { IconRenderer } from '@/components/IconRenderer';
 import { formatPeriodLabel } from '@/utils/dateUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 import {
   Wallet,
   Landmark,
@@ -54,10 +55,7 @@ export const Balances: React.FC = () => {
             <Wallet className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-2xl font-bold text-slate-900 font-mono">
-            {balanceMatrix.totalRow.latestBalance.toLocaleString('de-DE', {
-              style: 'currency',
-              currency: 'EUR',
-            })}
+            {formatMoney(balanceMatrix.totalRow.latestBalance)}
           </div>
         </div>
 
@@ -129,10 +127,7 @@ export const Balances: React.FC = () => {
                       return (
                         <td key={pKey} className="py-3 px-4 text-right whitespace-nowrap font-mono">
                           <div className="font-bold text-slate-900">
-                            {pData.endBalance.toLocaleString('de-DE', {
-                              style: 'currency',
-                              currency: 'EUR',
-                            })}
+                            {formatMoney(pData.endBalance)}
                           </div>
                           {pData.cashflow !== 0 && (
                             <div
@@ -140,12 +135,7 @@ export const Balances: React.FC = () => {
                                 pData.cashflow >= 0 ? 'text-emerald-600' : 'text-slate-500'
                               }`}
                             >
-                              ({pData.cashflow >= 0 ? '+' : ''}
-                              {pData.cashflow.toLocaleString('de-DE', {
-                                style: 'currency',
-                                currency: 'EUR',
-                              })}
-                              )
+                              ({formatMoney(pData.cashflow, { signDisplay: 'always' })})
                             </div>
                           )}
                         </td>
@@ -154,10 +144,7 @@ export const Balances: React.FC = () => {
 
                     {/* Aktueller Stand */}
                     <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold bg-slate-50/50 text-slate-900 text-sm">
-                      {row.latestBalance.toLocaleString('de-DE', {
-                        style: 'currency',
-                        currency: 'EUR',
-                      })}
+                      {formatMoney(row.latestBalance)}
                     </td>
                   </tr>
                 ))
@@ -184,18 +171,12 @@ export const Balances: React.FC = () => {
                         key={pKey}
                         className="py-3.5 px-4 text-right font-mono font-bold text-slate-900"
                       >
-                        {endBal.toLocaleString('de-DE', {
-                          style: 'currency',
-                          currency: 'EUR',
-                        })}
+                        {formatMoney(endBal)}
                       </td>
                     );
                   })}
                   <td className="py-3.5 px-4 text-right font-mono font-extrabold bg-slate-200/60 text-slate-900 text-sm">
-                    {balanceMatrix.totalRow.latestBalance.toLocaleString('de-DE', {
-                      style: 'currency',
-                      currency: 'EUR',
-                    })}
+                    {formatMoney(balanceMatrix.totalRow.latestBalance)}
                   </td>
                 </tr>
               </tfoot>

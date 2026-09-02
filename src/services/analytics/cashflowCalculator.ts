@@ -35,6 +35,10 @@ export interface BucketCashflowRow {
   totalOutbound: number;
   totalNet: number;
   totalBudget?: number;
+  /** Effektives Soll-Budget (entweder manuell konfiguriert oder Rollup von Kinderelementen) */
+  effectiveBudget?: number;
+  /** Kennzeichnet, ob das Budget durch Summation von Kind-Budgets zustande kam */
+  isBudgetRollup?: boolean;
 }
 
 export interface CashflowAnalysisResult {
@@ -171,6 +175,55 @@ export function calculateCashflowMatrix(
 
   const rows: BucketCashflowRow[] = [];
 
+  /**
+   * Rekursive Berechnung des effektiven Budgets:
+   * 1. Hat der Bucket ein eigenes manuelles targetBudget -> dieses verwenden.
+   * 2. Falls nicht, aber Kinderelemente mit Budgets existieren -> Summe der Kind-Budgets (Rollup).
+   * 3. Ansonsten undefined.
+   */
+  const getEffectiveBucketBudget = (
+    bId: string
+  ): { amount: number; isRollup: boolean } | undefined => {
+    const b = buckets.find((item) => item.id === bId);
+    if (!b) return undefined;
+
+    if (b.targetBudget) {
+      return {
+        amount: normalizeBudgetToGranularity(
+          b.targetBudget.amount,
+          b.targetBudget.period,
+          granularity
+        ),
+        isRollup: false,
+      };
+    }
+
+    const children = childrenMap.get(bId) || [];
+    if (children.length === 0) {
+      return undefined;
+    }
+
+    let sum = 0;
+    let hasAnyChildBudget = false;
+
+    children.forEach((child) => {
+      const childRes = getEffectiveBucketBudget(child.id);
+      if (childRes !== undefined) {
+        sum += childRes.amount;
+        hasAnyChildBudget = true;
+      }
+    });
+
+    if (hasAnyChildBudget) {
+      return {
+        amount: sum,
+        isRollup: true,
+      };
+    }
+
+    return undefined;
+  };
+
   const processBucket = (bucket: Bucket, depth: number) => {
     const subtreeIds = getSubtreeBucketIds(bucket.id);
     const hasChildren = (childrenMap.get(bucket.id) || []).length > 0;
@@ -179,14 +232,10 @@ export function calculateCashflowMatrix(
     let totalInbound = 0;
     let totalOutbound = 0;
 
-    // Normalisiertes Budget für die Granularität berechnen
-    const budgetAmount = bucket.targetBudget
-      ? normalizeBudgetToGranularity(
-          bucket.targetBudget.amount,
-          bucket.targetBudget.period,
-          granularity
-        )
-      : undefined;
+    // Effektives Budget (eigenes manuelles Budget oder Rollup aus Kind-Elementen)
+    const effectiveBudgetInfo = getEffectiveBucketBudget(bucket.id);
+    const budgetAmount = effectiveBudgetInfo?.amount;
+    const isBudgetRollup = effectiveBudgetInfo?.isRollup ?? false;
 
     periodKeys.forEach((pKey) => {
       let inbound = 0;
@@ -230,6 +279,8 @@ export function calculateCashflowMatrix(
       totalOutbound,
       totalNet,
       totalBudget,
+      effectiveBudget: budgetAmount,
+      isBudgetRollup,
     });
 
     // Kinder verarbeiten

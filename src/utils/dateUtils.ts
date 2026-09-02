@@ -6,6 +6,7 @@
  */
 
 import { ISODateString, PeriodGranularity } from '@/types/finance';
+import { roundToTwoDecimals } from './moneyUtils';
 
 /**
  * Validiert, ob ein gegebener String ein valides ISO-Datum (YYYY-MM-DD) darstellt.
@@ -288,13 +289,13 @@ export function normalizeBudgetToGranularity(
 
   switch (toGranularity) {
     case 'monthly':
-      return monthlyEquivalent;
+      return roundToTwoDecimals(monthlyEquivalent);
     case 'quarterly':
-      return monthlyEquivalent * 3;
+      return roundToTwoDecimals(monthlyEquivalent * 3);
     case 'halfYearly':
-      return monthlyEquivalent * 6;
+      return roundToTwoDecimals(monthlyEquivalent * 6);
     case 'yearly':
-      return monthlyEquivalent * 12;
+      return roundToTwoDecimals(monthlyEquivalent * 12);
   }
 }
 

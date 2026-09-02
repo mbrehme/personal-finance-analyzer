@@ -77,4 +77,57 @@ describe('BucketModal', () => {
       })
     );
   });
+
+  it('displays rollup hint for parent buckets and allows setting manual budget', async () => {
+    const handleSave = vi.fn().mockResolvedValue(undefined);
+    const parentBucket = {
+      id: 'b-parent',
+      name: 'Wohnen',
+      parentId: null,
+      order: 0,
+    };
+    const childBucket = {
+      id: 'b-child',
+      name: 'Miete',
+      parentId: 'b-parent',
+      order: 0,
+      targetBudget: { amount: 1200, period: 'monthly' as const },
+    };
+
+    render(
+      <BucketModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onSave={handleSave}
+        bucket={parentBucket}
+        existingBuckets={[parentBucket, childBucket]}
+      />
+    );
+
+    // Automatischer Rollup-Hinweis muss sichtbar sein
+    expect(screen.getByText(/Automatisches Rollup aktiv/i)).toBeInTheDocument();
+    expect(screen.getByText(/1\.200,00/i)).toBeInTheDocument();
+
+    // Klick auf "Manuell überschreiben"
+    const overrideBtn = screen.getByRole('button', { name: /Manuell überschreiben/i });
+    fireEvent.click(overrideBtn);
+
+    // Rollup-Hinweis unter den Inputs sichtbar
+    expect(screen.getByText(/Rollup der Kinder:/i)).toBeInTheDocument();
+
+    // Speichern mit manuellem Betrag
+    const submitBtn = screen.getByText('Änderungen speichern');
+    fireEvent.submit(submitBtn.closest('form')!);
+
+    expect(handleSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'b-parent',
+        name: 'Wohnen',
+        targetBudget: {
+          amount: 1200,
+          period: 'monthly',
+        },
+      })
+    );
+  });
 });

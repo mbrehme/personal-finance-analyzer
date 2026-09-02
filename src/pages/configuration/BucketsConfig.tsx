@@ -9,6 +9,7 @@ import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
 import { Bucket } from '@/types/finance';
 import { normalizeBudgetToGranularity } from '@/utils/dateUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/components/IconRenderer';
 import { BucketModal } from '@/components/modals/BucketModal';
 import {
@@ -349,10 +350,7 @@ export const BucketsConfig: React.FC = () => {
           <td className="py-3 px-4 text-xs text-slate-700 w-[180px] shrink-0 whitespace-nowrap">
             {bucket.targetBudget ? (
               <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                {bucket.targetBudget.amount.toLocaleString('de-DE', {
-                  style: 'currency',
-                  currency: 'EUR',
-                })}{' '}
+                {formatMoney(bucket.targetBudget.amount)}{' '}
                 / {bucket.targetBudget.period === 'monthly' ? 'Monat' : bucket.targetBudget.period}
               </span>
             ) : hasChildren ? (
@@ -360,11 +358,8 @@ export const BucketsConfig: React.FC = () => {
                 const subtreeMonthly = getSubtreeMonthlyBudget(bucket.id);
                 return subtreeMonthly > 0 ? (
                   <span className="font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200 text-[11px]">
-                    {subtreeMonthly.toLocaleString('de-DE', {
-                      style: 'currency',
-                      currency: 'EUR',
-                    })}{' '}
-                    / Monat (Summe)
+                    {formatMoney(subtreeMonthly)}{' '}
+                    / Monat (Rollup)
                   </span>
                 ) : (
                   <span className="text-slate-400">Kein Budget</span>

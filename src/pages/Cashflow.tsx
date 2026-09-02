@@ -18,6 +18,7 @@ import {
   formatSubPeriodLabel,
   normalizeBudgetToGranularity,
 } from '@/utils/dateUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 import {
   TrendingUp,
   ChevronRight,
@@ -354,6 +355,7 @@ export const Cashflow: React.FC = () => {
       const isCollapsed = collapsedBuckets.has(row.bucket.id);
       const children = childrenMap.get(row.bucket.id) || [];
       const targetBudget =
+        row.effectiveBudget ??
         row.periods[matrix.periodKeys[0]]?.budget ??
         (row.bucket.targetBudget
           ? normalizeBudgetToGranularity(
@@ -403,7 +405,7 @@ export const Cashflow: React.FC = () => {
                   </span>
                   {targetBudget !== undefined && targetBudget > 0 && (
                     <span className="text-[10px] text-slate-500 font-mono font-medium truncate">
-                      Soll: {targetBudget.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                      Soll: {formatMoney(targetBudget)}
                     </span>
                   )}
                 </div>
@@ -457,10 +459,7 @@ export const Cashflow: React.FC = () => {
                           net < 0 ? 'text-slate-900' : 'text-emerald-600'
                         }`}
                       >
-                        {net.toLocaleString('de-DE', {
-                          style: 'currency',
-                          currency: 'EUR',
-                        })}
+                        {formatMoney(net)}
                       </span>
 
                       {/* Budget Abweichung (Über- oder Unterschreitung) */}
@@ -472,11 +471,7 @@ export const Cashflow: React.FC = () => {
                               : 'text-red-600'
                           }`}
                         >
-                          {diffToBudget.toLocaleString('de-DE', {
-                            style: 'currency',
-                            currency: 'EUR',
-                            signDisplay: 'always',
-                          })}
+                          {formatMoney(diffToBudget, { signDisplay: 'always' })}
                         </div>
                       )}
                     </div>
@@ -496,10 +491,7 @@ export const Cashflow: React.FC = () => {
                       avgNet < 0 ? 'text-slate-900' : 'text-emerald-600'
                     }`}
                   >
-                    {avgNet.toLocaleString('de-DE', {
-                      style: 'currency',
-                      currency: 'EUR',
-                    })}
+                    {formatMoney(avgNet)}
                   </span>
 
                   {/* Budget Abweichung auf Durchschnittsbasis */}
@@ -511,11 +503,7 @@ export const Cashflow: React.FC = () => {
                           : 'text-red-600'
                       }`}
                     >
-                      {avgDiff.toLocaleString('de-DE', {
-                        style: 'currency',
-                        currency: 'EUR',
-                        signDisplay: 'always',
-                      })}
+                      {formatMoney(avgDiff, { signDisplay: 'always' })}
                     </div>
                   )}
                 </div>
@@ -595,10 +583,7 @@ export const Cashflow: React.FC = () => {
             <ArrowUpRight className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-2xl font-bold text-emerald-600 font-mono">
-            {matrix.totalRow.totalInbound.toLocaleString('de-DE', {
-              style: 'currency',
-              currency: 'EUR',
-            })}
+            {formatMoney(matrix.totalRow.totalInbound)}
           </div>
         </div>
 
@@ -608,10 +593,7 @@ export const Cashflow: React.FC = () => {
             <ArrowDownRight className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-2xl font-bold text-slate-900 font-mono">
-            {matrix.totalRow.totalOutbound.toLocaleString('de-DE', {
-              style: 'currency',
-              currency: 'EUR',
-            })}
+            {formatMoney(matrix.totalRow.totalOutbound)}
           </div>
         </div>
 
@@ -625,11 +607,7 @@ export const Cashflow: React.FC = () => {
               matrix.totalRow.totalNet >= 0 ? 'text-emerald-600' : 'text-rose-600'
             }`}
           >
-            {matrix.totalRow.totalNet.toLocaleString('de-DE', {
-              style: 'currency',
-              currency: 'EUR',
-              signDisplay: 'always',
-            })}
+            {formatMoney(matrix.totalRow.totalNet, { signDisplay: 'always' })}
           </div>
         </div>
       </div>
@@ -814,10 +792,7 @@ export const Cashflow: React.FC = () => {
                           net >= 0 ? 'text-emerald-700' : 'text-slate-900'
                         }`}
                       >
-                        {net.toLocaleString('de-DE', {
-                          style: 'currency',
-                          currency: 'EUR',
-                        })}
+                        {formatMoney(net)}
                       </td>
                     );
                   })}
@@ -825,11 +800,7 @@ export const Cashflow: React.FC = () => {
                   {/* Sticky Durchschnitts-Spalte rechts */}
                   <td className="sticky right-0 z-20 bg-slate-200 py-3.5 px-3 text-right font-mono font-extrabold border-l-2 border-t-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] min-w-[110px] w-[110px] max-w-[110px]">
                     <span className={totalAvgNet >= 0 ? 'text-emerald-700' : 'text-slate-900'}>
-                      {totalAvgNet.toLocaleString('de-DE', {
-                        style: 'currency',
-                        currency: 'EUR',
-                        signDisplay: 'always',
-                      })}
+                      {formatMoney(totalAvgNet, { signDisplay: 'always' })}
                     </span>
                   </td>
                 </tr>

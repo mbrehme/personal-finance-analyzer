@@ -159,4 +159,66 @@ describe('cashflowCalculator', () => {
     expect(expRow?.periods['2026-08'].diffToBudget).toBe(18);
     expect(incRow?.periods['2026-08'].diffToBudget).toBe(18);
   });
+
+  it('rolls up child budgets to parent buckets when parent has no manual budget', () => {
+    const hierarchyBuckets: Bucket[] = [
+      {
+        id: 'b-parent',
+        name: 'Ausgaben',
+        parentId: null,
+      },
+      {
+        id: 'b-child-1',
+        name: 'Miete',
+        parentId: 'b-parent',
+        targetBudget: { period: 'monthly', amount: 1000 },
+      },
+      {
+        id: 'b-child-2',
+        name: 'Kredite',
+        parentId: 'b-parent',
+      },
+      {
+        id: 'b-grandchild',
+        name: 'KFW',
+        parentId: 'b-child-2',
+        targetBudget: { period: 'monthly', amount: 250 },
+      },
+      {
+        id: 'b-manual-parent',
+        name: 'Haushalt',
+        parentId: null,
+        targetBudget: { period: 'monthly', amount: 500 },
+      },
+      {
+        id: 'b-manual-child',
+        name: 'Lebensmittel',
+        parentId: 'b-manual-parent',
+        targetBudget: { period: 'monthly', amount: 300 },
+      },
+    ];
+
+    const matrix = calculateCashflowMatrix(hierarchyBuckets, [], 'monthly', undefined, {
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+    });
+
+    const parentRow = matrix.rows.find((r) => r.bucket.id === 'b-parent');
+    const child2Row = matrix.rows.find((r) => r.bucket.id === 'b-child-2');
+    const manualParentRow = matrix.rows.find((r) => r.bucket.id === 'b-manual-parent');
+
+    // b-child-2 erbt Budget von b-grandchild (250)
+    expect(child2Row?.effectiveBudget).toBe(250);
+    expect(child2Row?.isBudgetRollup).toBe(true);
+    expect(child2Row?.periods['2026-09'].budget).toBe(250);
+
+    // b-parent rollt b-child-1 (1000) + b-child-2 (250) = 1250 auf
+    expect(parentRow?.effectiveBudget).toBe(1250);
+    expect(parentRow?.isBudgetRollup).toBe(true);
+    expect(parentRow?.periods['2026-09'].budget).toBe(1250);
+
+    // b-manual-parent behält sein eigenes manuelles Budget (500), kein Rollup
+    expect(manualParentRow?.effectiveBudget).toBe(500);
+    expect(manualParentRow?.isBudgetRollup).toBe(false);
+  });
 });

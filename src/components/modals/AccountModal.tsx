@@ -12,6 +12,7 @@ import { EntityVisualFields } from '../EntityVisualFields';
 import { MoneyInput } from '../MoneyInput';
 import { X, Plus, Trash2, Calendar } from 'lucide-react';
 import { toISODateString } from '@/utils/dateUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 
 export interface AccountModalProps {
   isOpen: boolean;
@@ -192,7 +193,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
                       <span className="font-semibold text-slate-800">{entry.date}:</span>
                       <span className="text-slate-900 font-bold">
-                        {entry.amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        {formatMoney(entry.amount)}
                       </span>
                       {entry.note && <span className="text-slate-500 italic">({entry.note})</span>}
                     </div>

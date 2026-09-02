@@ -8,6 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
 import { Account } from '@/types/finance';
 import { formatDate } from '@/utils/dateUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/components/IconRenderer';
 import { AccountModal } from '@/components/modals/AccountModal';
 import {
@@ -195,10 +196,7 @@ export const AccountsConfig: React.FC = () => {
                           <span>Stichtag: {formatDate(acc.balanceEntries[acc.balanceEntries.length - 1].date)}</span>
                         </div>
                         <div className="font-mono font-bold text-slate-900 text-sm">
-                          {acc.balanceEntries[acc.balanceEntries.length - 1].amount.toLocaleString('de-DE', {
-                            style: 'currency',
-                            currency: 'EUR',
-                          })}
+                          {formatMoney(acc.balanceEntries[acc.balanceEntries.length - 1].amount)}
                         </div>
                       </>
                     ) : (

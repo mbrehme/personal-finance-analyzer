@@ -17,6 +17,7 @@ import { IconRenderer } from '@/components/IconRenderer';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { CsvImportModal } from '@/components/modals/CsvImportModal';
 import { formatDate } from '@/utils/dateUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 import {
   Receipt,
   Search,
@@ -591,11 +592,7 @@ export const Transactions: React.FC = () => {
                       {/* Betrag */}
                       <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold">
                         <span className={isOutbound ? 'text-slate-900' : 'text-emerald-600'}>
-                          {tx.value.toLocaleString('de-DE', {
-                            style: 'currency',
-                            currency: 'EUR',
-                            signDisplay: 'always',
-                          })}
+                          {formatMoney(tx.value, { signDisplay: 'always' })}
                         </span>
                       </td>
 

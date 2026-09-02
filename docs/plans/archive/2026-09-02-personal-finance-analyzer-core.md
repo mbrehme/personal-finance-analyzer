@@ -1,7 +1,8 @@
 # Plan: Personal Finance Analyzer – Lokale Finanzverwaltung & Analyse
 
-* **Status:** Entwurf
+* **Status:** Abgeschlossen
 * **Erstellt am:** 2026-09-02
+* **Abgeschlossen am:** 2026-09-02
 * **Bearbeiter:** Antigravity & Entwickler-Team
 
 ---
@@ -21,32 +22,32 @@ Die Anwendung gliedert sich in vier Kernbereiche:
 ## 2. Anforderungen & User Stories
 
 ### A. Datenschutz & Speicherung (Local-First)
-- [ ] Alle Transaktionen, Buckets und Konten werden im Browser persistiert (IndexedDB).
-- [ ] Vollständiger JSON-Export und -Import der gesamten Konfiguration und Transaktionsdaten.
+- [x] Alle Transaktionen, Buckets und Konten werden im Browser persistiert (IndexedDB).
+- [x] Vollständiger JSON-Export und -Import der gesamten Konfiguration und Transaktionsdaten.
 
 ### B. Configuration (Buckets & Accounts)
-- [ ] **Hierarchische Buckets:** Baumstruktur (Parent- & Child-Buckets) mit auf-/zuklappbarer Tabellendarstellung.
-- [ ] **Kein fester Bucket-Typ:** Buckets besitzen keinen festen Typ (`income/expense`), sondern dienen als flexible Cluster.
-- [ ] **Regex-Kategorisierung:** Regex-Regeln können ausschließlich für Child-/Leaf-Buckets definiert werden (Verwendungszweck, Empfänger, IBAN).
-- [ ] **Soll-Werte (Budgets):** Konfigurierbare Budgets pro Bucket für Monat, Quartal, Halbjahr oder Jahr.
-- [ ] **Account und Bucket Import/Export:** Export und Import der Bucket- und Account-Konfiguration als JSON-Datei.
-- [ ] **Accounts & Balance-Einträge:** Anlegen von Konten und Erfassen von Stichtags-Salden (Stand zu Datum X mit `ISODateString`).
+- [x] **Hierarchische Buckets:** Baumstruktur (Parent- & Child-Buckets) mit auf-/zuklappbarer Tabellendarstellung.
+- [x] **Kein fester Bucket-Typ:** Buckets besitzen keinen festen Typ (`income/expense`), sondern dienen als flexible Cluster.
+- [x] **Regex-Kategorisierung:** Regex-Regeln können ausschließlich für Child-/Leaf-Buckets definiert werden (Verwendungszweck, Empfänger, IBAN).
+- [x] **Soll-Werte (Budgets):** Konfigurierbare Budgets pro Bucket für Monat, Quartal, Halbjahr oder Jahr.
+- [x] **Account und Bucket Import/Export:** Export und Import der Bucket- und Account-Konfiguration als JSON-Datei.
+- [x] **Accounts & Balance-Einträge:** Anlegen von Konten und Erfassen von Stichtags-Salden (Stand zu Datum X mit `ISODateString`).
 
 ### C. Data (Transactions & CSV Import)
-- [ ] **CSV-Importer:** Intelligenter Import mit automatischer Erkennung und manuellem Spalten-Mapping (`valueDate`, `bookingDate`, `issuer`, `receiver`, `subject`, `type`, `iban`, `value`).
-- [ ] **Uniqueness:** Sicherstellen, dass Transaktionen unique sind (eindeutige ID aus Hash/Kombination relevanter Spalten).
-- [ ] **Auto-Bucket-Matching:** Automatische Zuordnung von Transaktionen zu Buckets bei Import sowie bei Änderung der Regex-Konfiguration.
-- [ ] **Transaktionstabelle:** Filterung der einzelnen Spalten mit Bezugnahme zum Typ (Dropdown, Datepicker, Freitext, Betrag).
-- [ ] **Manueller Eingriff:** Möglichkeit, Transaktionen manuell einem Bucket zuzuordnen (mit `manualBucketOverride`), was in der Konfiguration gespeichert und exportiert wird.
+- [x] **CSV-Importer:** Intelligenter Import mit automatischer Erkennung und manuellem Spalten-Mapping (`valueDate`, `bookingDate`, `issuer`, `receiver`, `subject`, `type`, `iban`, `value`).
+- [x] **Uniqueness:** Sicherstellen, dass Transaktionen unique sind (eindeutige ID aus Hash/Kombination relevanter Spalten).
+- [x] **Auto-Bucket-Matching:** Automatische Zuordnung von Transaktionen zu Buckets bei Import sowie bei Änderung der Regex-Konfiguration.
+- [x] **Transaktionstabelle:** Filterung der einzelnen Spalten mit Bezugnahme zum Typ (Dropdown, Datepicker, Freitext, Betrag).
+- [x] **Manueller Eingriff:** Möglichkeit, Transaktionen manuell einem Bucket zuzuordnen (mit `manualBucketOverride`), was in der Konfiguration gespeichert und exportiert wird.
 
 ### D. Cashflow-Analyse
-- [ ] **Matrix-Ansicht:** Zeilen = Buckets (collapsible, Kindersummen rollen zu Eltern hoch), Spalten = Zeitperioden (`YearMonthString` bzw. Periodenschlüssel).
-- [ ] **Granularität:** Umschaltbar zwischen Monat, Quartal, Halbjahr und Jahr.
-- [ ] **Soll-Ist-Abgleich:** Gegenüberstellung der tatsächlichen Ausgaben/Einnahmen mit den Bucket-Sollwerten.
+- [x] **Matrix-Ansicht:** Zeilen = Buckets (collapsible, Kindersummen rollen zu Eltern hoch), Spalten = Zeitperioden (`YearMonthString` bzw. Periodenschlüssel).
+- [x] **Granularität:** Umschaltbar zwischen Monat, Quartal, Halbjahr und Jahr.
+- [x] **Soll-Ist-Abgleich:** Gegenüberstellung der tatsächlichen Ausgaben/Einnahmen mit den Bucket-Sollwerten.
 
 ### E. Balances (Kontostände)
-- [ ] **Verlaufsanalyse:** Rekonstruktion und Darstellung des Kontostands über Zeitintervalle basierend auf hinterlegten Stichtagssalden und Cashflows.
-- [ ] Umschaltbare Granularität und Filterung nach Konten.
+- [x] **Verlaufsanalyse:** Rekonstruktion und Darstellung des Kontostands über Zeitintervalle basierend auf hinterlegten Stichtagssalden und Cashflows.
+- [x] Umschaltbare Granularität und Filterung nach Konten.
 
 ---
 
@@ -251,39 +252,39 @@ export interface FinanceConfigExport {
 ---
 
 ## 4. Schrittweiser Umsetzungsplan
-
-1. [ ] **Schritt 1: Domain-Modell & Local-First Storage Layer**
+ 
+1. [x] **Schritt 1: Domain-Modell & Local-First Storage Layer**
    - Datei: `src/types/finance.ts` & `src/utils/dateUtils.ts` (vollständige Interfaces & ISODateString-Helfer)
    - Datei: `src/services/storage/db.ts` & `src/services/storage/FinanceContext.tsx`
    - Datei: `src/services/storage/db.test.ts` (Unit-Tests für lokale Persistenz)
 
-2. [ ] **Schritt 2: Regex-Matching Engine & CSV-Parser**
+2. [x] **Schritt 2: Regex-Matching Engine & CSV-Parser**
    - Datei: `src/services/matcher/regexMatcher.ts` & `regexMatcher.test.ts`
    - Datei: `src/services/csv/csvParser.ts` & `csvParser.test.ts`
 
-3. [ ] **Schritt 3: Configuration Page (`/configuration`)**
+3. [x] **Schritt 3: Configuration Page (`/configuration`)**
    - Hierarchische Bucket-Baumtabelle (Collapsible, Regex-Validierung, Budgets)
    - Bucket Modal & JSON Import/Export
    - Account-Verwaltung & Stichtags-Salden (`BalanceEntry` mit `ISODateString`)
    - Tests für Bucket- und Account-Operationen
 
-4. [ ] **Schritt 4: Transactions Page (`/transactions`)**
+4. [x] **Schritt 4: Transactions Page (`/transactions`)**
    - CSV-Import Wizard mit Mapping & Voransicht (Konvertierung in `ISODateString`)
    - Automatische Bucket-Zuweisung mit manueller Override-Möglichkeit
    - Leistungsfähige Filter- und Sortierleiste mit Datumsfiltern
    - Tests für Filter- und Transaktionsverwaltung
 
-5. [ ] **Schritt 5: Cashflow Page (`/cashflow`)**
+5. [x] **Schritt 5: Cashflow Page (`/cashflow`)**
    - Aggregations-Engine für Zeitintervalle (Monat, Quartal, Halbjahr, Jahr)
    - Collapsible Matrix-Tabelle mit Soll-Ist-Vergleich
    - Tests für Cashflow-Berechnung und Aggregation
 
-6. [ ] **Schritt 6: Balances Page (`/balances`)**
+6. [x] **Schritt 6: Balances Page (`/balances`)**
    - Salden-Berechnungs-Engine (Kombination aus Stichtagen und Cashflow-Deltas)
    - Kontostands-Tabelle über ausgewählte Zeiträume
    - Tests für Kontostand-Berechnung
 
-7. [ ] **Schritt 7: Navigation, Design-Feinschliff & Dokumentation**
+7. [x] **Schritt 7: Navigation, Design-Feinschliff & Dokumentation**
    - Anpassung der Hauptnavigation in `Header.tsx` und `App.tsx`
    - Aktualisierung von `README.md` und Archivierung des Plans
 

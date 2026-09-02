@@ -96,14 +96,19 @@ export const ConfigurationLayout: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              if (confirm('Möchtest du wirklich alle Daten zurücksetzen?')) {
+              if (
+                confirm(
+                  'Möchtest du wirklich alle Daten zurücksetzen? Alle Konten, Buckets und Buchungen werden auf die Standardeinstellungen zurückgesetzt.'
+                )
+              ) {
                 resetWorkspace();
               }
             }}
-            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            title="Zurücksetzen"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 rounded-lg transition-colors border border-rose-200"
+            title="Alle Daten auf Standardeinstellungen zurücksetzen"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 text-rose-600" />
+            <span>Zurücksetzen</span>
           </button>
         </div>
       </div>

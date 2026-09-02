@@ -14,6 +14,7 @@ import {
   fillPeriodKeyRange,
   getCurrentPeriodKey,
   getPeriodKey,
+  getPeriodKeysBetween,
   normalizeBudgetToGranularity,
 } from '@/utils/dateUtils';
 
@@ -70,24 +71,48 @@ export function calculateCashflowMatrix(
   transactions: Transaction[],
   granularity: PeriodGranularity,
   selectedAccountId?: string,
-  options?: { includeCurrentPeriod?: boolean; referenceDate?: Date | string | number }
+  options?: {
+    includeCurrentPeriod?: boolean;
+    referenceDate?: Date | string | number;
+    startDate?: string;
+    endDate?: string;
+  }
 ): CashflowAnalysisResult {
-  // 1. Transaktionen nach Konto filtern (falls angegeben)
-  const filteredTx = selectedAccountId
+  // 1. Transaktionen filtern (nach Konto und/oder Datumsbereich)
+  let filteredTx = selectedAccountId
     ? transactions.filter((t) => t.accountId === selectedAccountId)
     : transactions;
 
-  // 2. Perioden extrahieren und Lücken bis zum aktuellen Zeitraum schließen
-  const rawPeriodKeys = extractPeriodKeys(filteredTx, granularity);
-  const includeCurrent = options?.includeCurrentPeriod ?? false;
-  const currentKey = includeCurrent
-    ? getCurrentPeriodKey(granularity, options?.referenceDate)
-    : undefined;
+  if (options?.startDate || options?.endDate) {
+    filteredTx = filteredTx.filter((tx) => {
+      if (options.startDate && tx.valueDate < options.startDate) return false;
+      if (options.endDate && tx.valueDate > options.endDate) return false;
+      return true;
+    });
+  }
 
-  const periodKeys =
-    rawPeriodKeys.length > 0 && includeCurrent
-      ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentKey)
-      : rawPeriodKeys;
+  // 2. Periodenschlüssel ermitteln
+  let periodKeys: string[] = [];
+
+  if (options?.startDate && options?.endDate) {
+    // Wenn ein expliziter Bereich gewählt wurde: Immer alle Perioden dieses Bereichs generieren!
+    periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
+  } else {
+    // Sonst aus Transaktionen extrahieren und Lücken bis zum aktuellen Zeitraum schließen
+    const rawPeriodKeys = extractPeriodKeys(filteredTx, granularity);
+    const includeCurrent = options?.includeCurrentPeriod ?? false;
+    const currentKey = includeCurrent
+      ? getCurrentPeriodKey(granularity, options?.referenceDate)
+      : undefined;
+
+    if (rawPeriodKeys.length > 0) {
+      periodKeys = includeCurrent
+        ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentKey)
+        : rawPeriodKeys;
+    } else if (currentKey) {
+      periodKeys = [currentKey];
+    }
+  }
 
   // 3. Direkte Transaktions-Summen pro Bucket und Periode berechnen
   const directSums = new Map<string, Record<string, { inbound: number; outbound: number }>>();

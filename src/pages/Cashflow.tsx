@@ -10,6 +10,7 @@ import { useFinance } from '@/services/storage/FinanceContext';
 import { PeriodGranularity } from '@/types/finance';
 import { calculateCashflowMatrix, BucketCashflowRow } from '@/services/analytics/cashflowCalculator';
 import { PeriodSelector } from '@/components/PeriodSelector';
+import { DateRangePicker } from '@/components/DateRangePicker';
 import { IconRenderer } from '@/components/IconRenderer';
 import {
   getCurrentPeriodKey,
@@ -48,6 +49,8 @@ interface YearGroup {
 
 export const CASHFLOW_ACCOUNT_FILTER_KEY = 'cashflow_filter_account_id';
 export const CASHFLOW_GRANULARITY_KEY = 'cashflow_filter_granularity';
+export const CASHFLOW_START_DATE_KEY = 'cashflow_filter_start_date';
+export const CASHFLOW_END_DATE_KEY = 'cashflow_filter_end_date';
 
 export const Cashflow: React.FC = () => {
   const { buckets, transactions, accounts } = useFinance();
@@ -85,6 +88,28 @@ export const Cashflow: React.FC = () => {
     return 'all';
   });
 
+  const [startDate, setStartDate] = useState<string>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return localStorage.getItem(CASHFLOW_START_DATE_KEY) || '';
+      }
+    } catch {
+      // Storage access error handling
+    }
+    return '';
+  });
+
+  const [endDate, setEndDate] = useState<string>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return localStorage.getItem(CASHFLOW_END_DATE_KEY) || '';
+      }
+    } catch {
+      // Storage access error handling
+    }
+    return '';
+  });
+
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -104,6 +129,25 @@ export const Cashflow: React.FC = () => {
       // Storage access error handling
     }
   }, [selectedAccountId]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        if (startDate) {
+          localStorage.setItem(CASHFLOW_START_DATE_KEY, startDate);
+        } else {
+          localStorage.removeItem(CASHFLOW_START_DATE_KEY);
+        }
+        if (endDate) {
+          localStorage.setItem(CASHFLOW_END_DATE_KEY, endDate);
+        } else {
+          localStorage.removeItem(CASHFLOW_END_DATE_KEY);
+        }
+      }
+    } catch {
+      // Storage access error handling
+    }
+  }, [startDate, endDate]);
 
   // Wenn das gespeicherte Konto in den geladenen Konten nicht mehr existiert, auf 'all' zurücksetzen
   useEffect(() => {
@@ -133,15 +177,28 @@ export const Cashflow: React.FC = () => {
     });
   };
 
+  const isCurrentPeriodInRange = useMemo(() => {
+    if (!startDate && !endDate) return true;
+    const now = new Date();
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (startDate && todayIso < startDate) return false;
+    if (endDate && todayIso > endDate) return false;
+    return true;
+  }, [startDate, endDate]);
+
   const matrix = useMemo(() => {
     return calculateCashflowMatrix(
       buckets,
       transactions,
       granularity,
       selectedAccountId !== 'all' ? selectedAccountId : undefined,
-      { includeCurrentPeriod: true }
+      {
+        includeCurrentPeriod: isCurrentPeriodInRange,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      }
     );
-  }, [buckets, transactions, granularity, selectedAccountId]);
+  }, [buckets, transactions, granularity, selectedAccountId, isCurrentPeriodInRange, startDate, endDate]);
 
   const currentPeriodKey = useMemo(() => getCurrentPeriodKey(granularity), [granularity]);
   const currentYear = useMemo(() => getYearFromPeriodKey(currentPeriodKey), [currentPeriodKey]);
@@ -431,7 +488,7 @@ export const Cashflow: React.FC = () => {
             })}
 
             {/* Sticky Durchschnitts-Spalte rechts (deutlich abgesetzt) */}
-            <td className="sticky right-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-3 text-right whitespace-nowrap font-mono border-b border-slate-200 border-l-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors">
+            <td className="sticky right-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-3 text-right whitespace-nowrap font-mono border-b border-slate-200 border-l-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] min-w-[110px] w-[110px] max-w-[110px] transition-colors">
               {avgNet !== 0 ? (
                 <div>
                   <span
@@ -502,7 +559,7 @@ export const Cashflow: React.FC = () => {
           <select
             value={selectedAccountId}
             onChange={(e) => setSelectedAccountId(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 h-9"
           >
             <option value="all">Alle Konten</option>
             {accounts.map((acc) => (
@@ -511,6 +568,19 @@ export const Cashflow: React.FC = () => {
               </option>
             ))}
           </select>
+
+          {/* Zeitraum-Filter */}
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(range) => {
+              setStartDate(range.startDate);
+              setEndDate(range.endDate);
+            }}
+            placeholder="Gesamter Zeitraum"
+            align="left"
+            className="w-auto min-w-[190px] sm:min-w-[220px]"
+          />
 
           {/* Granularitäts-Umschalter */}
           <PeriodSelector value={granularity} onChange={setGranularity} />
@@ -568,6 +638,19 @@ export const Cashflow: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div ref={tableContainerRef} className="overflow-x-auto scroll-smooth no-scrollbar">
           <table className="w-full text-left border-separate border-spacing-0">
+            <colgroup>
+              <col className="w-[240px] min-w-[240px] max-w-[240px]" style={{ width: '240px' }} />
+              {displayColumns.map((col) => (
+                <col
+                  key={col.id}
+                  className="min-w-[100px]"
+                  style={{
+                    width: `${100 / (displayColumns.length || 1)}%`,
+                  }}
+                />
+              ))}
+              <col className="w-[110px] min-w-[110px] max-w-[110px]" style={{ width: '110px' }} />
+            </colgroup>
             <thead>
               {/* Zeile 1: Übergeordnete Jahres-Gruppen mit Auf-/Zuklappen */}
               <tr className="bg-slate-200 text-slate-800 text-xs font-bold uppercase tracking-wider">
@@ -672,7 +755,16 @@ export const Cashflow: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {matrix.rows.length > 0 ? (
+              {displayColumns.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={2}
+                    className="py-12 text-center text-slate-400 text-sm"
+                  >
+                    Noch keine Daten für diesen Zeitraum vorhanden.
+                  </td>
+                </tr>
+              ) : matrix.rows.length > 0 ? (
                 renderRows()
               ) : (
                 <tr>
@@ -680,7 +772,7 @@ export const Cashflow: React.FC = () => {
                     colSpan={displayColumns.length + 2}
                     className="py-12 text-center text-slate-400 text-sm"
                   >
-                    Noch keine Daten für diesen Zeitraum vorhanden.
+                    Noch keine Buckets konfiguriert.
                   </td>
                 </tr>
               )}
@@ -731,7 +823,7 @@ export const Cashflow: React.FC = () => {
                   })}
 
                   {/* Sticky Durchschnitts-Spalte rechts */}
-                  <td className="sticky right-0 z-20 bg-slate-200 py-3.5 px-3 text-right font-mono font-extrabold border-l-2 border-t-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)]">
+                  <td className="sticky right-0 z-20 bg-slate-200 py-3.5 px-3 text-right font-mono font-extrabold border-l-2 border-t-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] min-w-[110px] w-[110px] max-w-[110px]">
                     <span className={totalAvgNet >= 0 ? 'text-emerald-700' : 'text-slate-900'}>
                       {totalAvgNet.toLocaleString('de-DE', {
                         style: 'currency',

@@ -7,7 +7,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Cashflow, CASHFLOW_ACCOUNT_FILTER_KEY, CASHFLOW_GRANULARITY_KEY } from './Cashflow';
+import {
+  Cashflow,
+  CASHFLOW_ACCOUNT_FILTER_KEY,
+  CASHFLOW_GRANULARITY_KEY,
+  CASHFLOW_START_DATE_KEY,
+  CASHFLOW_END_DATE_KEY,
+} from './Cashflow';
 import { FinanceProvider } from '@/services/storage/FinanceContext';
 import * as FinanceContextModule from '@/services/storage/FinanceContext';
 import { getCurrentPeriodKey } from '@/utils/dateUtils';
@@ -214,5 +220,49 @@ describe('Cashflow Page', () => {
     expect(localStorage.getItem(CASHFLOW_GRANULARITY_KEY)).toBe('yearly');
 
     unmount();
+  });
+
+  it('allows filtering by date range via DateRangePicker and persists in localStorage', async () => {
+    const user = userEvent.setup();
+    localStorage.removeItem(CASHFLOW_START_DATE_KEY);
+    localStorage.removeItem(CASHFLOW_END_DATE_KEY);
+
+    render(
+      <FinanceProvider>
+        <Cashflow />
+      </FinanceProvider>
+    );
+
+    const datePickerBtn = screen.getByRole('button', { name: /Zeitraum auswählen/i });
+    expect(datePickerBtn).toBeInTheDocument();
+
+    await user.click(datePickerBtn);
+    expect(screen.getByText('Zeitraum wählen')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Dieses Jahr' }));
+    expect(localStorage.getItem(CASHFLOW_START_DATE_KEY)).toBeTruthy();
+    expect(localStorage.getItem(CASHFLOW_END_DATE_KEY)).toBeTruthy();
+  });
+
+  it('renders the period column when selecting a single month with no transactions', async () => {
+    const user = userEvent.setup();
+    localStorage.removeItem(CASHFLOW_START_DATE_KEY);
+    localStorage.removeItem(CASHFLOW_END_DATE_KEY);
+
+    render(
+      <FinanceProvider>
+        <Cashflow />
+      </FinanceProvider>
+    );
+
+    const datePickerBtn = screen.getByRole('button', { name: /Zeitraum auswählen/i });
+    await user.click(datePickerBtn);
+
+    // Klick auf "Dieser Monat"
+    await user.click(screen.getByRole('button', { name: 'Dieser Monat' }));
+
+    // Die Monatsspalte muss in der Tabelle vorhanden sein
+    expect(screen.getByTestId('current-period-header')).toBeInTheDocument();
+    expect(screen.getByText('Aktuell')).toBeInTheDocument();
   });
 });

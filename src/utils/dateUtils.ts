@@ -369,3 +369,389 @@ export function fillPeriodKeyRange(
 
   return Array.from(keySet).sort();
 }
+
+/**
+ * Ermittelt alle Periodenschlüssel innerhalb eines geschlossenen Datumsbereichs (Start- und Enddatum).
+ *
+ * @param {string} startDate - Startdatum im ISO-Format (YYYY-MM-DD oder YYYY-MM)
+ * @param {string} endDate - Enddatum im ISO-Format (YYYY-MM-DD oder YYYY-MM)
+ * @param {PeriodGranularity} granularity - Granularität ('monthly', 'quarterly', 'halfYearly', 'yearly')
+ * @returns {string[]} Chronologisch sortierte Liste aller Periodenschlüssel im Bereich
+ *
+ * @example
+ * ```ts
+ * getPeriodKeysBetween('2026-07-01', '2026-09-30', 'monthly');
+ * // => ['2026-07', '2026-08', '2026-09']
+ * ```
+ */
+export function getPeriodKeysBetween(
+  startDate: string,
+  endDate: string,
+  granularity: PeriodGranularity
+): string[] {
+  if (!startDate || !endDate) {
+    return [];
+  }
+
+  const startYear = parseInt(startDate.substring(0, 4), 10);
+  const endYear = parseInt(endDate.substring(0, 4), 10);
+  if (isNaN(startYear) || isNaN(endYear) || startYear > endYear) {
+    return [];
+  }
+
+  const startMonth = parseInt(startDate.substring(5, 7) || '1', 10);
+  const endMonth = parseInt(endDate.substring(5, 7) || '12', 10);
+
+  const keys = new Set<string>();
+
+  if (granularity === 'yearly') {
+    for (let y = startYear; y <= endYear; y++) {
+      keys.add(`${y}`);
+    }
+  } else if (granularity === 'halfYearly') {
+    for (let y = startYear; y <= endYear; y++) {
+      const minH = y === startYear ? (startMonth <= 6 ? 1 : 2) : 1;
+      const maxH = y === endYear ? (endMonth <= 6 ? 1 : 2) : 2;
+      for (let h = minH; h <= maxH; h++) {
+        keys.add(`${y}-H${h}`);
+      }
+    }
+  } else if (granularity === 'quarterly') {
+    for (let y = startYear; y <= endYear; y++) {
+      const minQ = y === startYear ? Math.floor((startMonth - 1) / 3) + 1 : 1;
+      const maxQ = y === endYear ? Math.floor((endMonth - 1) / 3) + 1 : 4;
+      for (let q = minQ; q <= maxQ; q++) {
+        keys.add(`${y}-Q${q}`);
+      }
+    }
+  } else {
+    // monthly
+    for (let y = startYear; y <= endYear; y++) {
+      const minM = y === startYear ? startMonth : 1;
+      const maxM = y === endYear ? endMonth : 12;
+      for (let m = minM; m <= maxM; m++) {
+        keys.add(`${y}-${String(m).padStart(2, '0')}`);
+      }
+    }
+  }
+
+  return Array.from(keys).sort();
+}
+
+/**
+ * Verfügbare Schnellauswahl-Presets für Datums- und Periodenbereiche (Monats-, Quartals- & Jahresebene).
+ */
+export type DateRangePreset =
+  | 'this_year'
+  | 'this_half_year'
+  | 'this_quarter'
+  | 'this_month'
+  | 'last_year'
+  | 'last_half_year'
+  | 'last_quarter'
+  | 'last_month'
+  | 'all_time'
+  | 'custom';
+
+/**
+ * Ein Datumsbereich mit Start- und Enddatum im Format YYYY-MM-DD (ISODateString)
+ * oder Leerstring für unbegrenzte Zeiträume.
+ */
+export interface DateRange {
+  startDate: string;
+  endDate: string;
+}
+
+/**
+ * Definition eines konfigurierbaren Presets für die Benutzeroberfläche.
+ */
+export interface DateRangePresetConfig {
+  id: DateRangePreset;
+  label: string;
+  group: 'current' | 'past' | 'all';
+}
+
+/**
+ * Liste aller verfügbaren Presets zur Anzeige im DateRangePicker.
+ */
+export const DATE_RANGE_PRESETS: DateRangePresetConfig[] = [
+  { id: 'this_year', label: 'Dieses Jahr', group: 'current' },
+  { id: 'this_half_year', label: 'Dieses Halbjahr', group: 'current' },
+  { id: 'this_quarter', label: 'Dieses Quartal', group: 'current' },
+  { id: 'this_month', label: 'Dieser Monat', group: 'current' },
+  { id: 'last_year', label: 'Letztes Jahr', group: 'past' },
+  { id: 'last_half_year', label: 'Letztes Halbjahr', group: 'past' },
+  { id: 'last_quarter', label: 'Letztes Quartal', group: 'past' },
+  { id: 'last_month', label: 'Letzter Monat', group: 'past' },
+  { id: 'all_time', label: 'Gesamter Zeitraum', group: 'all' },
+];
+
+/**
+ * Ermittelt die Anzahl der Tage eines Monats unter Berücksichtigung von Schaltjahren.
+ */
+function getLastDayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/**
+ * Formatiert Jahr, Monat und Tag zu einem ISO-Datumsstring (YYYY-MM-DD).
+ */
+function formatIso(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * Berechnet Start- und Enddatum für ein vorgegebenes DateRangePreset bezogen auf ein Referenzdatum.
+ *
+ * @param {DateRangePreset} preset - Das gewählte Preset
+ * @param {Date | string | number} [referenceDate=new Date()] - Referenzzeitpunkt (Standard: heute)
+ * @returns {DateRange} Objekt mit startDate und endDate (jeweils Format YYYY-MM-DD)
+ *
+ * @example
+ * ```ts
+ * getDateRangeForPreset('this_year', new Date(2026, 8, 3));
+ * // => { startDate: '2026-01-01', endDate: '2026-12-31' }
+ * ```
+ */
+export function getDateRangeForPreset(
+  preset: DateRangePreset,
+  referenceDate: Date | string | number = new Date()
+): DateRange {
+  if (preset === 'all_time') {
+    return { startDate: '', endDate: '' };
+  }
+
+  const ref =
+    referenceDate instanceof Date
+      ? referenceDate
+      : typeof referenceDate === 'string' || typeof referenceDate === 'number'
+      ? new Date(referenceDate)
+      : new Date();
+
+  const year = ref.getFullYear();
+  const month = ref.getMonth() + 1; // 1-12
+
+  switch (preset) {
+    case 'this_year':
+      return {
+        startDate: formatIso(year, 1, 1),
+        endDate: formatIso(year, 12, 31),
+      };
+
+    case 'last_year':
+      return {
+        startDate: formatIso(year - 1, 1, 1),
+        endDate: formatIso(year - 1, 12, 31),
+      };
+
+    case 'this_half_year': {
+      const isH1 = month <= 6;
+      return {
+        startDate: isH1 ? formatIso(year, 1, 1) : formatIso(year, 7, 1),
+        endDate: isH1 ? formatIso(year, 6, 30) : formatIso(year, 12, 31),
+      };
+    }
+
+    case 'last_half_year': {
+      const isH1 = month <= 6;
+      return {
+        startDate: isH1 ? formatIso(year - 1, 7, 1) : formatIso(year, 1, 1),
+        endDate: isH1 ? formatIso(year - 1, 12, 31) : formatIso(year, 6, 30),
+      };
+    }
+
+    case 'this_quarter': {
+      const q = Math.floor((month - 1) / 3) + 1;
+      const startM = (q - 1) * 3 + 1;
+      const endM = q * 3;
+      return {
+        startDate: formatIso(year, startM, 1),
+        endDate: formatIso(year, endM, getLastDayOfMonth(year, endM)),
+      };
+    }
+
+    case 'last_quarter': {
+      const q = Math.floor((month - 1) / 3) + 1;
+      const prevQ = q === 1 ? 4 : q - 1;
+      const prevQYear = q === 1 ? year - 1 : year;
+      const startM = (prevQ - 1) * 3 + 1;
+      const endM = prevQ * 3;
+      return {
+        startDate: formatIso(prevQYear, startM, 1),
+        endDate: formatIso(prevQYear, endM, getLastDayOfMonth(prevQYear, endM)),
+      };
+    }
+
+    case 'this_month':
+      return {
+        startDate: formatIso(year, month, 1),
+        endDate: formatIso(year, month, getLastDayOfMonth(year, month)),
+      };
+
+    case 'last_month': {
+      const prevM = month === 1 ? 12 : month - 1;
+      const prevMYear = month === 1 ? year - 1 : year;
+      return {
+        startDate: formatIso(prevMYear, prevM, 1),
+        endDate: formatIso(prevMYear, prevM, getLastDayOfMonth(prevMYear, prevM)),
+      };
+    }
+
+    default:
+      return { startDate: '', endDate: '' };
+  }
+}
+
+/**
+ * Erzeugt einen Datumsbereich vom 1. Tag des Startmonats bis zum letzten Tag des Endmonats.
+ *
+ * @param {string} startMonthKey - Startmonat im Format YYYY-MM
+ * @param {string} endMonthKey - Endmonat im Format YYYY-MM
+ * @returns {DateRange} Bereich mit startDate und endDate
+ *
+ * @example
+ * ```ts
+ * getMonthDateRange('2025-02', '2025-04');
+ * // => { startDate: '2025-02-01', endDate: '2025-04-30' }
+ * ```
+ */
+export function getMonthDateRange(startMonthKey: string, endMonthKey: string): DateRange {
+  if (!startMonthKey && !endMonthKey) {
+    return { startDate: '', endDate: '' };
+  }
+
+  const [sY, sM] = (startMonthKey || endMonthKey).split('-').map(Number);
+  const [eY, eM] = (endMonthKey || startMonthKey).split('-').map(Number);
+
+  const startDate = formatIso(sY, sM, 1);
+  const endDate = formatIso(eY, eM, getLastDayOfMonth(eY, eM));
+
+  return { startDate, endDate };
+}
+
+/**
+ * Erkennt, ob ein gegebener Von-Bis-Datumsbereich exakt einem Standard-Preset entspricht.
+ *
+ * @param {string} startDate - Startdatum YYYY-MM-DD
+ * @param {string} endDate - Enddatum YYYY-MM-DD
+ * @param {Date | string | number} [referenceDate=new Date()] - Referenzzeitpunkt
+ * @returns {DateRangePreset} Das erkannte Preset oder 'custom'
+ */
+export function detectPresetForRange(
+  startDate: string,
+  endDate: string,
+  referenceDate: Date | string | number = new Date()
+): DateRangePreset {
+  if (!startDate && !endDate) {
+    return 'all_time';
+  }
+
+  const presets: DateRangePreset[] = [
+    'this_year',
+    'this_half_year',
+    'this_quarter',
+    'this_month',
+    'last_year',
+    'last_half_year',
+    'last_quarter',
+    'last_month',
+  ];
+
+  for (const p of presets) {
+    const r = getDateRangeForPreset(p, referenceDate);
+    if (r.startDate === startDate && r.endDate === endDate) {
+      return p;
+    }
+  }
+
+  return 'custom';
+}
+
+/**
+ * Formatiert einen Datumsbereich kompakt und lesbar für den Trigger-Button.
+ *
+ * @param {string} startDate - Startdatum YYYY-MM-DD
+ * @param {string} endDate - Enddatum YYYY-MM-DD
+ * @param {Date | string | number} [referenceDate=new Date()] - Referenzzeitpunkt
+ * @returns {string} Lesbare Beschriftung (z. B. "Dieses Jahr (2026)", "Mär 2025 – Jul 2026")
+ */
+export function formatDateRangeDisplay(
+  startDate: string,
+  endDate: string,
+  referenceDate: Date | string | number = new Date()
+): string {
+  if (!startDate && !endDate) {
+    return 'Gesamter Zeitraum';
+  }
+
+  const monthNames = [
+    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+  ];
+
+  const preset = detectPresetForRange(startDate, endDate, referenceDate);
+
+  const ref =
+    referenceDate instanceof Date
+      ? referenceDate
+      : typeof referenceDate === 'string' || typeof referenceDate === 'number'
+      ? new Date(referenceDate)
+      : new Date();
+  const year = ref.getFullYear();
+  const month = ref.getMonth() + 1;
+
+  switch (preset) {
+    case 'this_year':
+      return `Dieses Jahr (${year})`;
+    case 'last_year':
+      return `Letztes Jahr (${year - 1})`;
+    case 'this_half_year': {
+      const h = month <= 6 ? 1 : 2;
+      return `Dieses Halbjahr (H${h} ${year})`;
+    }
+    case 'last_half_year': {
+      const isH1 = month <= 6;
+      return isH1 ? `Letztes Halbjahr (H2 ${year - 1})` : `Letztes Halbjahr (H1 ${year})`;
+    }
+    case 'this_quarter': {
+      const q = Math.floor((month - 1) / 3) + 1;
+      return `Dieses Quartal (Q${q} ${year})`;
+    }
+    case 'last_quarter': {
+      const q = Math.floor((month - 1) / 3) + 1;
+      const prevQ = q === 1 ? 4 : q - 1;
+      const prevY = q === 1 ? year - 1 : year;
+      return `Letztes Quartal (Q${prevQ} ${prevY})`;
+    }
+    case 'this_month': {
+      return `Dieser Monat (${monthNames[month - 1]} ${year})`;
+    }
+    case 'last_month': {
+      const prevM = month === 1 ? 12 : month - 1;
+      const prevY = month === 1 ? year - 1 : year;
+      return `Letzter Monat (${monthNames[prevM - 1]} ${prevY})`;
+    }
+    default:
+      break;
+  }
+
+  if (startDate && endDate) {
+    const [sY, sM] = startDate.split('-');
+    const [eY, eM] = endDate.split('-');
+    const startLabel = `${monthNames[Number(sM) - 1]} ${sY}`;
+    const endLabel = `${monthNames[Number(eM) - 1]} ${eY}`;
+
+    if (startLabel === endLabel) {
+      return startLabel;
+    }
+    return `${startLabel} – ${endLabel}`;
+  }
+
+  if (startDate) {
+    const [sY, sM] = startDate.split('-');
+    return `Ab ${monthNames[Number(sM) - 1]} ${sY}`;
+  }
+
+  const [eY, eM] = endDate.split('-');
+  return `Bis ${monthNames[Number(eM) - 1]} ${eY}`;
+}

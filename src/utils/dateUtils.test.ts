@@ -16,6 +16,11 @@ import {
   getYearFromPeriodKey,
   formatSubPeriodLabel,
   fillPeriodKeyRange,
+  getPeriodKeysBetween,
+  getDateRangeForPreset,
+  getMonthDateRange,
+  detectPresetForRange,
+  formatDateRangeDisplay,
 } from './dateUtils';
 import { ISODateString } from '@/types/finance';
 
@@ -180,6 +185,171 @@ describe('dateUtils', () => {
         '2026-H1',
         '2026-H2',
       ]);
+    });
+  });
+
+  describe('getDateRangeForPreset', () => {
+    // Referenzdatum: 15. September 2026 (Q3, H2)
+    const refDate = new Date(2026, 8, 15);
+
+    it('calculates this_year and last_year correctly', () => {
+      expect(getDateRangeForPreset('this_year', refDate)).toEqual({
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+      });
+      expect(getDateRangeForPreset('last_year', refDate)).toEqual({
+        startDate: '2025-01-01',
+        endDate: '2025-12-31',
+      });
+    });
+
+    it('calculates this_half_year and last_half_year correctly', () => {
+      // September ist H2
+      expect(getDateRangeForPreset('this_half_year', refDate)).toEqual({
+        startDate: '2026-07-01',
+        endDate: '2026-12-31',
+      });
+      // Vorheriges Halbjahr ist H1 2026
+      expect(getDateRangeForPreset('last_half_year', refDate)).toEqual({
+        startDate: '2026-01-01',
+        endDate: '2026-06-30',
+      });
+
+      // Wenn Referenzdatum in H1 liegt (z.B. März 2026):
+      const refH1 = new Date(2026, 2, 10);
+      expect(getDateRangeForPreset('this_half_year', refH1)).toEqual({
+        startDate: '2026-01-01',
+        endDate: '2026-06-30',
+      });
+      expect(getDateRangeForPreset('last_half_year', refH1)).toEqual({
+        startDate: '2025-07-01',
+        endDate: '2025-12-31',
+      });
+    });
+
+    it('calculates this_quarter and last_quarter correctly', () => {
+      // September ist Q3
+      expect(getDateRangeForPreset('this_quarter', refDate)).toEqual({
+        startDate: '2026-07-01',
+        endDate: '2026-09-30',
+      });
+      expect(getDateRangeForPreset('last_quarter', refDate)).toEqual({
+        startDate: '2026-04-01',
+        endDate: '2026-06-30',
+      });
+
+      // Januar (Q1): last_quarter sollte Q4 des Vorjahres sein
+      const refQ1 = new Date(2026, 0, 15);
+      expect(getDateRangeForPreset('this_quarter', refQ1)).toEqual({
+        startDate: '2026-01-01',
+        endDate: '2026-03-31',
+      });
+      expect(getDateRangeForPreset('last_quarter', refQ1)).toEqual({
+        startDate: '2025-10-01',
+        endDate: '2025-12-31',
+      });
+    });
+
+    it('calculates this_month and last_month correctly', () => {
+      // September (30 Tage)
+      expect(getDateRangeForPreset('this_month', refDate)).toEqual({
+        startDate: '2026-09-01',
+        endDate: '2026-09-30',
+      });
+      expect(getDateRangeForPreset('last_month', refDate)).toEqual({
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+      });
+
+      // Januar: Vormonat ist Dezember des Vorjahres
+      const refJan = new Date(2026, 0, 15);
+      expect(getDateRangeForPreset('last_month', refJan)).toEqual({
+        startDate: '2025-12-01',
+        endDate: '2025-12-31',
+      });
+    });
+
+    it('returns empty strings for all_time', () => {
+      expect(getDateRangeForPreset('all_time', refDate)).toEqual({
+        startDate: '',
+        endDate: '',
+      });
+    });
+  });
+
+  describe('getMonthDateRange', () => {
+    it('creates accurate full-month date boundaries', () => {
+      expect(getMonthDateRange('2025-02', '2025-04')).toEqual({
+        startDate: '2025-02-01',
+        endDate: '2025-04-30',
+      });
+    });
+
+    it('handles leap year in February', () => {
+      expect(getMonthDateRange('2024-02', '2024-02')).toEqual({
+        startDate: '2024-02-01',
+        endDate: '2024-02-29',
+      });
+      expect(getMonthDateRange('2025-02', '2025-02')).toEqual({
+        startDate: '2025-02-01',
+        endDate: '2025-02-28',
+      });
+    });
+  });
+
+  describe('detectPresetForRange & formatDateRangeDisplay', () => {
+    const refDate = new Date(2026, 8, 15);
+
+    it('detects presets correctly', () => {
+      expect(detectPresetForRange('2026-01-01', '2026-12-31', refDate)).toBe('this_year');
+      expect(detectPresetForRange('2026-07-01', '2026-12-31', refDate)).toBe('this_half_year');
+      expect(detectPresetForRange('2026-07-01', '2026-09-30', refDate)).toBe('this_quarter');
+      expect(detectPresetForRange('2026-09-01', '2026-09-30', refDate)).toBe('this_month');
+      expect(detectPresetForRange('', '', refDate)).toBe('all_time');
+      expect(detectPresetForRange('2025-03-01', '2026-05-31', refDate)).toBe('custom');
+    });
+
+    it('formats display labels cleanly', () => {
+      expect(formatDateRangeDisplay('2026-01-01', '2026-12-31', refDate)).toBe('Dieses Jahr (2026)');
+      expect(formatDateRangeDisplay('', '', refDate)).toBe('Gesamter Zeitraum');
+      expect(formatDateRangeDisplay('2025-03-01', '2026-05-31', refDate)).toBe('Mär 2025 – Mai 2026');
+      expect(formatDateRangeDisplay('2025-03-01', '2025-03-31', refDate)).toBe('Mär 2025');
+    });
+  });
+
+  describe('getPeriodKeysBetween', () => {
+    it('returns exact period keys for monthly granularity', () => {
+      expect(getPeriodKeysBetween('2026-09-01', '2026-09-30', 'monthly')).toEqual(['2026-09']);
+      expect(getPeriodKeysBetween('2026-07-01', '2026-09-30', 'monthly')).toEqual([
+        '2026-07',
+        '2026-08',
+        '2026-09',
+      ]);
+      expect(getPeriodKeysBetween('2025-11-01', '2026-02-28', 'monthly')).toEqual([
+        '2025-11',
+        '2025-12',
+        '2026-01',
+        '2026-02',
+      ]);
+    });
+
+    it('returns exact period keys for quarterly, halfYearly, and yearly', () => {
+      expect(getPeriodKeysBetween('2026-07-01', '2026-09-30', 'quarterly')).toEqual(['2026-Q3']);
+      expect(getPeriodKeysBetween('2026-01-01', '2026-12-31', 'halfYearly')).toEqual([
+        '2026-H1',
+        '2026-H2',
+      ]);
+      expect(getPeriodKeysBetween('2024-01-01', '2026-12-31', 'yearly')).toEqual([
+        '2024',
+        '2025',
+        '2026',
+      ]);
+    });
+
+    it('returns empty array when inputs are missing or invalid', () => {
+      expect(getPeriodKeysBetween('', '', 'monthly')).toEqual([]);
+      expect(getPeriodKeysBetween('2026-09-01', '', 'monthly')).toEqual([]);
+      expect(getPeriodKeysBetween('2027-01-01', '2026-01-01', 'monthly')).toEqual([]);
     });
   });
 });

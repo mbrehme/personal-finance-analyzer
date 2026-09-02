@@ -14,6 +14,7 @@ import {
   sortTransactionsDesc,
 } from '@/types/finance';
 import { IconRenderer } from '@/components/IconRenderer';
+import { DateRangePicker } from '@/components/DateRangePicker';
 import { CsvImportModal } from '@/components/modals/CsvImportModal';
 import { formatDate } from '@/utils/dateUtils';
 import {
@@ -520,28 +521,16 @@ export const Transactions: React.FC = () => {
           </div>
 
           {/* 5. Datums-Bereich */}
-          <div className="lg:col-span-3 flex items-center gap-1.5">
-            <div className="relative flex-1 flex items-center">
-              <input
-                type="date"
-                value={inputStartDate}
-                onChange={(e) => setInputStartDate(e.target.value)}
-                className="w-full h-9 px-2.5 text-xs border border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
-                title="Von Datum"
-                placeholder="Von"
-              />
-            </div>
-            <span className="text-slate-400 text-xs font-bold shrink-0">–</span>
-            <div className="relative flex-1 flex items-center">
-              <input
-                type="date"
-                value={inputEndDate}
-                onChange={(e) => setInputEndDate(e.target.value)}
-                className="w-full h-9 px-2.5 text-xs border border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
-                title="Bis Datum"
-                placeholder="Bis"
-              />
-            </div>
+          <div className="lg:col-span-3">
+            <DateRangePicker
+              startDate={inputStartDate}
+              endDate={inputEndDate}
+              onChange={({ startDate, endDate }) => {
+                setInputStartDate(startDate);
+                setInputEndDate(endDate);
+              }}
+              className="w-full"
+            />
           </div>
         </div>
       </form>

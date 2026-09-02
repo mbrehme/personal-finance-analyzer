@@ -22,5 +22,31 @@ describe('Transactions Page', () => {
     expect(screen.getByText(/CSV Import/i)).toBeInTheDocument();
     expect(screen.getByText(/Filter & Suche/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Filter anwenden/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Zeitraum auswählen/i })).toBeInTheDocument();
+    expect(screen.getByText('Gesamter Zeitraum')).toBeInTheDocument();
+  });
+
+  it('allows opening the date range picker and selecting a preset', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    const datePickerBtn = await screen.findByRole('button', { name: /Zeitraum auswählen/i });
+    await user.click(datePickerBtn);
+
+    expect(screen.getByText('Zeitraum wählen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dieses Jahr' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Dieses Jahr' }));
+    expect(screen.getByText(/Dieses Jahr/i)).toBeInTheDocument();
+
+    // Filter erst anwenden, wenn der Button geklickt wird
+    const applyBtn = screen.getByRole('button', { name: /Filter anwenden/i });
+    await user.click(applyBtn);
   });
 });

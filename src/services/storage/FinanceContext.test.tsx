@@ -34,7 +34,6 @@ describe('FinanceContext', () => {
     await act(async () => {
       createdAcc = await result.current.addAccount({
         name: 'Neues Sparkonto',
-        currency: 'EUR',
         bucketIds: [],
         balanceEntries: [],
       });

@@ -325,7 +325,7 @@ export const Transactions: React.FC = () => {
                         <span className={isOutbound ? 'text-slate-900' : 'text-emerald-600'}>
                           {tx.value.toLocaleString('de-DE', {
                             style: 'currency',
-                            currency: account?.currency || 'EUR',
+                            currency: 'EUR',
                             signDisplay: 'always',
                           })}
                         </span>

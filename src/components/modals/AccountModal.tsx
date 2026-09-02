@@ -33,8 +33,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   existingBuckets,
 }) => {
   const [name, setName] = useState('');
-  const [iban, setIban] = useState('');
-  const [currency, setCurrency] = useState('EUR');
   const [color, setColor] = useState(COLOR_PALETTE[0]);
   const [icon, setIcon] = useState('Landmark');
   const [bucketIds, setBucketIds] = useState<string[]>([]);
@@ -49,16 +47,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   useEffect(() => {
     if (account) {
       setName(account.name);
-      setIban(account.iban || '');
-      setCurrency(account.currency || 'EUR');
       setColor(account.color || COLOR_PALETTE[0]);
       setIcon(account.icon || 'Landmark');
       setBucketIds(account.bucketIds || []);
       setBalanceEntries(account.balanceEntries || []);
     } else {
       setName('');
-      setIban('');
-      setCurrency('EUR');
       setColor(COLOR_PALETTE[0]);
       setIcon('Landmark');
       setBucketIds([]);
@@ -101,8 +95,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       const payload = {
         ...(account ? { id: account.id } : {}),
         name: name.trim(),
-        iban: iban.trim() || undefined,
-        currency,
         color,
         icon,
         bucketIds,
@@ -136,45 +128,18 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
         <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
           {/* Basis-Informationen */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Kontoname *
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="z. B. Girokonto ING, Tagesgeld DKB, Depot"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                IBAN (optional)
-              </label>
-              <input
-                type="text"
-                value={iban}
-                onChange={(e) => setIban(e.target.value)}
-                placeholder="DE89 3704 0044 ..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm uppercase"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Währung
-              </label>
-              <input
-                type="text"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Kontoname *
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="z. B. Girokonto ING, Tagesgeld DKB, Depot"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
           </div>
 
           {/* Farbe & Icon */}
@@ -265,7 +230,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
                       <span className="font-semibold text-slate-800">{entry.date}:</span>
                       <span className="text-slate-900 font-bold">
-                        {entry.amount.toLocaleString('de-DE', { style: 'currency', currency })}
+                        {entry.amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                       </span>
                       {entry.note && <span className="text-slate-500 italic">({entry.note})</span>}
                     </div>

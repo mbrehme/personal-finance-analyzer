@@ -114,11 +114,6 @@ export const Balances: React.FC = () => {
                         </div>
                         <div>
                           <div className="font-bold text-slate-900">{row.account.name}</div>
-                          {row.account.iban && (
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              {row.account.iban}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -136,7 +131,7 @@ export const Balances: React.FC = () => {
                           <div className="font-bold text-slate-900">
                             {pData.endBalance.toLocaleString('de-DE', {
                               style: 'currency',
-                              currency: row.account.currency,
+                              currency: 'EUR',
                             })}
                           </div>
                           {pData.cashflow !== 0 && (
@@ -148,7 +143,7 @@ export const Balances: React.FC = () => {
                               ({pData.cashflow >= 0 ? '+' : ''}
                               {pData.cashflow.toLocaleString('de-DE', {
                                 style: 'currency',
-                                currency: row.account.currency,
+                                currency: 'EUR',
                               })}
                               )
                             </div>
@@ -161,7 +156,7 @@ export const Balances: React.FC = () => {
                     <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold bg-slate-50/50 text-slate-900 text-sm">
                       {row.latestBalance.toLocaleString('de-DE', {
                         style: 'currency',
-                        currency: row.account.currency,
+                        currency: 'EUR',
                       })}
                     </td>
                   </tr>

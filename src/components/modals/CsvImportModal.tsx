@@ -153,7 +153,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name} {acc.iban ? `(${acc.iban})` : ''}
+                      {acc.name}
                     </option>
                   ))}
                 </select>

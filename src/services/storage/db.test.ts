@@ -17,7 +17,6 @@ describe('financeDB Storage Layer', () => {
     const account: Account = {
       id: 'acc-1',
       name: 'Girokonto Test',
-      currency: 'EUR',
       bucketIds: ['b-living'],
       balanceEntries: [
         { id: 'be-1', date: '2026-09-01', amount: 2500, note: 'Monatsanfang' },
@@ -83,7 +82,6 @@ describe('financeDB Storage Layer', () => {
     const account: Account = {
       id: 'acc-export',
       name: 'Sparkonto',
-      currency: 'EUR',
       bucketIds: ['b-savings'],
       balanceEntries: [],
     };

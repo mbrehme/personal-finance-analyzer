@@ -12,7 +12,6 @@ describe('balanceCalculator', () => {
   const account: Account = {
     id: 'acc-giro',
     name: 'Girokonto',
-    currency: 'EUR',
     bucketIds: [],
     balanceEntries: [
       {

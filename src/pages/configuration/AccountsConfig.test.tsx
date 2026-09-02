@@ -23,6 +23,7 @@ describe('AccountsConfig Subpage', () => {
 
     const dragHandles = screen.getAllByTitle('Ziehen zum Umsortieren');
     expect(dragHandles.length).toBeGreaterThan(0);
+    expect(screen.getByText(/Stichtag:/i)).toBeInTheDocument();
   });
 });
 

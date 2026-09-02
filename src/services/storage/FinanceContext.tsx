@@ -56,7 +56,6 @@ const SEED_ACCOUNTS: Account[] = [
   {
     id: 'acc-giro-main',
     name: 'Haupt-Girokonto',
-    currency: 'EUR',
     color: '#3b82f6',
     icon: 'Landmark',
     bucketIds: ['b-living', 'b-rent', 'b-groceries', 'b-salary', 'b-leisure'],

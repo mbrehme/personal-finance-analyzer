@@ -136,7 +136,7 @@ export const ConfigurationLayout: React.FC = () => {
           }`}
         >
           <Landmark className="w-4 h-4" />
-          Konten & Salden ({accounts.length})
+          Konten ({accounts.length})
         </NavLink>
       </div>
 

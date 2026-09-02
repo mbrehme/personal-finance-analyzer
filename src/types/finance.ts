@@ -98,10 +98,6 @@ export interface BalanceEntry {
 export interface Account extends EntityVisualMetadata {
   /** Eindeutige ID des Kontos */
   id: string;
-  /** Optionale IBAN */
-  iban?: string;
-  /** Währungscode (Standard 'EUR') */
-  currency: string;
   /** IDs der diesem Konto zugeordneten Buckets */
   bucketIds: string[];
   /** Historische Stichtags-Salden zur exakten Salden-Rekonstruktion */

@@ -7,6 +7,7 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
 import { Account } from '@/types/finance';
+import { formatDate } from '@/utils/dateUtils';
 import { IconRenderer } from '@/components/IconRenderer';
 import { AccountModal } from '@/components/modals/AccountModal';
 import {
@@ -155,9 +156,6 @@ export const AccountsConfig: React.FC = () => {
                     <h3 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                       {acc.name}
                     </h3>
-                    <p className="text-xs text-slate-500 font-mono">
-                      {acc.iban || 'Keine IBAN angegeben'} ({acc.currency})
-                    </p>
                   </div>
                 </div>
 
@@ -187,21 +185,33 @@ export const AccountsConfig: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Rechter Bereich: Saldo & Aktionen */}
-                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 min-w-[220px]">
+                {/* Rechter Bereich: Saldo mit Stichtag & Aktionen */}
+                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 min-w-[230px]">
                   <div className="text-left sm:text-right">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center sm:justify-end gap-1 mb-0.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      {acc.balanceEntries.length} Salden
-                    </div>
-                    <div className="font-mono font-bold text-slate-900 text-sm">
-                      {acc.balanceEntries.length > 0
-                        ? acc.balanceEntries[acc.balanceEntries.length - 1].amount.toLocaleString('de-DE', {
+                    {acc.balanceEntries.length > 0 ? (
+                      <>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center sm:justify-end gap-1 mb-0.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Stichtag: {formatDate(acc.balanceEntries[acc.balanceEntries.length - 1].date)}</span>
+                        </div>
+                        <div className="font-mono font-bold text-slate-900 text-sm">
+                          {acc.balanceEntries[acc.balanceEntries.length - 1].amount.toLocaleString('de-DE', {
                             style: 'currency',
-                            currency: acc.currency,
-                          })
-                        : '0,00 €'}
-                    </div>
+                            currency: 'EUR',
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center sm:justify-end gap-1 mb-0.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-slate-300" />
+                          <span>Kein Stichtag</span>
+                        </div>
+                        <div className="font-mono font-bold text-slate-400 text-sm">
+                          0,00 €
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1">

@@ -17,7 +17,7 @@ describe('CsvImportModal', () => {
       <CsvImportModal
         isOpen={true}
         onClose={handleClose}
-        accounts={[{ id: 'acc-1', name: 'Girokonto', currency: 'EUR', bucketIds: [], balanceEntries: [] }]}
+        accounts={[{ id: 'acc-1', name: 'Girokonto', bucketIds: [], balanceEntries: [] }]}
         onImport={handleImport}
       />
     );

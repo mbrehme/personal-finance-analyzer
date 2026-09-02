@@ -30,7 +30,7 @@ describe('ConfigurationLayout', () => {
     expect(screen.getByText('JSON Import')).toBeInTheDocument();
     expect(screen.getByText('Zurücksetzen')).toBeInTheDocument();
     expect(screen.getByText(/Buckets \(\d+\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Konten & Salden \(\d+\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Konten \(\d+\)/i)).toBeInTheDocument();
     expect(screen.getByText('Buckets Content')).toBeInTheDocument();
   });
 });

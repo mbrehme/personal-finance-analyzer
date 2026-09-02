@@ -5,13 +5,13 @@
  * @module pages/Cashflow
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
 import { PeriodGranularity } from '@/types/finance';
 import { calculateCashflowMatrix, BucketCashflowRow } from '@/services/analytics/cashflowCalculator';
 import { PeriodSelector } from '@/components/PeriodSelector';
 import { IconRenderer } from '@/components/IconRenderer';
-import { formatPeriodLabel } from '@/utils/dateUtils';
+import { formatPeriodLabel, getCurrentPeriodKey } from '@/utils/dateUtils';
 import {
   TrendingUp,
   ChevronRight,
@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Target,
+  Calendar,
 } from 'lucide-react';
 
 export const Cashflow: React.FC = () => {
@@ -27,6 +28,9 @@ export const Cashflow: React.FC = () => {
   const [granularity, setGranularity] = useState<PeriodGranularity>('monthly');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const currentPeriodHeaderRef = useRef<HTMLTableCellElement>(null);
 
   const toggleCollapse = (bucketId: string) => {
     setCollapsedBuckets((prev) => {
@@ -48,6 +52,51 @@ export const Cashflow: React.FC = () => {
       selectedAccountId !== 'all' ? selectedAccountId : undefined
     );
   }, [buckets, transactions, granularity, selectedAccountId]);
+
+  const currentPeriodKey = useMemo(() => getCurrentPeriodKey(granularity), [granularity]);
+  const hasCurrentPeriod = matrix.periodKeys.includes(currentPeriodKey);
+
+  // Automatisches und manuelles Scrollen zum aktuellen Zeitraum
+  const scrollToCurrentPeriod = useCallback(() => {
+    if (!tableContainerRef.current) return;
+
+    const container = tableContainerRef.current;
+    const targetEl = currentPeriodHeaderRef.current;
+
+    if (targetEl) {
+      const targetLeft = targetEl.offsetLeft;
+      const targetWidth = targetEl.offsetWidth;
+      const containerWidth = container.clientWidth;
+      const scrollLeft = Math.max(0, targetLeft - containerWidth / 2 + targetWidth / 2);
+
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+      } else {
+        container.scrollLeft = scrollLeft;
+      }
+      return;
+    }
+
+    // Fallback: Wenn heutiger Zeitraum jünger als alle Daten ist, zum neuesten Zeitraum scrollen
+    if (
+      matrix.periodKeys.length > 0 &&
+      currentPeriodKey > matrix.periodKeys[matrix.periodKeys.length - 1]
+    ) {
+      const scrollLeft = container.scrollWidth;
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+      } else {
+        container.scrollLeft = scrollLeft;
+      }
+    }
+  }, [currentPeriodKey, matrix.periodKeys]);
+
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      scrollToCurrentPeriod();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [scrollToCurrentPeriod]);
 
   // Rekursives Rendern der Zeilen unter Beachtung des Collapse-States
   const renderRows = (): React.ReactNode => {
@@ -113,12 +162,18 @@ export const Cashflow: React.FC = () => {
 
             {/* Perioden Spalten */}
             {matrix.periodKeys.map((pKey) => {
+              const isCurrent = pKey === currentPeriodKey;
               const pData = row.periods[pKey] || { inbound: 0, outbound: 0, net: 0 };
               const isOverBudget =
                 pData.diffToBudget !== undefined && pData.diffToBudget > 0;
 
               return (
-                <td key={pKey} className="py-3 px-4 text-right whitespace-nowrap font-mono">
+                <td
+                  key={pKey}
+                  className={`py-3 px-4 text-right whitespace-nowrap font-mono transition-colors ${
+                    isCurrent ? 'bg-blue-50/50 border-x-2 border-blue-200/80 font-semibold' : ''
+                  }`}
+                >
                   {pData.net !== 0 ? (
                     <div>
                       <span
@@ -141,7 +196,7 @@ export const Cashflow: React.FC = () => {
                       )}
                     </div>
                   ) : (
-                    <span className="text-slate-300">-</span>
+                    <span className={isCurrent ? 'text-slate-400' : 'text-slate-300'}>-</span>
                   )}
                 </td>
               );
@@ -198,6 +253,19 @@ export const Cashflow: React.FC = () => {
 
           {/* Granularitäts-Umschalter */}
           <PeriodSelector value={granularity} onChange={setGranularity} />
+
+          {/* Button: Zu aktuellem Zeitraum springen */}
+          {hasCurrentPeriod && (
+            <button
+              type="button"
+              onClick={scrollToCurrentPeriod}
+              title="Zum aktuellen Zeitraum scrollen"
+              className="px-2.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Heute</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -250,17 +318,36 @@ export const Cashflow: React.FC = () => {
 
       {/* Matrix Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div ref={tableContainerRef} className="overflow-x-auto scroll-smooth">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                 <th className="py-3.5 px-4 min-w-[220px]">Bucket</th>
                 <th className="py-3.5 px-3 text-right">Soll / Periode</th>
-                {matrix.periodKeys.map((pKey) => (
-                  <th key={pKey} className="py-3.5 px-4 text-right min-w-[120px]">
-                    {formatPeriodLabel(pKey, granularity)}
-                  </th>
-                ))}
+                {matrix.periodKeys.map((pKey) => {
+                  const isCurrent = pKey === currentPeriodKey;
+                  return (
+                    <th
+                      key={pKey}
+                      ref={isCurrent ? currentPeriodHeaderRef : undefined}
+                      data-testid={isCurrent ? 'current-period-header' : undefined}
+                      className={`py-3.5 px-4 text-right min-w-[130px] transition-colors ${
+                        isCurrent
+                          ? 'bg-blue-100/90 text-blue-950 border-x-2 border-blue-400 font-extrabold shadow-inner'
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>{formatPeriodLabel(pKey, granularity)}</span>
+                        {isCurrent && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider bg-blue-600 text-white shadow-xs">
+                            Aktuell
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
                 <th className="py-3.5 px-4 text-right min-w-[130px] bg-slate-100/70">Gesamt</th>
               </tr>
             </thead>
@@ -285,13 +372,14 @@ export const Cashflow: React.FC = () => {
                   <td className="py-3.5 px-4 text-slate-900 font-bold">Netto-Gesamtergebnis</td>
                   <td className="py-3.5 px-3 text-right text-slate-400">-</td>
                   {matrix.periodKeys.map((pKey) => {
+                    const isCurrent = pKey === currentPeriodKey;
                     const net = matrix.totalRow.periods[pKey]?.net || 0;
                     return (
                       <td
                         key={pKey}
-                        className={`py-3.5 px-4 text-right font-mono font-bold ${
-                          net >= 0 ? 'text-emerald-600' : 'text-slate-900'
-                        }`}
+                        className={`py-3.5 px-4 text-right font-mono font-bold transition-colors ${
+                          isCurrent ? 'bg-blue-100/90 border-x-2 border-blue-400' : ''
+                        } ${net >= 0 ? 'text-emerald-600' : 'text-slate-900'}`}
                       >
                         {net.toLocaleString('de-DE', {
                           style: 'currency',

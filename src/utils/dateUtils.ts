@@ -161,6 +161,27 @@ export function getPeriodKey(dateStr: ISODateString, granularity: PeriodGranular
 }
 
 /**
+ * Ermittelt den Periodenschlüssel für den aktuellen Zeitpunkt (bzw. ein übergebenes Referenzdatum)
+ * unter Berücksichtigung der gewählten Granularität.
+ *
+ * @param {PeriodGranularity} granularity - Die gewünschte Zeit-Granularität ('monthly', 'quarterly', 'halfYearly', 'yearly')
+ * @param {Date | string | number} [referenceDate=new Date()] - Optionales Referenzdatum (standardmäßig heute)
+ * @returns {string} Der ermittelte Periodenschlüssel (z. B. '2026-09', '2026-Q3', '2026-H2', '2026')
+ * @example
+ * ```ts
+ * const currentMonthKey = getCurrentPeriodKey('monthly'); // '2026-09'
+ * const currentQuarterKey = getCurrentPeriodKey('quarterly'); // '2026-Q3'
+ * ```
+ */
+export function getCurrentPeriodKey(
+  granularity: PeriodGranularity,
+  referenceDate: Date | string | number = new Date()
+): string {
+  const iso = toISODateString(referenceDate);
+  return getPeriodKey(iso, granularity);
+}
+
+/**
  * Formatiert einen Perioden-Schlüssel für die Tabellenköpfe lesbar.
  */
 export function formatPeriodLabel(periodKey: string, granularity: PeriodGranularity): string {

@@ -12,6 +12,7 @@ import {
   getPeriodKey,
   formatPeriodLabel,
   normalizeBudgetToGranularity,
+  getCurrentPeriodKey,
 } from './dateUtils';
 import { ISODateString } from '@/types/finance';
 
@@ -102,6 +103,23 @@ describe('dateUtils', () => {
 
     it('scales yearly budget down to monthly', () => {
       expect(normalizeBudgetToGranularity(1200, 'yearly', 'monthly')).toBe(100);
+    });
+  });
+
+  describe('getCurrentPeriodKey', () => {
+    const fixedDate = new Date(2026, 8, 2); // 2026-09-02
+
+    it('returns the current period key for a given date across all granularities', () => {
+      expect(getCurrentPeriodKey('monthly', fixedDate)).toBe('2026-09');
+      expect(getCurrentPeriodKey('quarterly', fixedDate)).toBe('2026-Q3');
+      expect(getCurrentPeriodKey('halfYearly', fixedDate)).toBe('2026-H2');
+      expect(getCurrentPeriodKey('yearly', fixedDate)).toBe('2026');
+    });
+
+    it('defaults to current date when no referenceDate is provided', () => {
+      const now = new Date();
+      const currentYear = String(now.getFullYear());
+      expect(getCurrentPeriodKey('yearly')).toBe(currentYear);
     });
   });
 });

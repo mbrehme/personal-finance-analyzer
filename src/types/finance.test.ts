@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { buildCompoundSearchField, sortTransactionsDesc, Transaction } from './finance';
 
 describe('finance domain helpers', () => {
-  it('builds a compound search field with all relevant transaction properties', () => {
+  it('builds a compound search field with format [Typ] Empfänger: Zweck (Iban)', () => {
     const tx: Transaction = {
       id: 'tx-123',
       accountId: 'acc-ing',
@@ -25,13 +25,25 @@ describe('finance domain helpers', () => {
     };
 
     const compound = buildCompoundSearchField(tx);
-    expect(compound).toContain('acc-ing');
-    expect(compound).toContain('Arbeitgeber GmbH');
-    expect(compound).toContain('Max Mustermann');
-    expect(compound).toContain('Gehaltszahlung August');
-    expect(compound).toContain('inbound');
-    expect(compound).toContain('3500');
-    expect(compound).toContain('DE1234567890');
+    expect(compound).toBe('[Eingang] Max Mustermann: Gehaltszahlung August (DE1234567890)');
+
+    const txOutbound: Transaction = {
+      id: 'tx-124',
+      accountId: 'acc-ing',
+      valueDate: '2026-09-02',
+      bookingDate: '2026-09-02',
+      issuer: 'Max Mustermann',
+      receiver: 'REWE Markt GmbH',
+      subject: 'Kartenzahlung',
+      type: 'outbound',
+      iban: 'DE9876543210',
+      value: -42.5,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+    };
+
+    const compoundOutbound = buildCompoundSearchField(txOutbound);
+    expect(compoundOutbound).toBe('[Ausgang] REWE Markt GmbH: Kartenzahlung (DE9876543210)');
   });
 
   it('sorts transactions by date descending and preserves CSV importIndex order for same date', () => {

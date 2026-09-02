@@ -154,24 +154,25 @@ export interface Transaction {
 }
 
 /**
- * Erzeugt das zusammengesetzte Suchfeld (Compound Search String) für eine Transaktion.
- * Wird sowohl für die Freitextsuche als auch für die Regex-Bucket-Zuordnung verwendet.
+ * Erzeugt das zusammengesetzte Suchfeld (Compound Search String / Searchable Key) für eine Transaktion.
+ * Format: `[Typ] Empfänger: Zweck (Iban)`
+ * (z. B. `[Ausgang] REWE Markt: Einkauf Lebensmittel (DE1234567890)`)
  *
- * @param {Transaction} tx - Die Transaktion
- * @returns {string} Zusammengesetzter Suchstring
+ * Wird sowohl für die Freitextsuche als auch für die regelbasierte Regex-Bucket-Zuordnung verwendet.
+ *
+ * @param {Transaction} tx - Die zu verarbeitende Transaktion
+ * @returns {string} Zusammengesetzter Suchstring nach dem Schema `[Typ] Empfänger: Zweck (Iban)`
+ * @example
+ * const key = buildCompoundSearchField(transaction);
+ * // "[Ausgang] REWE Markt: Einkauf (DE1234567890)"
  */
 export function buildCompoundSearchField(tx: Transaction): string {
-  return [
-    tx.accountId,
-    tx.issuer,
-    tx.receiver,
-    tx.subject,
-    tx.type,
-    tx.value.toString(),
-    tx.iban,
-  ]
-    .filter(Boolean)
-    .join(' | ');
+  const type = tx.type === 'inbound' ? 'Eingang' : 'Ausgang';
+  const receiver = (tx.receiver || tx.issuer || '').trim();
+  const subject = (tx.subject || '').trim();
+  const iban = (tx.iban || '').trim();
+
+  return `[${type}] ${receiver}: ${subject} (${iban})`;
 }
 
 /**

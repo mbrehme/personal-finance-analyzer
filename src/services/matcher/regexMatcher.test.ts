@@ -32,7 +32,7 @@ describe('regexMatcher Engine', () => {
       id: 'b-salary',
       name: 'Gehalt',
       parentId: null,
-      regexPattern: 'acc-ing.*Gehalt|Tech Corp',
+      regexPattern: 'Eingang.+Gehalt|Tech Corp',
     },
     {
       id: 'b-special',
@@ -71,7 +71,7 @@ describe('regexMatcher Engine', () => {
     expect(match.assignmentSource).toBe('auto_regex');
   });
 
-  it('matches compound field with accountId and subject', () => {
+  it('matches compound field with [Eingang] and subject', () => {
     const tx: Transaction = {
       id: 'tx-2',
       accountId: 'acc-ing-giro',
@@ -120,8 +120,8 @@ describe('regexMatcher Engine', () => {
         accountId: 'acc-1',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
-        issuer: 'Rewe',
-        receiver: 'Me',
+        issuer: 'Me',
+        receiver: 'Rewe',
         subject: 'Einkauf',
         type: 'outbound',
         iban: 'DE00',
@@ -134,8 +134,8 @@ describe('regexMatcher Engine', () => {
         accountId: 'acc-1',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
-        issuer: 'Edeka',
-        receiver: 'Me',
+        issuer: 'Me',
+        receiver: 'Edeka',
         subject: 'Einkauf',
         type: 'outbound',
         iban: 'DE00',
@@ -150,5 +150,55 @@ describe('regexMatcher Engine', () => {
     expect(reMatched[0].assignmentSource).toBe('manual');
     expect(reMatched[1].bucketId).toBe('b-groceries'); // Neu zugewiesen
     expect(reMatched[1].assignmentSource).toBe('auto_regex');
+  });
+
+  it('matches against compound format [Typ] Empfänger: Zweck (Iban)', () => {
+    const testBuckets: Bucket[] = [
+      {
+        id: 'b-gifts',
+        name: 'Geschenke',
+        parentId: null,
+        regexPattern: 'Ausgang.+Geschenke',
+      },
+      {
+        id: 'b-partner-pocket',
+        name: 'Taschengeld Partner',
+        parentId: null,
+        regexPattern: 'Denise.+Taschengeld',
+      },
+    ];
+
+    const giftTx: Transaction = {
+      id: 'tx-gift',
+      accountId: 'acc-1',
+      valueDate: '2026-09-01',
+      bookingDate: '2026-09-01',
+      issuer: 'Me',
+      receiver: 'Amazon',
+      subject: 'Geschenke Geburtstag',
+      type: 'outbound',
+      iban: 'DE112233',
+      value: -50,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+    };
+
+    const pocketTx: Transaction = {
+      id: 'tx-pocket',
+      accountId: 'acc-1',
+      valueDate: '2026-09-01',
+      bookingDate: '2026-09-01',
+      issuer: 'Me',
+      receiver: 'Denise Gül Brehme',
+      subject: 'Monatliches Taschengeld',
+      type: 'outbound',
+      iban: 'DE445566',
+      value: -150,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+    };
+
+    expect(matchTransaction(giftTx, testBuckets).bucketId).toBe('b-gifts');
+    expect(matchTransaction(pocketTx, testBuckets).bucketId).toBe('b-partner-pocket');
   });
 });

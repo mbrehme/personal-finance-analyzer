@@ -13,6 +13,7 @@ import {
   FinanceConfigExport,
   Transaction,
   sortTransactionsDesc,
+  ReMatchStatus,
 } from '@/types/finance';
 import { financeDB } from './db';
 import { matchTransaction, reMatchAllTransactions } from '../matcher/regexMatcher';
@@ -23,6 +24,8 @@ export interface FinanceContextType {
   transactions: Transaction[];
   loading: boolean;
   error: string | null;
+  reMatchStatus: ReMatchStatus;
+  setReMatchStatus: (status: ReMatchStatus) => void;
   needsReMatch: boolean;
   reMatching: boolean;
   setNeedsReMatch: (val: boolean) => void;
@@ -62,14 +65,51 @@ const SEED_CONFIG = seedConfigurationJson as unknown as FinanceConfigExport;
 const SEED_ACCOUNTS: Account[] = SEED_CONFIG.accounts;
 const SEED_BUCKETS: Bucket[] = SEED_CONFIG.buckets;
 
+const REMATCH_STATUS_STORAGE_KEY = 'finance_rematch_status';
+
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [needsReMatch, setNeedsReMatch] = useState(false);
-  const [reMatching, setReMatching] = useState(false);
+  const [reMatchStatus, setReMatchStatusState] = useState<ReMatchStatus>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(REMATCH_STATUS_STORAGE_KEY);
+        if (
+          stored === 'needs_reprogress' ||
+          stored === 'is_reprogressing' ||
+          stored === 'has_progressed'
+        ) {
+          return stored;
+        }
+      }
+    } catch {
+      // ignore storage access errors
+    }
+    return 'has_progressed';
+  });
   const [error, setError] = useState<string | null>(null);
+
+  const setReMatchStatus = useCallback((status: ReMatchStatus) => {
+    setReMatchStatusState(status);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(REMATCH_STATUS_STORAGE_KEY, status);
+      }
+    } catch {
+      // ignore storage access errors
+    }
+  }, []);
+
+  const needsReMatch = reMatchStatus === 'needs_reprogress';
+  const reMatching = reMatchStatus === 'is_reprogressing';
+  const setNeedsReMatch = useCallback(
+    (val: boolean) => {
+      setReMatchStatus(val ? 'needs_reprogress' : 'has_progressed');
+    },
+    [setReMatchStatus]
+  );
 
   // Initiales Laden aus IndexedDB / Seeden bei erstem Start
   const loadData = useCallback(async () => {
@@ -181,7 +221,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await financeDB.saveBucket(newBucket);
     const updatedBuckets = [...buckets, newBucket];
     setBuckets(updatedBuckets);
-    setNeedsReMatch(true);
+    setReMatchStatus('needs_reprogress');
 
     return newBucket;
   };
@@ -190,13 +230,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await financeDB.saveBucket(updated);
     const updatedBuckets = buckets.map((b) => (b.id === updated.id ? updated : b));
     setBuckets(updatedBuckets);
-    setNeedsReMatch(true);
+    setReMatchStatus('needs_reprogress');
   };
 
   const reorderBuckets = async (updatedBuckets: Bucket[]): Promise<void> => {
     await financeDB.saveBuckets(updatedBuckets);
     setBuckets(updatedBuckets);
-    setNeedsReMatch(true);
+    setReMatchStatus('needs_reprogress');
   };
 
   const deleteBucket = async (bucketId: string): Promise<void> => {
@@ -212,7 +252,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
     await financeDB.saveTransactions(updatedTxs);
     setTransactions(sortTransactionsDesc(updatedTxs));
-    setNeedsReMatch(true);
+    setReMatchStatus('needs_reprogress');
   };
 
   /* ================== TRANSACTIONS ================== */
@@ -301,13 +341,20 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const triggerReMatch = async (): Promise<void> => {
     try {
-      setReMatching(true);
-      const updatedTxs = reMatchAllTransactions(transactions, buckets);
-      await financeDB.saveTransactions(updatedTxs);
+      setReMatchStatus('is_reprogressing');
+      const allTxs = transactions.length > 0 ? transactions : await financeDB.getTransactions();
+      const allBuckets = buckets.length > 0 ? buckets : await financeDB.getBuckets();
+      const updatedTxs = reMatchAllTransactions(allTxs, allBuckets);
+
+      if (updatedTxs.length > 0) {
+        await financeDB.saveTransactions(updatedTxs);
+      }
       setTransactions(sortTransactionsDesc(updatedTxs));
-      setNeedsReMatch(false);
-    } finally {
-      setReMatching(false);
+      setReMatchStatus('has_progressed');
+    } catch (err) {
+      console.error('Re-Match fehlgeschlagen:', err);
+      setReMatchStatus('needs_reprogress');
+      throw err;
     }
   };
 
@@ -327,7 +374,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await financeDB.importConfiguration(parsed);
     setAccounts(parsed.accounts);
     setBuckets(parsed.buckets);
-    setNeedsReMatch(true);
+    setReMatchStatus('needs_reprogress');
   };
 
   const resetWorkspace = async (): Promise<void> => {
@@ -343,6 +390,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         transactions,
         loading,
         error,
+        reMatchStatus,
+        setReMatchStatus,
         needsReMatch,
         reMatching,
         setNeedsReMatch,

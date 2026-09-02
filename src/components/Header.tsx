@@ -14,12 +14,11 @@ import {
   Receipt,
   TrendingUp,
   Shield,
-  Sparkles,
   Loader2,
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
-  const { needsReMatch, reMatching, triggerReMatch, transactions } = useFinance();
+  const { reMatchStatus, triggerReMatch } = useFinance();
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -68,42 +67,47 @@ export const Header: React.FC = () => {
           </NavLink>
         </nav>
 
-        {/* Header Actions */}
-        <div className="flex items-center gap-3">
-          {/* Globaler Neu-Matchen Knopf */}
+        {/* Header Actions: Re-Match Status Button */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={triggerReMatch}
-            disabled={reMatching || transactions.length === 0}
+            disabled={reMatchStatus === 'is_reprogressing'}
+            data-testid="rematch-button"
+            data-status={reMatchStatus}
             title={
-              needsReMatch
-                ? 'Regeln oder Buckets wurden angepasst. Klicke hier, um alle Buchungen neu zuzuordnen.'
-                : 'Regex-Regeln und Bucket-Zuweisungen auf alle Buchungen anwenden'
+              reMatchStatus === 'needs_reprogress'
+                ? 'Regeln oder Konfiguration wurden geändert. Klicke hier, um alle Buchungen neu zuzuordnen.'
+                : reMatchStatus === 'is_reprogressing'
+                ? 'Buchungen werden aktuell neu zugeordnet...'
+                : 'Alle Buchungen sind synchronisiert. Klicke für ein erneutes manuelles Matching.'
             }
-            className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${
-              needsReMatch
-                ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-md ring-2 ring-amber-400/50'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 shadow-sm disabled:opacity-40'
+            className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs transition-all ${
+              reMatchStatus === 'needs_reprogress'
+                ? 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 shadow-sm font-semibold'
+                : reMatchStatus === 'is_reprogressing'
+                ? 'bg-blue-50 text-blue-800 border border-blue-200 cursor-wait font-medium'
+                : 'text-slate-600 bg-white hover:bg-slate-100 border border-slate-200/80 shadow-sm hover:text-slate-900 font-medium disabled:opacity-40'
             }`}
           >
-            {reMatching ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-current" />
-            ) : (
-              <Sparkles
-                className={`w-3.5 h-3.5 ${
-                  needsReMatch ? 'text-amber-100 animate-bounce' : 'text-amber-500'
-                }`}
-              />
-            )}
-            <span>{reMatching ? 'Matche...' : 'Neu matchen'}</span>
-
-            {/* Pulsierender Indikator bei Änderungsbedarf */}
-            {needsReMatch && !reMatching && (
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-80"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+            {/* Status-Icon / Indikator */}
+            {reMatchStatus === 'is_reprogressing' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+            ) : reMatchStatus === 'needs_reprogress' ? (
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
               </span>
+            ) : (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
             )}
+
+            {/* Kompaktes Label */}
+            <span>
+              {reMatchStatus === 'is_reprogressing'
+                ? 'Progressing...'
+                : 'Reprogress'}
+            </span>
           </button>
         </div>
       </div>

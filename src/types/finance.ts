@@ -30,6 +30,14 @@ export type TransactionType = 'inbound' | 'outbound';
 export type BucketAssignmentSource = 'auto_regex' | 'manual' | 'unassigned';
 
 /**
+ * Status des Neu-Matching-Prozesses für Transaktionen:
+ * - 'needs_reprogress': Relevante Änderungen (z. B. Konfiguration/Buckets) müssen neu angewendet werden
+ * - 'is_reprogressing': Das Re-Matching wird aktuell im Hintergrund ausgeführt
+ * - 'has_progressed': Alle Transaktionen sind aktuell und vollständig synchronisiert
+ */
+export type ReMatchStatus = 'needs_reprogress' | 'is_reprogressing' | 'has_progressed';
+
+/**
  * Soll-Budget für einen Bucket bezogen auf eine bestimmte Zeitperiode.
  */
 export interface TargetBudget {

@@ -47,11 +47,76 @@ interface YearGroup {
   colSpan: number;
 }
 
+export const CASHFLOW_ACCOUNT_FILTER_KEY = 'cashflow_filter_account_id';
+export const CASHFLOW_GRANULARITY_KEY = 'cashflow_filter_granularity';
+
 export const Cashflow: React.FC = () => {
   const { buckets, transactions, accounts } = useFinance();
 
-  const [granularity, setGranularity] = useState<PeriodGranularity>('monthly');
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [granularity, setGranularity] = useState<PeriodGranularity>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(CASHFLOW_GRANULARITY_KEY);
+        if (
+          stored === 'monthly' ||
+          stored === 'quarterly' ||
+          stored === 'halfYearly' ||
+          stored === 'yearly'
+        ) {
+          return stored;
+        }
+      }
+    } catch {
+      // Storage access error handling
+    }
+    return 'monthly';
+  });
+
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(CASHFLOW_ACCOUNT_FILTER_KEY);
+        if (stored) {
+          return stored;
+        }
+      }
+    } catch {
+      // Storage access error handling
+    }
+    return 'all';
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(CASHFLOW_GRANULARITY_KEY, granularity);
+      }
+    } catch {
+      // Storage access error handling
+    }
+  }, [granularity]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(CASHFLOW_ACCOUNT_FILTER_KEY, selectedAccountId);
+      }
+    } catch {
+      // Storage access error handling
+    }
+  }, [selectedAccountId]);
+
+  // Wenn das gespeicherte Konto in den geladenen Konten nicht mehr existiert, auf 'all' zurücksetzen
+  useEffect(() => {
+    if (
+      selectedAccountId !== 'all' &&
+      accounts.length > 0 &&
+      !accounts.some((a) => a.id === selectedAccountId)
+    ) {
+      setSelectedAccountId('all');
+    }
+  }, [accounts, selectedAccountId]);
+
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
 
   const tableContainerRef = useRef<HTMLDivElement>(null);

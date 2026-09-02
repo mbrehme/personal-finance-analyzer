@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Cashflow } from './Cashflow';
+import { Cashflow, CASHFLOW_ACCOUNT_FILTER_KEY, CASHFLOW_GRANULARITY_KEY } from './Cashflow';
 import { FinanceProvider } from '@/services/storage/FinanceContext';
 import * as FinanceContextModule from '@/services/storage/FinanceContext';
 import { getCurrentPeriodKey } from '@/utils/dateUtils';
@@ -157,5 +157,61 @@ describe('Cashflow Page', () => {
 
     // Jetzt sollte "Mai" für 2023-05 sichtbar sein
     expect(screen.getByText('Mai')).toBeInTheDocument();
+  });
+
+  it('persists and restores account filter and granularity to and from localStorage', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(CASHFLOW_ACCOUNT_FILTER_KEY, 'acc-persist');
+    localStorage.setItem(CASHFLOW_GRANULARITY_KEY, 'quarterly');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        { id: 'acc-1', name: 'Giro' },
+        { id: 'acc-persist', name: 'Sparkonto' },
+      ] as any,
+      buckets: [] as any,
+      transactions: [] as any,
+      loading: false,
+      error: null,
+      reMatchStatus: 'has_progressed',
+      setReMatchStatus: vi.fn(),
+      needsReMatch: false,
+      reMatching: false,
+      setNeedsReMatch: vi.fn(),
+      addBucket: vi.fn(),
+      updateBucket: vi.fn(),
+      deleteBucket: vi.fn(),
+      reorderBuckets: vi.fn(),
+      addAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+      reorderAccounts: vi.fn(),
+      addBalanceEntry: vi.fn(),
+      deleteBalanceEntry: vi.fn(),
+      importTransactions: vi.fn(),
+      assignTransactionBucket: vi.fn(),
+      deleteTransaction: vi.fn(),
+      clearTransactions: vi.fn(),
+      triggerReMatch: vi.fn(),
+      exportConfiguration: vi.fn(),
+      importConfiguration: vi.fn(),
+      resetWorkspace: vi.fn(),
+    });
+
+    const { unmount } = render(<Cashflow />);
+
+    // Überprüfen, ob die aus localStorage geladenen Werte aktiv sind
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('acc-persist');
+
+    // Anderes Konto auswählen
+    await user.selectOptions(select, 'acc-1');
+    expect(localStorage.getItem(CASHFLOW_ACCOUNT_FILTER_KEY)).toBe('acc-1');
+
+    // Granularität auf 'Jährlich' umstellen
+    await user.click(screen.getByRole('button', { name: 'Jährlich' }));
+    expect(localStorage.getItem(CASHFLOW_GRANULARITY_KEY)).toBe('yearly');
+
+    unmount();
   });
 });

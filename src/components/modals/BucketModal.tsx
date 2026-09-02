@@ -8,12 +8,13 @@
 import React, { useState, useEffect } from 'react';
 import { Bucket, PeriodGranularity } from '@/types/finance';
 import { AVAILABLE_ICONS, IconRenderer } from '../IconRenderer';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, Trash2 } from 'lucide-react';
 
 export interface BucketModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (bucketData: Omit<Bucket, 'id'> | Bucket) => Promise<void>;
+  onDelete?: (bucketId: string) => Promise<void>;
   bucket?: Bucket | null;
   existingBuckets: Bucket[];
 }
@@ -28,6 +29,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   bucket,
   existingBuckets,
 }) => {
@@ -41,6 +43,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
   const [budgetPeriod, setBudgetPeriod] = useState<PeriodGranularity>('monthly');
   const [regexError, setRegexError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (bucket) {
@@ -116,6 +119,19 @@ export const BucketModal: React.FC<BucketModalProps> = ({
     }
   };
 
+  const handleDelete = async () => {
+    if (!bucket || !onDelete) return;
+    if (confirm(`Bucket "${bucket.name}" wirklich löschen?`)) {
+      try {
+        setDeleting(true);
+        await onDelete(bucket.id);
+        onClose();
+      } finally {
+        setDeleting(false);
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   // Verfügbare Parents filtern (keine Zyklen erlauben)
@@ -132,6 +148,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
             {bucket ? 'Bucket bearbeiten' : 'Neuen Bucket anlegen'}
           </h3>
           <button
+            type="button"
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
           >
@@ -302,21 +319,37 @@ export const BucketModal: React.FC<BucketModalProps> = ({
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              Abbrechen
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !!regexError}
-              className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
-            >
-              {saving ? 'Speichert...' : bucket ? 'Änderungen speichern' : 'Bucket anlegen'}
-            </button>
+          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            {bucket && onDelete ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? 'Lösche...' : 'Bucket löschen'}
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !!regexError}
+                className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
+              >
+                {saving ? 'Speichert...' : bucket ? 'Änderungen speichern' : 'Bucket anlegen'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

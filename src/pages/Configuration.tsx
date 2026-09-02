@@ -108,13 +108,23 @@ export const Configuration: React.FC = () => {
 
     return (
       <React.Fragment key={bucket.id}>
-        <tr className="hover:bg-slate-50 transition-colors border-b border-slate-100">
+        <tr
+          onClick={() => {
+            setEditingBucket(bucket);
+            setIsBucketModalOpen(true);
+          }}
+          className="hover:bg-blue-50/60 cursor-pointer transition-colors border-b border-slate-100 group"
+          title="Klicken zum Bearbeiten"
+        >
           <td className="py-3 px-4">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 24}px` }}>
               {hasChildren ? (
                 <button
                   type="button"
-                  onClick={() => toggleCollapse(bucket.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleCollapse(bucket.id);
+                  }}
                   className="p-1 hover:bg-slate-200 rounded text-slate-500"
                 >
                   {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -123,12 +133,14 @@ export const Configuration: React.FC = () => {
                 <div className="w-6" />
               )}
               <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-white group-hover:scale-105 transition-transform"
                 style={{ backgroundColor: bucket.color || '#64748b' }}
               >
                 <IconRenderer name={bucket.icon} className="w-4 h-4" />
               </div>
-              <span className="font-semibold text-slate-800 text-sm">{bucket.name}</span>
+              <span className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 transition-colors">
+                {bucket.name}
+              </span>
             </div>
           </td>
 
@@ -169,35 +181,6 @@ export const Configuration: React.FC = () => {
             ) : (
               <span className="text-slate-400">0</span>
             )}
-          </td>
-
-          {/* Aktionen */}
-          <td className="py-3 px-4 text-right">
-            <div className="flex items-center justify-end gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingBucket(bucket);
-                  setIsBucketModalOpen(true);
-                }}
-                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Bearbeiten"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm(`Bucket "${bucket.name}" wirklich löschen?`)) {
-                    deleteBucket(bucket.id);
-                  }
-                }}
-                className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="Löschen"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
           </td>
         </tr>
 
@@ -316,7 +299,6 @@ export const Configuration: React.FC = () => {
                   <th className="py-3 px-4">Regex-Muster (Leafs)</th>
                   <th className="py-3 px-4">Soll-Budget</th>
                   <th className="py-3 px-4">Manuelle Overrides</th>
-                  <th className="py-3 px-4 text-right">Aktionen</th>
                 </tr>
               </thead>
               <tbody>
@@ -324,7 +306,7 @@ export const Configuration: React.FC = () => {
                   rootBuckets.map((root) => renderBucketRow(root, 0))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-sm text-slate-400">
+                    <td colSpan={4} className="py-8 text-center text-sm text-slate-400">
                       Noch keine Buckets angelegt.
                     </td>
                   </tr>
@@ -385,6 +367,7 @@ export const Configuration: React.FC = () => {
                         setIsAccountModalOpen(true);
                       }}
                       className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                      title="Bearbeiten"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -396,6 +379,7 @@ export const Configuration: React.FC = () => {
                         }
                       }}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Löschen"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -456,6 +440,7 @@ export const Configuration: React.FC = () => {
         onClose={() => setIsBucketModalOpen(false)}
         bucket={editingBucket}
         existingBuckets={buckets}
+        onDelete={deleteBucket}
         onSave={async (bucketData) => {
           if (editingBucket) {
             await updateBucket(bucketData as Bucket);

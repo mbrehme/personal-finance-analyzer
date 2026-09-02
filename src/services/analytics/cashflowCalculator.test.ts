@@ -102,4 +102,61 @@ describe('cashflowCalculator', () => {
     expect(matrix.totalRow.periods['2026-09'].net).toBe(3000);
     expect(matrix.totalRow.totalNet).toBe(4800);
   });
+
+  it('correctly calculates diffToBudget as actual minus budget', () => {
+    const testBuckets: Bucket[] = [
+      {
+        id: 'b-exp',
+        name: 'Ausgabe Bucket',
+        parentId: null,
+        targetBudget: { period: 'monthly', amount: 500 },
+      },
+      {
+        id: 'b-inc',
+        name: 'Einnahme Bucket',
+        parentId: null,
+        targetBudget: { period: 'monthly', amount: 500 },
+      },
+    ];
+
+    const testTxs: Transaction[] = [
+      {
+        id: 'tx-exp-1',
+        accountId: 'acc-1',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Me',
+        receiver: 'Shop',
+        subject: 'Shop',
+        type: 'outbound',
+        iban: 'DE00',
+        value: -518,
+        bucketId: 'b-exp',
+        assignmentSource: 'auto_regex',
+      },
+      {
+        id: 'tx-inc-1',
+        accountId: 'acc-1',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Partner',
+        receiver: 'Me',
+        subject: 'Einnahme',
+        type: 'inbound',
+        iban: 'DE00',
+        value: 518,
+        bucketId: 'b-inc',
+        assignmentSource: 'auto_regex',
+      },
+    ];
+
+    const matrix = calculateCashflowMatrix(testBuckets, testTxs, 'monthly');
+    const expRow = matrix.rows.find((r) => r.bucket.id === 'b-exp');
+    const incRow = matrix.rows.find((r) => r.bucket.id === 'b-inc');
+
+    // Beide haben einen tatsächlichen Betrag von 518 und ein Soll von 500
+    // Differenz muss in beiden Fällen +18 (18 mehr als geplant) sein
+    expect(expRow?.periods['2026-08'].diffToBudget).toBe(18);
+    expect(incRow?.periods['2026-08'].diffToBudget).toBe(18);
+  });
 });

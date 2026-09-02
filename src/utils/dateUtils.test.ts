@@ -13,6 +13,8 @@ import {
   formatPeriodLabel,
   normalizeBudgetToGranularity,
   getCurrentPeriodKey,
+  getYearFromPeriodKey,
+  formatSubPeriodLabel,
 } from './dateUtils';
 import { ISODateString } from '@/types/finance';
 
@@ -120,6 +122,29 @@ describe('dateUtils', () => {
       const now = new Date();
       const currentYear = String(now.getFullYear());
       expect(getCurrentPeriodKey('yearly')).toBe(currentYear);
+    });
+  });
+
+  describe('getYearFromPeriodKey', () => {
+    it('extracts the 4-digit year from various period key formats', () => {
+      expect(getYearFromPeriodKey('2024-05')).toBe('2024');
+      expect(getYearFromPeriodKey('2025-Q2')).toBe('2025');
+      expect(getYearFromPeriodKey('2026-H1')).toBe('2026');
+      expect(getYearFromPeriodKey('2027')).toBe('2027');
+    });
+  });
+
+  describe('formatSubPeriodLabel', () => {
+    it('formats short month label without year for monthly granularity', () => {
+      expect(formatSubPeriodLabel('2024-01', 'monthly')).toBe('Jan');
+      expect(formatSubPeriodLabel('2024-05', 'monthly')).toBe('Mai');
+      expect(formatSubPeriodLabel('2024-12', 'monthly')).toBe('Dez');
+    });
+
+    it('formats quarter and half-year labels cleanly', () => {
+      expect(formatSubPeriodLabel('2024-Q3', 'quarterly')).toBe('Q3');
+      expect(formatSubPeriodLabel('2024-H2', 'halfYearly')).toBe('H2');
+      expect(formatSubPeriodLabel('2024', 'yearly')).toBe('2024');
     });
   });
 });

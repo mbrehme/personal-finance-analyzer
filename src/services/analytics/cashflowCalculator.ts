@@ -164,8 +164,9 @@ export function calculateCashflowMatrix(
       totalInbound += inbound;
       totalOutbound += outbound;
 
+      const actualAmount = Math.abs(net);
       const diffToBudget =
-        budgetAmount !== undefined ? Math.abs(outbound) - budgetAmount : undefined;
+        budgetAmount !== undefined ? actualAmount - budgetAmount : undefined;
 
       periods[pKey] = {
         inbound,

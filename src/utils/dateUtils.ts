@@ -210,6 +210,59 @@ export function formatPeriodLabel(periodKey: string, granularity: PeriodGranular
 }
 
 /**
+ * Extrahiert das 4-stellige Kalenderjahr aus einem beliebigen Periodenschlüssel.
+ *
+ * @param {string} periodKey - Periodenschlüssel (z. B. '2024-05', '2024-Q2', '2024-H1', '2024')
+ * @returns {string} Das extrahierte Kalenderjahr (z. B. '2024')
+ * @example
+ * ```ts
+ * getYearFromPeriodKey('2024-05'); // '2024'
+ * getYearFromPeriodKey('2025-Q1'); // '2025'
+ * ```
+ */
+export function getYearFromPeriodKey(periodKey: string): string {
+  return periodKey.split('-')[0];
+}
+
+/**
+ * Formatiert die Unter-Periode für den zweistufigen Tabellenkopf ohne Jahreszahl,
+ * da das Jahr bereits im übergeordneten Jahres-Gruppenkopf gerendert wird.
+ *
+ * @param {string} periodKey - Periodenschlüssel (z. B. '2024-05', '2024-Q2', '2024-H1', '2024')
+ * @param {PeriodGranularity} granularity - Zeit-Granularität
+ * @returns {string} Kurzer Unter-Perioden-Name (z. B. 'Mai', 'Q2', 'H1', '2024')
+ * @example
+ * ```ts
+ * formatSubPeriodLabel('2024-05', 'monthly'); // 'Mai'
+ * formatSubPeriodLabel('2024-Q2', 'quarterly'); // 'Q2'
+ * ```
+ */
+export function formatSubPeriodLabel(periodKey: string, granularity: PeriodGranularity): string {
+  const monthNames = [
+    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+  ];
+
+  if (granularity === 'monthly') {
+    const parts = periodKey.split('-');
+    const mIndex = parseInt(parts[1], 10) - 1;
+    return monthNames[mIndex] || parts[1] || periodKey;
+  }
+
+  if (granularity === 'quarterly') {
+    const parts = periodKey.split('-');
+    return parts[1] || periodKey;
+  }
+
+  if (granularity === 'halfYearly') {
+    const parts = periodKey.split('-');
+    return parts[1] || periodKey;
+  }
+
+  return periodKey;
+}
+
+/**
  * Normalisiert ein Soll-Budget auf die gewählte Darstellungs-Granularität.
  */
 export function normalizeBudgetToGranularity(

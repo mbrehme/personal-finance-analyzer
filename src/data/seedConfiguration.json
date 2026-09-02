@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-09-02T18:45:00.000Z",
+  "exportedAt": "2026-09-02T18:47:00.000Z",
   "accounts": [
     {
       "id": "acc-giro-main",
@@ -66,13 +66,23 @@
       },
       "order": 2
     },
+
+    {
+      "id": "b-ausgaben",
+      "name": "Ausgaben",
+      "parentId": null,
+      "color": "#ef4444",
+      "icon": "TrendingDown",
+      "order": 1
+    },
+
     {
       "id": "b-kredite",
       "name": "Kredite",
-      "parentId": null,
-      "color": "#ef4444",
+      "parentId": "b-ausgaben",
+      "color": "#f43f5e",
       "icon": "CreditCard",
-      "order": 1
+      "order": 0
     },
     {
       "id": "b-kredite-maria",
@@ -113,13 +123,14 @@
       },
       "order": 2
     },
+
     {
       "id": "b-wohnung-haushalt",
       "name": "Wohnung & Haushalt",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#f97316",
       "icon": "Home",
-      "order": 2
+      "order": 1
     },
     {
       "id": "b-wh-hausgeld",
@@ -212,13 +223,14 @@
       },
       "order": 6
     },
+
     {
       "id": "b-versicherungen",
       "name": "Versicherungen",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#3b82f6",
       "icon": "Shield",
-      "order": 3
+      "order": 2
     },
     {
       "id": "b-vers-kranken",
@@ -294,13 +306,14 @@
       },
       "order": 5
     },
+
     {
       "id": "b-kinder",
       "name": "Kinder",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#ec4899",
       "icon": "Baby",
-      "order": 4
+      "order": 3
     },
     {
       "id": "b-kinder-kiga",
@@ -337,13 +350,14 @@
       "regexPattern": "tonies",
       "order": 2
     },
+
     {
       "id": "b-einkaufen",
       "name": "Einkaufen",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#10b981",
       "icon": "ShoppingBag",
-      "order": 5
+      "order": 4
     },
     {
       "id": "b-einkauf-lebensmittel",
@@ -384,13 +398,14 @@
       },
       "order": 2
     },
+
     {
       "id": "b-shopping",
       "name": "Shopping",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#8b5cf6",
       "icon": "Tag",
-      "order": 6
+      "order": 5
     },
     {
       "id": "b-shop-amazon",
@@ -427,13 +442,14 @@
       "regexPattern": "Zalando|Hornbach|Triple A Sales GmbH|Digistore24|Thalia",
       "order": 2
     },
+
     {
       "id": "b-freizeit-unterhaltung",
       "name": "Freizeit & Unterhaltung",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#6366f1",
       "icon": "Film",
-      "order": 7
+      "order": 6
     },
     {
       "id": "b-fz-zattoo",
@@ -467,7 +483,7 @@
       "parentId": "b-freizeit-unterhaltung",
       "color": "#818cf8",
       "icon": "Film",
-      "regexPattern": "Netflix|RTL interactive GmbH",
+      "regexPattern": "Netflix|RTL\\+|RTL Interactive",
       "targetBudget": {
         "period": "monthly",
         "amount": 19.99
@@ -535,13 +551,14 @@
       },
       "order": 7
     },
+
     {
       "id": "b-restaurants-bars",
       "name": "Restaurants & Bars",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#f59e0b",
       "icon": "Utensils",
-      "order": 8
+      "order": 7
     },
     {
       "id": "b-gastro-restaurant",
@@ -582,13 +599,14 @@
       },
       "order": 2
     },
+
     {
       "id": "b-verkehr-mobilitaet",
       "name": "Verkehr & Mobilität",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#0ea5e9",
       "icon": "Car",
-      "order": 9
+      "order": 8
     },
     {
       "id": "b-mob-oepnv",
@@ -638,13 +656,14 @@
       },
       "order": 3
     },
+
     {
       "id": "b-sonstiges",
       "name": "Sonstiges",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#64748b",
       "icon": "Folder",
-      "order": 10
+      "order": 9
     },
     {
       "id": "b-sonst-bank",
@@ -743,13 +762,14 @@
       "icon": "Tag",
       "order": 8
     },
+
     {
       "id": "b-taschengelder",
       "name": "Taschengelder",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#a855f7",
       "icon": "Wallet",
-      "order": 11
+      "order": 10
     },
     {
       "id": "b-taschengeld-martin",
@@ -777,13 +797,14 @@
       },
       "order": 1
     },
+
     {
       "id": "b-ruecklagen",
       "name": "Rücklagen",
-      "parentId": null,
+      "parentId": "b-ausgaben",
       "color": "#0284c7",
       "icon": "PiggyBank",
-      "order": 12
+      "order": 11
     },
     {
       "id": "b-rueck-reaktor",

@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { matchTransaction, reMatchAllTransactions, getLeafBuckets } from './regexMatcher';
-import { Bucket, Transaction } from '@/types/finance';
+import { matchTransaction, reMatchAllTransactions, getLeafCategories } from './regexMatcher';
+import { Category, Transaction } from '@/types/finance';
 
 describe('regexMatcher Engine', () => {
-  const buckets: Bucket[] = [
+  const categories: Category[] = [
     {
       id: 'b-living',
       name: 'Wohnen',
@@ -42,9 +42,9 @@ describe('regexMatcher Engine', () => {
     },
   ];
 
-  it('correctly filters leaf buckets only', () => {
-    const leafBuckets = getLeafBuckets(buckets);
-    const leafIds = leafBuckets.map((b) => b.id);
+  it('correctly filters leaf categories only', () => {
+    const leafCategories = getLeafCategories(categories);
+    const leafIds = leafCategories.map((c) => c.id);
     expect(leafIds).not.toContain('b-living'); // Parent
     expect(leafIds).toContain('b-rent'); // Child
     expect(leafIds).toContain('b-groceries'); // Leaf
@@ -62,12 +62,12 @@ describe('regexMatcher Engine', () => {
       type: 'outbound',
       iban: 'DE00',
       value: -45.5,
-      bucketId: null,
+      categoryId: null,
       assignmentSource: 'unassigned',
     };
 
-    const match = matchTransaction(tx, buckets);
-    expect(match.bucketId).toBe('b-groceries');
+    const match = matchTransaction(tx, categories);
+    expect(match.categoryId).toBe('b-groceries');
     expect(match.assignmentSource).toBe('auto_regex');
   });
 
@@ -83,16 +83,16 @@ describe('regexMatcher Engine', () => {
       type: 'inbound',
       iban: 'DE00',
       value: 4200,
-      bucketId: null,
+      categoryId: null,
       assignmentSource: 'unassigned',
     };
 
-    const match = matchTransaction(tx, buckets);
-    expect(match.bucketId).toBe('b-salary');
+    const match = matchTransaction(tx, categories);
+    expect(match.categoryId).toBe('b-salary');
     expect(match.assignmentSource).toBe('auto_regex');
   });
 
-  it('prioritizes manual assignment via bucket.manualTransactionIds', () => {
+  it('prioritizes manual assignment via category.manualTransactionIds', () => {
     const tx: Transaction = {
       id: 'tx-manual-special',
       accountId: 'acc-1',
@@ -104,12 +104,12 @@ describe('regexMatcher Engine', () => {
       type: 'outbound',
       iban: 'DE00',
       value: -10,
-      bucketId: null,
+      categoryId: null,
       assignmentSource: 'unassigned',
     };
 
-    const match = matchTransaction(tx, buckets);
-    expect(match.bucketId).toBe('b-special');
+    const match = matchTransaction(tx, categories);
+    expect(match.categoryId).toBe('b-special');
     expect(match.assignmentSource).toBe('manual');
   });
 
@@ -126,7 +126,7 @@ describe('regexMatcher Engine', () => {
         type: 'outbound',
         iban: 'DE00',
         value: -20,
-        bucketId: 'b-rent', // Manuell auf Miete gesetzt
+        categoryId: 'b-rent', // Manuell auf Miete gesetzt
         assignmentSource: 'manual',
       },
       {
@@ -140,20 +140,20 @@ describe('regexMatcher Engine', () => {
         type: 'outbound',
         iban: 'DE00',
         value: -30,
-        bucketId: null,
+        categoryId: null,
         assignmentSource: 'unassigned',
       },
     ];
 
-    const reMatched = reMatchAllTransactions(transactions, buckets);
-    expect(reMatched[0].bucketId).toBe('b-rent'); // Unverändert
+    const reMatched = reMatchAllTransactions(transactions, categories);
+    expect(reMatched[0].categoryId).toBe('b-rent'); // Unverändert
     expect(reMatched[0].assignmentSource).toBe('manual');
-    expect(reMatched[1].bucketId).toBe('b-groceries'); // Neu zugewiesen
+    expect(reMatched[1].categoryId).toBe('b-groceries'); // Neu zugewiesen
     expect(reMatched[1].assignmentSource).toBe('auto_regex');
   });
 
   it('matches against compound format [Typ] Empfänger: Zweck (Iban)', () => {
-    const testBuckets: Bucket[] = [
+    const testCategories: Category[] = [
       {
         id: 'b-gifts',
         name: 'Geschenke',
@@ -179,7 +179,7 @@ describe('regexMatcher Engine', () => {
       type: 'outbound',
       iban: 'DE112233',
       value: -50,
-      bucketId: null,
+      categoryId: null,
       assignmentSource: 'unassigned',
     };
 
@@ -194,11 +194,11 @@ describe('regexMatcher Engine', () => {
       type: 'outbound',
       iban: 'DE445566',
       value: -150,
-      bucketId: null,
+      categoryId: null,
       assignmentSource: 'unassigned',
     };
 
-    expect(matchTransaction(giftTx, testBuckets).bucketId).toBe('b-gifts');
-    expect(matchTransaction(pocketTx, testBuckets).bucketId).toBe('b-partner-pocket');
+    expect(matchTransaction(giftTx, testCategories).categoryId).toBe('b-gifts');
+    expect(matchTransaction(pocketTx, testCategories).categoryId).toBe('b-partner-pocket');
   });
 });

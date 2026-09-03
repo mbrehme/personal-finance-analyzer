@@ -38,7 +38,7 @@ export const Home: React.FC = () => {
           </h1>
 
           <p className="text-lg leading-relaxed text-slate-600 sm:text-xl">
-            Importiere Bankumsätze, erstelle intelligente Regex-Buckets mit Soll-Budgets und
+            Importiere Bankumsätze, erstelle intelligente Regex-Kategorien mit Soll-Budgets und
             verfolge deine Cashflows und Kontostände in Echtzeit – vollständig lokal.
           </p>
 
@@ -80,7 +80,8 @@ export const Home: React.FC = () => {
             </div>
             <h3 className="text-lg font-bold text-slate-900">1. Konfiguration</h3>
             <p className="mt-2 text-xs leading-relaxed text-slate-600">
-              Verwalte hierarchische Buckets mit Regex-Regeln, Soll-Budgets und verknüpften Konten.
+              Verwalte hierarchische Kategorien mit Regex-Regeln, Soll-Budgets und verknüpften
+              Konten.
             </p>
           </div>
 

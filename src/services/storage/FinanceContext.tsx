@@ -1,6 +1,6 @@
 /**
  * @file FinanceContext.tsx
- * @description Zentraler React Context State für Konten, Buckets und Transaktionen
+ * @description Zentraler React Context State für Konten, Kategorien und Transaktionen
  * mit persistenter IndexedDB-Synchronisation und automatischem Matching.
  * @module services/storage/FinanceContext
  */
@@ -9,7 +9,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import {
   Account,
   BalanceEntry,
-  Bucket,
+  Category,
   FinanceConfigExport,
   Transaction,
   sortTransactionsDesc,
@@ -20,7 +20,9 @@ import { matchTransaction, reMatchAllTransactions } from '../matcher/regexMatche
 
 export interface FinanceContextType {
   accounts: Account[];
-  buckets: Bucket[];
+  categories: Category[];
+  /** @deprecated Verwende categories */
+  buckets: Category[];
   transactions: Transaction[];
   loading: boolean;
   error: string | null;
@@ -30,11 +32,21 @@ export interface FinanceContextType {
   reMatching: boolean;
   setNeedsReMatch: (val: boolean) => void;
 
-  // Bucket Operations
-  addBucket: (bucket: Omit<Bucket, 'id'>) => Promise<Bucket>;
-  updateBucket: (bucket: Bucket) => Promise<void>;
+  // Category Operations
+  addCategory: (category: Omit<Category, 'id'>) => Promise<Category>;
+  updateCategory: (category: Category) => Promise<void>;
+  deleteCategory: (categoryId: string) => Promise<void>;
+  reorderCategories: (updatedCategories: Category[]) => Promise<void>;
+
+  // Backwards compatible Bucket aliases
+  /** @deprecated Verwende addCategory */
+  addBucket: (bucket: Omit<Category, 'id'>) => Promise<Category>;
+  /** @deprecated Verwende updateCategory */
+  updateBucket: (bucket: Category) => Promise<void>;
+  /** @deprecated Verwende deleteCategory */
   deleteBucket: (bucketId: string) => Promise<void>;
-  reorderBuckets: (updatedBuckets: Bucket[]) => Promise<void>;
+  /** @deprecated Verwende reorderCategories */
+  reorderBuckets: (updatedBuckets: Category[]) => Promise<void>;
 
   // Account Operations
   addAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
@@ -46,6 +58,8 @@ export interface FinanceContextType {
 
   // Transaction Operations
   importTransactions: (newTransactions: Transaction[]) => Promise<number>;
+  assignTransactionCategory: (transactionId: string, categoryId: string | null) => Promise<void>;
+  /** @deprecated Verwende assignTransactionCategory */
   assignTransactionBucket: (transactionId: string, bucketId: string | null) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
   clearTransactions: () => Promise<void>;
@@ -63,13 +77,13 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 const SEED_CONFIG = seedConfigurationJson as unknown as FinanceConfigExport;
 const SEED_ACCOUNTS: Account[] = SEED_CONFIG.accounts;
-const SEED_BUCKETS: Bucket[] = SEED_CONFIG.buckets;
+const SEED_CATEGORIES: Category[] = SEED_CONFIG.categories || SEED_CONFIG.buckets || [];
 
 const REMATCH_STATUS_STORAGE_KEY = 'finance_rematch_status';
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [buckets, setBuckets] = useState<Bucket[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [reMatchStatus, setReMatchStatusState] = useState<ReMatchStatus>(() => {
@@ -116,27 +130,28 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       setLoading(true);
       let loadedAccounts = await financeDB.getAccounts();
-      let loadedBuckets = await financeDB.getBuckets();
+      let loadedCategories = await financeDB.getCategories();
       const loadedTransactions = await financeDB.getTransactions();
 
-      if (loadedAccounts.length === 0 && loadedBuckets.length === 0) {
-        // Erstmaliges Seeden
+      if (loadedCategories.length === 0) {
+        await financeDB.saveCategories(SEED_CATEGORIES);
+        loadedCategories = SEED_CATEGORIES;
+      }
+
+      if (loadedAccounts.length === 0) {
         const seededAccounts: Account[] = [
           {
             ...SEED_ACCOUNTS[0],
-            bucketIds: SEED_BUCKETS.map((b) => b.id),
+            categoryIds: loadedCategories.map((c) => c.id),
+            bucketIds: loadedCategories.map((c) => c.id),
           },
         ];
-        await Promise.all([
-          ...seededAccounts.map((a) => financeDB.saveAccount(a)),
-          ...SEED_BUCKETS.map((b) => financeDB.saveBucket(b)),
-        ]);
+        await financeDB.saveAccounts(seededAccounts);
         loadedAccounts = seededAccounts;
-        loadedBuckets = SEED_BUCKETS;
       }
 
       setAccounts(loadedAccounts);
-      setBuckets(loadedBuckets);
+      setCategories(loadedCategories);
       setTransactions(sortTransactionsDesc(loadedTransactions));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Finanzdaten.');
@@ -155,7 +170,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...accountData,
       id: `acc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       balanceEntries: accountData.balanceEntries || [],
-      bucketIds: accountData.bucketIds || [],
+      categoryIds: accountData.categoryIds || accountData.bucketIds || [],
+      bucketIds: accountData.categoryIds || accountData.bucketIds || [],
     };
     await financeDB.saveAccount(newAccount);
     setAccounts((prev) => [...prev, newAccount]);
@@ -163,8 +179,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateAccount = async (updated: Account): Promise<void> => {
-    await financeDB.saveAccount(updated);
-    setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    const normalized: Account = {
+      ...updated,
+      categoryIds: updated.categoryIds || updated.bucketIds || [],
+      bucketIds: updated.categoryIds || updated.bucketIds || [],
+    };
+    await financeDB.saveAccount(normalized);
+    setAccounts((prev) => prev.map((a) => (a.id === normalized.id ? normalized : a)));
   };
 
   const deleteAccount = async (accountId: string): Promise<void> => {
@@ -211,45 +232,46 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await updateAccount(updatedAccount);
   };
 
-  /* ================== BUCKETS ================== */
-  const addBucket = async (bucketData: Omit<Bucket, 'id'>): Promise<Bucket> => {
-    const newBucket: Bucket = {
-      ...bucketData,
+  /* ================== CATEGORIES (BUCKETS) ================== */
+  const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<Category> => {
+    const newCategory: Category = {
+      ...categoryData,
       id: `b-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       manualTransactionIds: [],
     };
-    await financeDB.saveBucket(newBucket);
-    const updatedBuckets = [...buckets, newBucket];
-    setBuckets(updatedBuckets);
+    await financeDB.saveCategory(newCategory);
+    const updatedCategories = [...categories, newCategory];
+    setCategories(updatedCategories);
     setReMatchStatus('needs_reprogress');
 
-    return newBucket;
+    return newCategory;
   };
 
-  const updateBucket = async (updated: Bucket): Promise<void> => {
-    await financeDB.saveBucket(updated);
-    const updatedBuckets = buckets.map((b) => (b.id === updated.id ? updated : b));
-    setBuckets(updatedBuckets);
-    setReMatchStatus('needs_reprogress');
-  };
-
-  const reorderBuckets = async (updatedBuckets: Bucket[]): Promise<void> => {
-    await financeDB.saveBuckets(updatedBuckets);
-    setBuckets(updatedBuckets);
+  const updateCategory = async (updated: Category): Promise<void> => {
+    await financeDB.saveCategory(updated);
+    const updatedCategories = categories.map((c) => (c.id === updated.id ? updated : c));
+    setCategories(updatedCategories);
     setReMatchStatus('needs_reprogress');
   };
 
-  const deleteBucket = async (bucketId: string): Promise<void> => {
-    await financeDB.deleteBucket(bucketId);
-    const updatedBuckets = buckets.filter((b) => b.id !== bucketId);
-    setBuckets(updatedBuckets);
+  const reorderCategories = async (updatedCategories: Category[]): Promise<void> => {
+    await financeDB.saveCategories(updatedCategories);
+    setCategories(updatedCategories);
+    setReMatchStatus('needs_reprogress');
+  };
 
-    // Transaktionen bereinigen, die diesem Bucket zugeordnet waren
-    const updatedTxs = transactions.map((t) =>
-      t.bucketId === bucketId
-        ? { ...t, bucketId: null, assignmentSource: 'unassigned' as const }
-        : t
-    );
+  const deleteCategory = async (categoryId: string): Promise<void> => {
+    await financeDB.deleteCategory(categoryId);
+    const updatedCategories = categories.filter((c) => c.id !== categoryId);
+    setCategories(updatedCategories);
+
+    // Transaktionen bereinigen, die dieser Kategorie zugeordnet waren
+    const updatedTxs = transactions.map((t) => {
+      const currentCatId = t.categoryId ?? t.bucketId;
+      return currentCatId === categoryId
+        ? { ...t, categoryId: null, bucketId: null, assignmentSource: 'unassigned' as const }
+        : t;
+    });
     await financeDB.saveTransactions(updatedTxs);
     setTransactions(sortTransactionsDesc(updatedTxs));
     setReMatchStatus('needs_reprogress');
@@ -259,10 +281,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const importTransactions = async (newTransactions: Transaction[]): Promise<number> => {
     // 1. Regex & Manual Overrides anwenden
     const matched = newTransactions.map((tx) => {
-      const match = matchTransaction(tx, buckets);
+      const match = matchTransaction(tx, categories);
       return {
         ...tx,
-        bucketId: match.bucketId,
+        categoryId: match.categoryId,
+        bucketId: match.categoryId,
         assignmentSource: match.assignmentSource,
       };
     });
@@ -279,47 +302,48 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return toInsert.length;
   };
 
-  const assignTransactionBucket = async (
+  const assignTransactionCategory = async (
     transactionId: string,
-    targetBucketId: string | null
+    targetCategoryId: string | null
   ): Promise<void> => {
-    // 1. Vorherigen Bucket aktualisieren (Transaction ID entfernen)
-    let updatedBuckets = buckets.map((b) => {
-      if (b.manualTransactionIds && b.manualTransactionIds.includes(transactionId)) {
+    // 1. Vorherige Kategorie aktualisieren (Transaction ID entfernen)
+    let updatedCategories = categories.map((c) => {
+      if (c.manualTransactionIds && c.manualTransactionIds.includes(transactionId)) {
         return {
-          ...b,
-          manualTransactionIds: b.manualTransactionIds.filter((id) => id !== transactionId),
+          ...c,
+          manualTransactionIds: c.manualTransactionIds.filter((id) => id !== transactionId),
         };
       }
-      return b;
+      return c;
     });
 
-    // 2. Neuen Bucket aktualisieren (Transaction ID hinzufügen)
-    if (targetBucketId) {
-      updatedBuckets = updatedBuckets.map((b) => {
-        if (b.id === targetBucketId) {
-          const currentList = b.manualTransactionIds || [];
+    // 2. Neue Kategorie aktualisieren (Transaction ID hinzufügen)
+    if (targetCategoryId) {
+      updatedCategories = updatedCategories.map((c) => {
+        if (c.id === targetCategoryId) {
+          const currentList = c.manualTransactionIds || [];
           return {
-            ...b,
+            ...c,
             manualTransactionIds: currentList.includes(transactionId)
               ? currentList
               : [...currentList, transactionId],
           };
         }
-        return b;
+        return c;
       });
     }
 
-    await financeDB.saveBuckets(updatedBuckets);
-    setBuckets(updatedBuckets);
+    await financeDB.saveCategories(updatedCategories);
+    setCategories(updatedCategories);
 
     // 3. Transaktion aktualisieren
     const updatedTxs = transactions.map((t) => {
       if (t.id === transactionId) {
         return {
           ...t,
-          bucketId: targetBucketId,
-          assignmentSource: targetBucketId ? ('manual' as const) : ('unassigned' as const),
+          categoryId: targetCategoryId,
+          bucketId: targetCategoryId,
+          assignmentSource: targetCategoryId ? ('manual' as const) : ('unassigned' as const),
         };
       }
       return t;
@@ -343,8 +367,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       setReMatchStatus('is_reprogressing');
       const allTxs = transactions.length > 0 ? transactions : await financeDB.getTransactions();
-      const allBuckets = buckets.length > 0 ? buckets : await financeDB.getBuckets();
-      const updatedTxs = reMatchAllTransactions(allTxs, allBuckets);
+      const allCategories = categories.length > 0 ? categories : await financeDB.getCategories();
+      const updatedTxs = reMatchAllTransactions(allTxs, allCategories);
 
       if (updatedTxs.length > 0) {
         await financeDB.saveTransactions(updatedTxs);
@@ -361,10 +385,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   /* ================== EXPORT & IMPORT ================== */
   const exportConfiguration = async (): Promise<string> => {
     const exportData: FinanceConfigExport = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       accounts,
-      buckets,
+      categories,
+      buckets: categories,
     };
     return JSON.stringify(exportData, null, 2);
   };
@@ -372,21 +397,45 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const importConfiguration = async (jsonContent: string): Promise<void> => {
     const parsed: FinanceConfigExport = JSON.parse(jsonContent);
     await financeDB.importConfiguration(parsed);
+    const loadedCats = parsed.categories || parsed.buckets || [];
     setAccounts(parsed.accounts);
-    setBuckets(parsed.buckets);
+    setCategories(loadedCats);
     setReMatchStatus('needs_reprogress');
   };
 
   const resetWorkspace = async (): Promise<void> => {
-    await financeDB.clearAll();
-    await loadData();
+    try {
+      setLoading(true);
+      await financeDB.clearAll();
+
+      const seededAccounts: Account[] = [
+        {
+          ...SEED_ACCOUNTS[0],
+          categoryIds: SEED_CATEGORIES.map((c) => c.id),
+          bucketIds: SEED_CATEGORIES.map((c) => c.id),
+        },
+      ];
+
+      await financeDB.saveAccounts(seededAccounts);
+      await financeDB.saveCategories(SEED_CATEGORIES);
+
+      setAccounts(seededAccounts);
+      setCategories(SEED_CATEGORIES);
+      setTransactions([]);
+      setReMatchStatus('has_progressed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Zurücksetzen der Finanzdaten.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <FinanceContext.Provider
       value={{
         accounts,
-        buckets,
+        categories,
+        buckets: categories,
         transactions,
         loading,
         error,
@@ -401,12 +450,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         reorderAccounts,
         addBalanceEntry,
         deleteBalanceEntry,
-        addBucket,
-        updateBucket,
-        deleteBucket,
-        reorderBuckets,
+        addCategory,
+        updateCategory,
+        deleteCategory,
+        reorderCategories,
+        addBucket: addCategory,
+        updateBucket: updateCategory,
+        deleteBucket: deleteCategory,
+        reorderBuckets: reorderCategories,
         importTransactions,
-        assignTransactionBucket,
+        assignTransactionCategory,
+        assignTransactionBucket: assignTransactionCategory,
         deleteTransaction,
         clearTransactions,
         triggerReMatch,

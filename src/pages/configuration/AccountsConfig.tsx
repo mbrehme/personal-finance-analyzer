@@ -14,7 +14,7 @@ import { AccountModal } from '@/components/modals/AccountModal';
 import { Plus, Edit2, Trash2, ShieldCheck, GripVertical } from 'lucide-react';
 
 export const AccountsConfig: React.FC = () => {
-  const { buckets, accounts, addAccount, updateAccount, deleteAccount, reorderAccounts } =
+  const { categories, accounts, addAccount, updateAccount, deleteAccount, reorderAccounts } =
     useFinance();
 
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -101,6 +101,7 @@ export const AccountsConfig: React.FC = () => {
         {sortedAccounts.map((acc) => {
           const isDraggingThis = draggedAccountId === acc.id;
           const isTarget = dropTargetAccountId === acc.id;
+          const accountCatIds = acc.categoryIds || acc.bucketIds || [];
 
           return (
             <div
@@ -129,7 +130,7 @@ export const AccountsConfig: React.FC = () => {
               title="Klicken zum Bearbeiten &bull; Ziehen zum Umsortieren"
             >
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                {/* Linker Bereich: Drag Handle + Icon + Name + IBAN */}
+                {/* Linker Bereich: Drag Handle + Icon + Name */}
                 <div className="flex min-w-[240px] items-center gap-3">
                   <div
                     className="-ml-1 cursor-grab rounded p-1 text-slate-400 transition-colors hover:text-slate-700 active:cursor-grabbing"
@@ -152,32 +153,34 @@ export const AccountsConfig: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Mittlerer Bereich: Verknüpfte Buckets */}
+                {/* Mittlerer Bereich: Verknüpfte Kategorien */}
                 <div className="min-w-[200px] flex-1">
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Zugeordnete Buckets ({acc.bucketIds.length})
+                    Zugeordnete Kategorien ({accountCatIds.length})
                   </div>
                   <div className="flex max-h-16 flex-wrap gap-1 overflow-y-auto">
-                    {acc.bucketIds.length > 0 ? (
-                      acc.bucketIds.map((bId) => {
-                        const b = buckets.find((item) => item.id === bId);
-                        if (!b) return null;
+                    {accountCatIds.length > 0 ? (
+                      accountCatIds.map((cId) => {
+                        const c = categories.find((item) => item.id === cId);
+                        if (!c) return null;
                         return (
                           <span
-                            key={b.id}
+                            key={c.id}
                             className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
                           >
                             <IconRenderer
-                              name={b.icon}
-                              style={{ color: b.color }}
+                              name={c.icon}
+                              style={{ color: c.color }}
                               className="h-3 w-3"
                             />
-                            {b.name}
+                            {c.name}
                           </span>
                         );
                       })
                     ) : (
-                      <span className="text-xs italic text-slate-400">Alle Buckets zugelassen</span>
+                      <span className="text-xs italic text-slate-400">
+                        Alle Kategorien zugelassen
+                      </span>
                     )}
                   </div>
                 </div>
@@ -248,7 +251,7 @@ export const AccountsConfig: React.FC = () => {
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
         account={editingAccount}
-        existingBuckets={buckets}
+        existingCategories={categories}
         onSave={async (accountData) => {
           if (editingAccount) {
             await updateAccount(accountData as Account);

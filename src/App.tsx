@@ -9,7 +9,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { FinanceProvider } from '@/services/storage/FinanceContext';
 import { Header } from '@/components/Header';
 import { Home } from '@/pages/Home';
-import { ConfigurationLayout, BucketsConfig, AccountsConfig } from '@/pages/configuration';
+import { ConfigurationLayout, CategoriesConfig, AccountsConfig } from '@/pages/configuration';
 import { AnalyticsLayout } from '@/pages/analytics';
 import { Transactions } from '@/pages/Transactions';
 import { Cashflow } from '@/pages/Cashflow';
@@ -25,8 +25,12 @@ export const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/configuration" element={<ConfigurationLayout />}>
-                <Route index element={<Navigate to="buckets" replace />} />
-                <Route path="buckets" element={<BucketsConfig />} />
+                <Route index element={<Navigate to="categories" replace />} />
+                <Route path="categories" element={<CategoriesConfig />} />
+                <Route
+                  path="buckets"
+                  element={<Navigate to="/configuration/categories" replace />}
+                />
                 <Route path="accounts" element={<AccountsConfig />} />
               </Route>
               <Route path="/transactions" element={<Transactions />} />

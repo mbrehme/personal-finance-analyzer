@@ -96,10 +96,10 @@ export const Transactions: React.FC = () => {
   const {
     transactions,
     accounts,
-    buckets,
+    categories,
     loading,
     importTransactions,
-    assignTransactionBucket,
+    assignTransactionCategory,
     deleteTransaction,
     clearTransactions,
     reMatching,
@@ -108,7 +108,7 @@ export const Transactions: React.FC = () => {
   // Entwurfs-Filter State (Eingaben)
   const [inputSearchTerm, setInputSearchTerm] = useState('');
   const [inputAccountId, setInputAccountId] = useState<string>('all');
-  const [inputBucketId, setInputBucketId] = useState<string>('all');
+  const [inputCategoryId, setInputCategoryId] = useState<string>('all');
   const [inputType, setInputType] = useState<TransactionType | 'all'>('all');
   const [inputStartDate, setInputStartDate] = useState<string>('');
   const [inputEndDate, setInputEndDate] = useState<string>('');
@@ -117,14 +117,14 @@ export const Transactions: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<{
     searchTerm: string;
     accountId: string;
-    bucketId: string;
+    categoryId: string;
     type: TransactionType | 'all';
     startDate: string;
     endDate: string;
   }>({
     searchTerm: '',
     accountId: 'all',
-    bucketId: 'all',
+    categoryId: 'all',
     type: 'all',
     startDate: '',
     endDate: '',
@@ -142,20 +142,20 @@ export const Transactions: React.FC = () => {
     return new Map(accounts.map((a) => [a.id, a]));
   }, [accounts]);
 
-  // Strukturierte Bucket-Optionen für schnelle und übersichtliche Auswahl
-  const bucketOptions = useMemo(() => {
-    const childrenMap = new Map<string | null, typeof buckets>();
-    buckets.forEach((b) => {
-      const list = childrenMap.get(b.parentId) || [];
-      list.push(b);
-      childrenMap.set(b.parentId, list);
+  // Strukturierte Kategorie-Optionen für schnelle und übersichtliche Auswahl
+  const categoryOptions = useMemo(() => {
+    const childrenMap = new Map<string | null, typeof categories>();
+    categories.forEach((c) => {
+      const list = childrenMap.get(c.parentId) || [];
+      list.push(c);
+      childrenMap.set(c.parentId, list);
     });
 
-    const getPathName = (b: (typeof buckets)[0]): string => {
-      const parts = [b.name];
-      let currentParentId = b.parentId;
+    const getPathName = (c: (typeof categories)[0]): string => {
+      const parts = [c.name];
+      let currentParentId = c.parentId;
       while (currentParentId) {
-        const parent = buckets.find((p) => p.id === currentParentId);
+        const parent = categories.find((p) => p.id === currentParentId);
         if (parent) {
           if (parent.parentId !== null) {
             parts.unshift(parent.name);
@@ -168,41 +168,43 @@ export const Transactions: React.FC = () => {
       return parts.join(' > ');
     };
 
-    return buckets
-      .map((b) => ({
-        id: b.id,
-        name: getPathName(b),
-        isLeaf: (childrenMap.get(b.id) || []).length === 0,
+    return categories
+      .map((c) => ({
+        id: c.id,
+        name: getPathName(c),
+        isLeaf: (childrenMap.get(c.id) || []).length === 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  }, [buckets]);
+  }, [categories]);
 
   // Gefilterte Transaktionen basierend auf angewandten Filtern
   const filteredTransactions = useMemo(() => {
-    const { searchTerm, accountId, bucketId, type, startDate, endDate } = appliedFilters;
+    const { searchTerm, accountId, categoryId, type, startDate, endDate } = appliedFilters;
 
     const matches = transactions.filter((tx) => {
+      const txCatId = tx.categoryId ?? tx.bucketId ?? null;
+
       // 1. Account Filter
       if (accountId !== 'all' && tx.accountId !== accountId) {
         return false;
       }
 
-      // 2. Bucket Filter
-      if (bucketId === 'uncategorized' && tx.bucketId !== null) {
+      // 2. Kategorie Filter
+      if (categoryId === 'uncategorized' && txCatId !== null) {
         return false;
       }
-      if (bucketId === 'assigned' && tx.bucketId === null) {
+      if (categoryId === 'assigned' && txCatId === null) {
         return false;
       }
-      if (bucketId === 'manual' && tx.assignmentSource !== 'manual') {
+      if (categoryId === 'manual' && tx.assignmentSource !== 'manual') {
         return false;
       }
       if (
-        bucketId !== 'all' &&
-        bucketId !== 'uncategorized' &&
-        bucketId !== 'assigned' &&
-        bucketId !== 'manual' &&
-        tx.bucketId !== bucketId
+        categoryId !== 'all' &&
+        categoryId !== 'uncategorized' &&
+        categoryId !== 'assigned' &&
+        categoryId !== 'manual' &&
+        txCatId !== categoryId
       ) {
         return false;
       }
@@ -280,7 +282,7 @@ export const Transactions: React.FC = () => {
     setAppliedFilters({
       searchTerm: inputSearchTerm,
       accountId: inputAccountId,
-      bucketId: inputBucketId,
+      categoryId: inputCategoryId,
       type: inputType,
       startDate: inputStartDate,
       endDate: inputEndDate,
@@ -292,14 +294,14 @@ export const Transactions: React.FC = () => {
   const handleResetFilters = () => {
     setInputSearchTerm('');
     setInputAccountId('all');
-    setInputBucketId('all');
+    setInputCategoryId('all');
     setInputType('all');
     setInputStartDate('');
     setInputEndDate('');
     setAppliedFilters({
       searchTerm: '',
       accountId: 'all',
-      bucketId: 'all',
+      categoryId: 'all',
       type: 'all',
       startDate: '',
       endDate: '',
@@ -310,7 +312,7 @@ export const Transactions: React.FC = () => {
   const hasPendingChanges =
     inputSearchTerm !== appliedFilters.searchTerm ||
     inputAccountId !== appliedFilters.accountId ||
-    inputBucketId !== appliedFilters.bucketId ||
+    inputCategoryId !== appliedFilters.categoryId ||
     inputType !== appliedFilters.type ||
     inputStartDate !== appliedFilters.startDate ||
     inputEndDate !== appliedFilters.endDate;
@@ -318,7 +320,7 @@ export const Transactions: React.FC = () => {
   const hasActiveFilters =
     appliedFilters.searchTerm !== '' ||
     appliedFilters.accountId !== 'all' ||
-    appliedFilters.bucketId !== 'all' ||
+    appliedFilters.categoryId !== 'all' ||
     appliedFilters.type !== 'all' ||
     appliedFilters.startDate !== '' ||
     appliedFilters.endDate !== '';
@@ -334,7 +336,7 @@ export const Transactions: React.FC = () => {
         <div>
           <h3 className="text-base font-bold text-slate-800">Lade Buchungen & Transaktionen...</h3>
           <p className="mt-1 max-w-sm text-xs text-slate-400">
-            Buchungsdaten und Bucket-Zuordnungen werden aus der lokalen IndexedDB-Datenbank
+            Buchungsdaten und Kategorie-Zuordnungen werden aus der lokalen IndexedDB-Datenbank
             synchronisiert.
           </p>
         </div>
@@ -502,20 +504,20 @@ export const Transactions: React.FC = () => {
             </select>
           </div>
 
-          {/* 3. Bucket Filter */}
+          {/* 3. Kategorie Filter */}
           <div className="lg:col-span-2">
             <select
-              value={inputBucketId}
-              onChange={(e) => setInputBucketId(e.target.value)}
+              value={inputCategoryId}
+              onChange={(e) => setInputCategoryId(e.target.value)}
               className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Zuweisungen</option>
               <option value="assigned">Zugewiesen</option>
-              <option value="uncategorized">Ohne Bucket (Unzugewiesen)</option>
+              <option value="uncategorized">Ohne Kategorie (Unzugewiesen)</option>
               <option value="manual">Manuell überschrieben</option>
-              {bucketOptions.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
+              {categoryOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -559,7 +561,7 @@ export const Transactions: React.FC = () => {
                 <th className="px-4 py-3">Konto</th>
                 <th className="px-4 py-3">Empfänger / Sender & Text</th>
                 <th className="px-4 py-3 text-right">Betrag</th>
-                <th className="px-4 py-3">Bucket & Zuweisung</th>
+                <th className="px-4 py-3">Kategorie & Zuweisung</th>
                 <th className="px-4 py-3 text-right">Aktionen</th>
               </tr>
             </thead>
@@ -609,18 +611,20 @@ export const Transactions: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* Bucket Selector */}
+                      {/* Kategorie Selector */}
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-2">
                           <select
-                            value={tx.bucketId || ''}
-                            onChange={(e) => assignTransactionBucket(tx.id, e.target.value || null)}
+                            value={tx.categoryId || tx.bucketId || ''}
+                            onChange={(e) =>
+                              assignTransactionCategory(tx.id, e.target.value || null)
+                            }
                             className="max-w-[200px] rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
-                            <option value="">(Kein Bucket)</option>
-                            {bucketOptions.map((b) => (
-                              <option key={b.id} value={b.id}>
-                                {b.name}
+                            <option value="">(Keine Kategorie)</option>
+                            {categoryOptions.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
                               </option>
                             ))}
                           </select>

@@ -9,7 +9,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useFinance } from '@/services/storage/FinanceContext';
 import {
   calculateCashflowMatrix,
-  BucketCashflowRow,
+  CategoryCashflowRow,
 } from '@/services/analytics/cashflowCalculator';
 import { IconRenderer } from '@/components/IconRenderer';
 import {
@@ -57,21 +57,21 @@ interface YearGroup {
 }
 
 export const Cashflow: React.FC = () => {
-  const { buckets, transactions } = useFinance();
+  const { categories, transactions } = useFinance();
   const { granularity, selectedAccountId, startDate, endDate } = useAnalyticsFilter();
 
-  const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const currentPeriodHeaderRef = useRef<HTMLTableCellElement>(null);
 
-  const toggleCollapse = (bucketId: string) => {
-    setCollapsedBuckets((prev) => {
+  const toggleCollapse = (categoryId: string) => {
+    setCollapsedCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(bucketId)) {
-        next.delete(bucketId);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
       } else {
-        next.add(bucketId);
+        next.add(categoryId);
       }
       return next;
     });
@@ -88,7 +88,7 @@ export const Cashflow: React.FC = () => {
 
   const matrix = useMemo(() => {
     return calculateCashflowMatrix(
-      buckets,
+      categories,
       transactions,
       granularity,
       selectedAccountId && selectedAccountId !== 'all' ? selectedAccountId : undefined,
@@ -99,7 +99,7 @@ export const Cashflow: React.FC = () => {
       }
     );
   }, [
-    buckets,
+    categories,
     transactions,
     granularity,
     selectedAccountId,
@@ -250,24 +250,24 @@ export const Cashflow: React.FC = () => {
   // Rekursives Rendern der Zeilen unter Beachtung des Collapse-States
   const renderRows = (): React.ReactNode => {
     // Map der Kinder
-    const childrenMap = new Map<string | null, BucketCashflowRow[]>();
+    const childrenMap = new Map<string | null, CategoryCashflowRow[]>();
     matrix.rows.forEach((r) => {
-      const pId = r.bucket.parentId;
+      const pId = r.category.parentId;
       const list = childrenMap.get(pId) || [];
       list.push(r);
       childrenMap.set(pId, list);
     });
 
-    const renderTreeRow = (row: BucketCashflowRow): React.ReactNode => {
-      const isCollapsed = collapsedBuckets.has(row.bucket.id);
-      const children = childrenMap.get(row.bucket.id) || [];
+    const renderTreeRow = (row: CategoryCashflowRow): React.ReactNode => {
+      const isCollapsed = collapsedCategories.has(row.category.id);
+      const children = childrenMap.get(row.category.id) || [];
       const targetBudget =
         row.effectiveBudget ??
         row.periods[matrix.periodKeys[0]]?.budget ??
-        (row.bucket.targetBudget
+        (row.category.targetBudget
           ? normalizeBudgetToGranularity(
-              row.bucket.targetBudget.amount,
-              row.bucket.targetBudget.period,
+              row.category.targetBudget.amount,
+              row.category.targetBudget.period,
               granularity
             )
           : undefined);
@@ -278,9 +278,9 @@ export const Cashflow: React.FC = () => {
         targetBudget !== undefined && avgNet !== 0 ? Math.abs(avgNet) - targetBudget : undefined;
 
       return (
-        <React.Fragment key={row.bucket.id}>
+        <React.Fragment key={row.category.id}>
           <tr className="group text-xs transition-colors hover:bg-slate-50">
-            {/* Bucket Name & Hierarchie (deutlich abgesetzte sticky Spalte) */}
+            {/* Kategorie Name & Hierarchie (deutlich abgesetzte sticky Spalte) */}
             <td className="sticky left-0 z-20 w-[240px] min-w-[240px] max-w-[240px] whitespace-nowrap border-b border-r-2 border-b-slate-200 border-r-slate-300 bg-slate-100 px-4 py-2.5 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors group-hover:bg-slate-200">
               <div
                 className="flex items-center gap-2 truncate"
@@ -289,7 +289,7 @@ export const Cashflow: React.FC = () => {
                 {row.hasChildren ? (
                   <button
                     type="button"
-                    onClick={() => toggleCollapse(row.bucket.id)}
+                    onClick={() => toggleCollapse(row.category.id)}
                     className="flex-shrink-0 rounded p-0.5 text-slate-500 hover:bg-slate-200"
                   >
                     {isCollapsed ? (
@@ -303,15 +303,15 @@ export const Cashflow: React.FC = () => {
                 )}
                 <div
                   className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-white"
-                  style={{ backgroundColor: row.bucket.color || '#64748b' }}
+                  style={{ backgroundColor: row.category.color || '#64748b' }}
                 >
-                  <IconRenderer name={row.bucket.icon} className="h-3.5 w-3.5" />
+                  <IconRenderer name={row.category.icon} className="h-3.5 w-3.5" />
                 </div>
                 <div className="flex min-w-0 flex-col truncate">
                   <span
                     className={`truncate font-semibold ${row.depth === 0 ? 'font-bold text-slate-900' : 'text-slate-700'}`}
                   >
-                    {row.bucket.name}
+                    {row.category.name}
                   </span>
                   {targetBudget !== undefined && targetBudget > 0 && (
                     <span className="truncate font-mono text-[10px] font-medium text-slate-500">
@@ -495,7 +495,7 @@ export const Cashflow: React.FC = () => {
                   rowSpan={2}
                   className="sticky left-0 z-30 w-[240px] min-w-[240px] max-w-[240px] border-b-2 border-r-2 border-slate-300 bg-slate-200 px-4 py-3 text-left text-slate-900 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]"
                 >
-                  Bucket
+                  Kategorie
                 </th>
                 {yearGroups.map((group, gIdx) => {
                   const isCurrentYear = group.year === currentYear;
@@ -613,7 +613,7 @@ export const Cashflow: React.FC = () => {
                     colSpan={displayColumns.length + 2}
                     className="py-12 text-center text-sm text-slate-400"
                   >
-                    Noch keine Buckets konfiguriert.
+                    Noch keine Kategorien konfiguriert.
                   </td>
                 </tr>
               )}

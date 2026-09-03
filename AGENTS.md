@@ -16,7 +16,7 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 ### 2. Implementierungsphase
 
 - **Tech-Stack:** React 18, TypeScript (strikter Modus), Vite, Tailwind CSS.
-- **Terminologie:** Verwende **ausschließlich den Begriff "Bucket" bzw. "Buckets"** (niemals "Kategorie" oder "Kategorien").
+- **Terminologie:** Verwende in der UI ausschließlich den Begriff **"Kategorie" bzw. "Kategorien"** (niemals "Bucket" oder "Buckets"). Im englischen TypeScript-Code wird **`Category` bzw. `Categories`** verwendet.
 - **Path-Alias:** Verwende für alle relativen Modulimporte den konfigurierten Alias `@/*` (z. B. `import { Button } from '@/components/Button'`).
 - **Struktur:**
   - `src/components/`: Wiederverwendbare UI-Komponenten.

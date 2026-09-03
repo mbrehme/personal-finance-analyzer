@@ -7,17 +7,19 @@
 
 import {
   Account,
-  Bucket,
+  Category,
   Transaction,
   FinanceConfigExport,
   sortTransactionsDesc,
 } from '@/types/finance';
 
 const DB_NAME = 'personal_finance_analyzer_db';
-const DB_VERSION = 2;
+const DB_VERSION = 4;
 
 const STORES = {
   ACCOUNTS: 'accounts',
+  CATEGORIES: 'categories',
+  /** @deprecated Altes Schema vor v3 */
   BUCKETS: 'buckets',
   TRANSACTIONS: 'transactions',
 } as const;
@@ -27,12 +29,17 @@ const STORES = {
  */
 class MemoryStorage {
   accounts: Map<string, Account> = new Map();
-  buckets: Map<string, Bucket> = new Map();
+  categories: Map<string, Category> = new Map();
   transactions: Map<string, Transaction> = new Map();
+
+  // Alias für Abwärtskompatibilität
+  get buckets(): Map<string, Category> {
+    return this.categories;
+  }
 
   clear() {
     this.accounts.clear();
-    this.buckets.clear();
+    this.categories.clear();
     this.transactions.clear();
   }
 }
@@ -58,6 +65,10 @@ function openDB(): Promise<IDBDatabase> {
 
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
 
+    request.onblocked = () => {
+      console.warn('IndexedDB Upgrade wartet auf das Schließen älterer Verbindungen...');
+    };
+
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       const upgradeTx = (event.target as IDBOpenDBRequest).transaction!;
@@ -66,8 +77,24 @@ function openDB(): Promise<IDBDatabase> {
         db.createObjectStore(STORES.ACCOUNTS, { keyPath: 'id' });
       }
 
-      if (!db.objectStoreNames.contains(STORES.BUCKETS)) {
-        db.createObjectStore(STORES.BUCKETS, { keyPath: 'id' });
+      let categoryStore: IDBObjectStore;
+      if (!db.objectStoreNames.contains(STORES.CATEGORIES)) {
+        categoryStore = db.createObjectStore(STORES.CATEGORIES, { keyPath: 'id' });
+      } else {
+        categoryStore = upgradeTx.objectStore(STORES.CATEGORIES);
+      }
+
+      // Falls eine ältere 'buckets'-Tabelle existiert, Datensätze migrieren
+      if (db.objectStoreNames.contains(STORES.BUCKETS)) {
+        const oldBucketStore = upgradeTx.objectStore(STORES.BUCKETS);
+        const cursorReq = oldBucketStore.openCursor();
+        cursorReq.onsuccess = (e) => {
+          const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+          if (cursor) {
+            categoryStore.put(cursor.value);
+            cursor.continue();
+          }
+        };
       }
 
       let txStore: IDBObjectStore;
@@ -80,6 +107,9 @@ function openDB(): Promise<IDBDatabase> {
       if (!txStore.indexNames.contains('accountId')) {
         txStore.createIndex('accountId', 'accountId', { unique: false });
       }
+      if (!txStore.indexNames.contains('categoryId')) {
+        txStore.createIndex('categoryId', 'categoryId', { unique: false });
+      }
       if (!txStore.indexNames.contains('bucketId')) {
         txStore.createIndex('bucketId', 'bucketId', { unique: false });
       }
@@ -88,7 +118,13 @@ function openDB(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => {
+        db.close();
+      };
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -164,43 +200,98 @@ export const financeDB = {
     await performStoreOperation(STORES.ACCOUNTS, 'readwrite', (store) => store.delete(accountId));
   },
 
-  /* ================== BUCKETS ================== */
-  async getBuckets(): Promise<Bucket[]> {
+  /* ================== CATEGORIES (BUCKETS) ================== */
+  async getCategories(): Promise<Category[]> {
     if (!isIndexedDBAvailable()) {
-      return Array.from(memoryStore.buckets.values());
+      return Array.from(memoryStore.categories.values());
     }
-    return performStoreOperation<Bucket[]>(STORES.BUCKETS, 'readonly', (store) => store.getAll());
+    const db = await openDB();
+    if (db.objectStoreNames.contains(STORES.CATEGORIES)) {
+      const cats = await performStoreOperation<Category[]>(STORES.CATEGORIES, 'readonly', (store) =>
+        store.getAll()
+      );
+      if (cats && cats.length > 0) {
+        return cats;
+      }
+    }
+    // Fallback: Ältere 'buckets'-Tabelle lesen falls 'categories' noch nicht befüllt ist
+    if (db.objectStoreNames.contains(STORES.BUCKETS)) {
+      const legacyBuckets = await performStoreOperation<Category[]>(
+        STORES.BUCKETS,
+        'readonly',
+        (store) => store.getAll()
+      );
+      if (legacyBuckets && legacyBuckets.length > 0) {
+        // Bei Verfügbarkeit in die neue Tabelle übertragen
+        if (db.objectStoreNames.contains(STORES.CATEGORIES)) {
+          await this.saveCategories(legacyBuckets);
+        }
+        return legacyBuckets;
+      }
+    }
+    return [];
   },
 
-  async saveBucket(bucket: Bucket): Promise<void> {
-    if (!isIndexedDBAvailable()) {
-      memoryStore.buckets.set(bucket.id, bucket);
-      return;
-    }
-    await performStoreOperation(STORES.BUCKETS, 'readwrite', (store) => store.put(bucket));
+  // Alias für Abwärtskompatibilität
+  async getBuckets(): Promise<Category[]> {
+    return this.getCategories();
   },
 
-  async saveBuckets(buckets: Bucket[]): Promise<void> {
+  async saveCategory(category: Category): Promise<void> {
     if (!isIndexedDBAvailable()) {
-      buckets.forEach((b) => memoryStore.buckets.set(b.id, b));
+      memoryStore.categories.set(category.id, category);
       return;
     }
     const db = await openDB();
+    const targetStore = db.objectStoreNames.contains(STORES.CATEGORIES)
+      ? STORES.CATEGORIES
+      : STORES.BUCKETS;
+    await performStoreOperation(targetStore, 'readwrite', (store) => store.put(category));
+  },
+
+  // Alias für Abwärtskompatibilität
+  async saveBucket(bucket: Category): Promise<void> {
+    return this.saveCategory(bucket);
+  },
+
+  async saveCategories(categories: Category[]): Promise<void> {
+    if (!isIndexedDBAvailable()) {
+      categories.forEach((c) => memoryStore.categories.set(c.id, c));
+      return;
+    }
+    const db = await openDB();
+    const targetStore = db.objectStoreNames.contains(STORES.CATEGORIES)
+      ? STORES.CATEGORIES
+      : STORES.BUCKETS;
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORES.BUCKETS, 'readwrite');
-      const store = tx.objectStore(STORES.BUCKETS);
-      buckets.forEach((b) => store.put(b));
+      const tx = db.transaction(targetStore, 'readwrite');
+      const store = tx.objectStore(targetStore);
+      categories.forEach((c) => store.put(c));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
   },
 
-  async deleteBucket(bucketId: string): Promise<void> {
+  // Alias für Abwärtskompatibilität
+  async saveBuckets(buckets: Category[]): Promise<void> {
+    return this.saveCategories(buckets);
+  },
+
+  async deleteCategory(categoryId: string): Promise<void> {
     if (!isIndexedDBAvailable()) {
-      memoryStore.buckets.delete(bucketId);
+      memoryStore.categories.delete(categoryId);
       return;
     }
-    await performStoreOperation(STORES.BUCKETS, 'readwrite', (store) => store.delete(bucketId));
+    const db = await openDB();
+    const targetStore = db.objectStoreNames.contains(STORES.CATEGORIES)
+      ? STORES.CATEGORIES
+      : STORES.BUCKETS;
+    await performStoreOperation(targetStore, 'readwrite', (store) => store.delete(categoryId));
+  },
+
+  // Alias für Abwärtskompatibilität
+  async deleteBucket(bucketId: string): Promise<void> {
+    return this.deleteCategory(bucketId);
   },
 
   /* ================== TRANSACTIONS ================== */
@@ -211,8 +302,18 @@ export const financeDB = {
    * @returns Promise mit Transaktionsliste
    */
   async getTransactions(): Promise<Transaction[]> {
+    const normalizeTx = (t: Transaction): Transaction => {
+      const catId = t.categoryId ?? t.bucketId ?? null;
+      return {
+        ...t,
+        categoryId: catId,
+        bucketId: catId,
+      };
+    };
+
     if (!isIndexedDBAvailable()) {
-      return sortTransactionsDesc(Array.from(memoryStore.transactions.values()));
+      const items = Array.from(memoryStore.transactions.values()).map(normalizeTx);
+      return sortTransactionsDesc(items);
     }
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -226,7 +327,7 @@ export const financeDB = {
         req.onsuccess = (event) => {
           const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
           if (cursor) {
-            results.push(cursor.value);
+            results.push(normalizeTx(cursor.value));
             cursor.continue();
           } else {
             resolve(sortTransactionsDesc(results));
@@ -235,30 +336,47 @@ export const financeDB = {
         req.onerror = () => reject(req.error);
       } else {
         const req = store.getAll();
-        req.onsuccess = () => resolve(sortTransactionsDesc(req.result));
+        req.onsuccess = () =>
+          resolve(sortTransactionsDesc((req.result as Transaction[]).map(normalizeTx)));
         req.onerror = () => reject(req.error);
       }
     });
   },
 
   async saveTransaction(tx: Transaction): Promise<void> {
+    const catId = tx.categoryId ?? tx.bucketId ?? null;
+    const normalized: Transaction = {
+      ...tx,
+      categoryId: catId,
+      bucketId: catId,
+    };
+
     if (!isIndexedDBAvailable()) {
-      memoryStore.transactions.set(tx.id, tx);
+      memoryStore.transactions.set(normalized.id, normalized);
       return;
     }
-    await performStoreOperation(STORES.TRANSACTIONS, 'readwrite', (store) => store.put(tx));
+    await performStoreOperation(STORES.TRANSACTIONS, 'readwrite', (store) => store.put(normalized));
   },
 
   async saveTransactions(transactions: Transaction[]): Promise<void> {
+    const normalizedList = transactions.map((tx) => {
+      const catId = tx.categoryId ?? tx.bucketId ?? null;
+      return {
+        ...tx,
+        categoryId: catId,
+        bucketId: catId,
+      };
+    });
+
     if (!isIndexedDBAvailable()) {
-      transactions.forEach((t) => memoryStore.transactions.set(t.id, t));
+      normalizedList.forEach((t) => memoryStore.transactions.set(t.id, t));
       return;
     }
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.TRANSACTIONS, 'readwrite');
       const store = tx.objectStore(STORES.TRANSACTIONS);
-      transactions.forEach((t) => store.put(t));
+      normalizedList.forEach((t) => store.put(t));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -284,40 +402,51 @@ export const financeDB = {
 
   /* ================== EXPORT & IMPORT ================== */
   async exportConfiguration(): Promise<FinanceConfigExport> {
-    const [accounts, buckets] = await Promise.all([this.getAccounts(), this.getBuckets()]);
+    const [accounts, categories] = await Promise.all([this.getAccounts(), this.getCategories()]);
 
     return {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       accounts,
-      buckets,
+      categories,
+      buckets: categories,
     };
   },
 
   async importConfiguration(config: FinanceConfigExport): Promise<void> {
-    if (!config || !Array.isArray(config.accounts) || !Array.isArray(config.buckets)) {
+    const categoriesToImport = config.categories || config.buckets;
+    if (!config || !Array.isArray(config.accounts) || !Array.isArray(categoriesToImport)) {
       throw new Error('Ungültiges Konfigurationsformat.');
     }
 
     if (!isIndexedDBAvailable()) {
       memoryStore.accounts.clear();
-      memoryStore.buckets.clear();
+      memoryStore.categories.clear();
       config.accounts.forEach((acc) => memoryStore.accounts.set(acc.id, acc));
-      config.buckets.forEach((b) => memoryStore.buckets.set(b.id, b));
+      categoriesToImport.forEach((c) => memoryStore.categories.set(c.id, c));
       return;
     }
 
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction([STORES.ACCOUNTS, STORES.BUCKETS], 'readwrite');
+      const candidates = [STORES.ACCOUNTS, STORES.CATEGORIES, STORES.BUCKETS];
+      const storeNames = candidates.filter((name) => db.objectStoreNames.contains(name));
+      const tx = db.transaction(storeNames, 'readwrite');
       const accStore = tx.objectStore(STORES.ACCOUNTS);
-      const bucketStore = tx.objectStore(STORES.BUCKETS);
 
       accStore.clear();
-      bucketStore.clear();
-
       config.accounts.forEach((acc) => accStore.put(acc));
-      config.buckets.forEach((b) => bucketStore.put(b));
+
+      if (db.objectStoreNames.contains(STORES.CATEGORIES)) {
+        const catStore = tx.objectStore(STORES.CATEGORIES);
+        catStore.clear();
+        categoriesToImport.forEach((c) => catStore.put(c));
+      }
+      if (db.objectStoreNames.contains(STORES.BUCKETS)) {
+        const bucketStore = tx.objectStore(STORES.BUCKETS);
+        bucketStore.clear();
+        categoriesToImport.forEach((c) => bucketStore.put(c));
+      }
 
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -332,13 +461,21 @@ export const financeDB = {
     if (isIndexedDBAvailable()) {
       const db = await openDB();
       return new Promise((resolve, reject) => {
-        const tx = db.transaction(
-          [STORES.ACCOUNTS, STORES.BUCKETS, STORES.TRANSACTIONS],
-          'readwrite'
-        );
-        tx.objectStore(STORES.ACCOUNTS).clear();
-        tx.objectStore(STORES.BUCKETS).clear();
-        tx.objectStore(STORES.TRANSACTIONS).clear();
+        const candidates = [
+          STORES.ACCOUNTS,
+          STORES.CATEGORIES,
+          STORES.BUCKETS,
+          STORES.TRANSACTIONS,
+        ];
+        const storeNames = candidates.filter((name) => db.objectStoreNames.contains(name));
+        if (storeNames.length === 0) {
+          resolve();
+          return;
+        }
+        const tx = db.transaction(storeNames, 'readwrite');
+        storeNames.forEach((name) => {
+          tx.objectStore(name).clear();
+        });
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });

@@ -289,6 +289,7 @@ export function convertRowsToTransactions(
       type,
       iban,
       value,
+      categoryId: null,
       bucketId: null,
       assignmentSource: 'unassigned',
       importFilename: filename || undefined,

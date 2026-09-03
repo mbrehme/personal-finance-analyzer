@@ -14,7 +14,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe('FinanceContext', () => {
-  it('initializes with seed accounts and buckets', async () => {
+  it('initializes with seed accounts and categories', async () => {
     const { result } = renderHook(() => useFinance(), { wrapper });
 
     await waitFor(() => {
@@ -22,6 +22,7 @@ describe('FinanceContext', () => {
     });
 
     expect(result.current.accounts.length).toBeGreaterThan(0);
+    expect(result.current.categories.length).toBeGreaterThan(0);
     expect(result.current.buckets.length).toBeGreaterThan(0);
   });
 
@@ -34,7 +35,7 @@ describe('FinanceContext', () => {
     await act(async () => {
       createdAcc = await result.current.addAccount({
         name: 'Neues Sparkonto',
-        bucketIds: [],
+        categoryIds: [],
         balanceEntries: [],
       });
     });
@@ -53,7 +54,7 @@ describe('FinanceContext', () => {
     expect(found?.name).toBe('Sparkonto Umbenannt');
   });
 
-  it('manages manual bucket assignment and records manualTransactionIds', async () => {
+  it('manages manual category assignment and records manualTransactionIds', async () => {
     const { result } = renderHook(() => useFinance(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -71,42 +72,43 @@ describe('FinanceContext', () => {
           type: 'outbound',
           iban: 'DE00',
           value: -50,
-          bucketId: null,
+          categoryId: null,
           assignmentSource: 'unassigned',
         },
       ]);
     });
 
-    const targetBucket = result.current.buckets[0];
+    const targetCategory = result.current.categories[0];
 
     await act(async () => {
-      await result.current.assignTransactionBucket('tx-test-assign', targetBucket.id);
+      await result.current.assignTransactionCategory('tx-test-assign', targetCategory.id);
     });
 
     const updatedTx = result.current.transactions.find((t) => t.id === 'tx-test-assign');
-    expect(updatedTx?.bucketId).toBe(targetBucket.id);
+    expect(updatedTx?.categoryId).toBe(targetCategory.id);
+    expect(updatedTx?.bucketId).toBe(targetCategory.id);
     expect(updatedTx?.assignmentSource).toBe('manual');
 
-    const updatedBucket = result.current.buckets.find((b) => b.id === targetBucket.id);
-    expect(updatedBucket?.manualTransactionIds).toContain('tx-test-assign');
+    const updatedCategory = result.current.categories.find((c) => c.id === targetCategory.id);
+    expect(updatedCategory?.manualTransactionIds).toContain('tx-test-assign');
   });
 
-  it('reorders buckets and accounts successfully', async () => {
+  it('reorders categories and accounts successfully', async () => {
     const { result } = renderHook(() => useFinance(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    // Reorder Buckets
-    const initialBuckets = [...result.current.buckets];
-    const reversedBuckets = initialBuckets.map((b, idx) => ({
-      ...b,
-      order: initialBuckets.length - idx,
+    // Reorder Categories
+    const initialCategories = [...result.current.categories];
+    const reversedCategories = initialCategories.map((c, idx) => ({
+      ...c,
+      order: initialCategories.length - idx,
     }));
 
     await act(async () => {
-      await result.current.reorderBuckets(reversedBuckets);
+      await result.current.reorderCategories(reversedCategories);
     });
 
-    expect(result.current.buckets[0].order).toBe(initialBuckets.length);
+    expect(result.current.categories[0].order).toBe(initialCategories.length);
 
     // Reorder Accounts
     const initialAccounts = [...result.current.accounts];
@@ -120,5 +122,25 @@ describe('FinanceContext', () => {
     });
 
     expect(result.current.accounts[0].order).toBe(5);
+  });
+
+  it('resets workspace to seed categories and accounts', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Delete a category to alter state
+    const firstCat = result.current.categories[0];
+    await act(async () => {
+      await result.current.deleteCategory(firstCat.id);
+    });
+
+    // Reset workspace
+    await act(async () => {
+      await result.current.resetWorkspace();
+    });
+
+    expect(result.current.categories.length).toBeGreaterThan(0);
+    expect(result.current.accounts.length).toBeGreaterThan(0);
+    expect(result.current.transactions.length).toBe(0);
   });
 });

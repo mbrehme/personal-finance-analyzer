@@ -155,7 +155,8 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                 {importedCount} Buchung(en) erfolgreich importiert!
               </h4>
               <p className="text-xs text-slate-500">
-                Die Transaktionen wurden automatisch gegen bestehende Buckets und Overrides geprüft.
+                Die Transaktionen wurden automatisch gegen bestehende Kategorien und Overrides
+                geprüft.
               </p>
               <button
                 onClick={resetModal}

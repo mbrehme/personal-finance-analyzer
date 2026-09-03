@@ -11,7 +11,7 @@ import { useFinance } from '@/services/storage/FinanceContext';
 import { Layers, Landmark, Download, Upload, RotateCcw } from 'lucide-react';
 
 export const ConfigurationLayout: React.FC = () => {
-  const { buckets, accounts, exportConfiguration, importConfiguration, resetWorkspace } =
+  const { categories, accounts, exportConfiguration, importConfiguration, resetWorkspace } =
     useFinance();
 
   const location = useLocation();
@@ -57,8 +57,8 @@ export const ConfigurationLayout: React.FC = () => {
             Konfiguration
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Verwalte hierarchische Buckets, Regex-Muster, Soll-Budgets und Konten. Klicke auf eine
-            Zeile zum Bearbeiten oder nutze Drag & Drop zum Sortieren & Unterordnen.
+            Verwalte hierarchische Kategorien, Regex-Muster, Soll-Budgets und Konten. Klicke auf
+            eine Zeile zum Bearbeiten oder nutze Drag & Drop zum Sortieren & Unterordnen.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export const ConfigurationLayout: React.FC = () => {
             onClick={() => {
               if (
                 confirm(
-                  'Möchtest du wirklich alle Daten zurücksetzen? Alle Konten, Buckets und Buchungen werden auf die Standardeinstellungen zurückgesetzt.'
+                  'Möchtest du wirklich alle Daten zurücksetzen? Alle Konten, Kategorien und Buchungen werden auf die Standardeinstellungen zurückgesetzt.'
                 )
               ) {
                 resetWorkspace();
@@ -106,7 +106,7 @@ export const ConfigurationLayout: React.FC = () => {
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200">
         <NavLink
-          to="/configuration/buckets"
+          to="/configuration/categories"
           className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
             !isAccounts
               ? 'border-blue-600 text-blue-600'
@@ -114,7 +114,7 @@ export const ConfigurationLayout: React.FC = () => {
           }`}
         >
           <Layers className="h-4 w-4" />
-          Buckets ({buckets.length})
+          Kategorien ({categories.length})
         </NavLink>
 
         <NavLink

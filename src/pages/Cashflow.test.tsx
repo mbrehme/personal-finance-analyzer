@@ -62,6 +62,7 @@ describe('Cashflow Page', () => {
     const currentMonthKey = getCurrentPeriodKey('monthly');
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Giro' }] as any,
+      categories: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
       buckets: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
       transactions: [
         {
@@ -86,6 +87,10 @@ describe('Cashflow Page', () => {
       needsReMatch: false,
       reMatching: false,
       setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
       addBucket: vi.fn(),
       updateBucket: vi.fn(),
       deleteBucket: vi.fn(),
@@ -97,6 +102,7 @@ describe('Cashflow Page', () => {
       addBalanceEntry: vi.fn(),
       deleteBalanceEntry: vi.fn(),
       importTransactions: vi.fn(),
+      assignTransactionCategory: vi.fn(),
       assignTransactionBucket: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),
@@ -117,6 +123,7 @@ describe('Cashflow Page', () => {
     const currentMonthKey = getCurrentPeriodKey('monthly');
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Giro' }] as any,
+      categories: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
       buckets: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
       transactions: [
         {
@@ -155,6 +162,10 @@ describe('Cashflow Page', () => {
       needsReMatch: false,
       reMatching: false,
       setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
       addBucket: vi.fn(),
       updateBucket: vi.fn(),
       deleteBucket: vi.fn(),
@@ -166,6 +177,7 @@ describe('Cashflow Page', () => {
       addBalanceEntry: vi.fn(),
       deleteBalanceEntry: vi.fn(),
       importTransactions: vi.fn(),
+      assignTransactionCategory: vi.fn(),
       assignTransactionBucket: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),
@@ -199,6 +211,7 @@ describe('Cashflow Page', () => {
         { id: 'acc-1', name: 'Giro' },
         { id: 'acc-persist', name: 'Sparkonto' },
       ] as any,
+      categories: [] as any,
       buckets: [] as any,
       transactions: [] as any,
       loading: false,
@@ -208,6 +221,10 @@ describe('Cashflow Page', () => {
       needsReMatch: false,
       reMatching: false,
       setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
       addBucket: vi.fn(),
       updateBucket: vi.fn(),
       deleteBucket: vi.fn(),
@@ -219,6 +236,7 @@ describe('Cashflow Page', () => {
       addBalanceEntry: vi.fn(),
       deleteBalanceEntry: vi.fn(),
       importTransactions: vi.fn(),
+      assignTransactionCategory: vi.fn(),
       assignTransactionBucket: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),

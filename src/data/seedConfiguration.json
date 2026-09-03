@@ -7,7 +7,7 @@
       "name": "Haupt-Girokonto",
       "color": "#3b82f6",
       "icon": "Landmark",
-      "bucketIds": [],
+      "categoryIds": [],
       "balanceEntries": [
         {
           "id": "be-seed-1",
@@ -18,7 +18,7 @@
       ]
     }
   ],
-  "buckets": [
+  "categories": [
     {
       "id": "b-einnahmen",
       "name": "Einnahmen",

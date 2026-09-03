@@ -12,7 +12,7 @@ describe('balanceCalculator', () => {
   const account: Account = {
     id: 'acc-giro',
     name: 'Girokonto',
-    bucketIds: [],
+    categoryIds: [],
     balanceEntries: [
       {
         id: 'be-1',
@@ -35,7 +35,7 @@ describe('balanceCalculator', () => {
       type: 'inbound',
       iban: 'DE00',
       value: 1000,
-      bucketId: null,
+      categoryId: null,
       assignmentSource: 'unassigned',
     },
     {
@@ -49,7 +49,7 @@ describe('balanceCalculator', () => {
       type: 'outbound',
       iban: 'DE00',
       value: -800,
-      bucketId: null,
+      categoryId: null,
       assignmentSource: 'unassigned',
     },
   ];
@@ -79,7 +79,7 @@ describe('balanceCalculator', () => {
     const secondAccount: Account = {
       id: 'acc-tagesgeld',
       name: 'Tagesgeld',
-      bucketIds: [],
+      categoryIds: [],
       balanceEntries: [],
     };
 

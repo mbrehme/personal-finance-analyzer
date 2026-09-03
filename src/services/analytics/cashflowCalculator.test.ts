@@ -6,10 +6,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { calculateCashflowMatrix, extractPeriodKeys } from './cashflowCalculator';
-import { Bucket, Transaction } from '@/types/finance';
+import { Category, Transaction } from '@/types/finance';
 
 describe('cashflowCalculator', () => {
-  const buckets: Bucket[] = [
+  const categories: Category[] = [
     {
       id: 'b-living',
       name: 'Wohnen',
@@ -40,7 +40,7 @@ describe('cashflowCalculator', () => {
       type: 'inbound',
       iban: 'DE00',
       value: 3000,
-      bucketId: 'b-salary',
+      categoryId: 'b-salary',
       assignmentSource: 'auto_regex',
     },
     {
@@ -54,7 +54,7 @@ describe('cashflowCalculator', () => {
       type: 'outbound',
       iban: 'DE00',
       value: -1200,
-      bucketId: 'b-rent',
+      categoryId: 'b-rent',
       assignmentSource: 'auto_regex',
     },
     {
@@ -68,7 +68,7 @@ describe('cashflowCalculator', () => {
       type: 'inbound',
       iban: 'DE00',
       value: 3000,
-      bucketId: 'b-salary',
+      categoryId: 'b-salary',
       assignmentSource: 'auto_regex',
     },
   ];
@@ -78,22 +78,22 @@ describe('cashflowCalculator', () => {
     expect(keys).toEqual(['2026-08', '2026-09']);
   });
 
-  it('rolls up child bucket sums to parent bucket in cashflow matrix', () => {
-    const matrix = calculateCashflowMatrix(buckets, transactions, 'monthly');
+  it('rolls up child category sums to parent category in cashflow matrix', () => {
+    const matrix = calculateCashflowMatrix(categories, transactions, 'monthly');
     expect(matrix.periodKeys).toEqual(['2026-08', '2026-09']);
 
-    const livingRow = matrix.rows.find((r) => r.bucket.id === 'b-living');
+    const livingRow = matrix.rows.find((r) => r.category.id === 'b-living');
     expect(livingRow).toBeDefined();
     expect(livingRow?.hasChildren).toBe(true);
     // In August: Miete = -1200 gerollt zu Wohnen
     expect(livingRow?.periods['2026-08'].outbound).toBe(-1200);
     expect(livingRow?.periods['2026-08'].budget).toBe(1500);
 
-    const rentRow = matrix.rows.find((r) => r.bucket.id === 'b-rent');
+    const rentRow = matrix.rows.find((r) => r.category.id === 'b-rent');
     expect(rentRow?.depth).toBe(1);
     expect(rentRow?.periods['2026-08'].outbound).toBe(-1200);
 
-    const salaryRow = matrix.rows.find((r) => r.bucket.id === 'b-salary');
+    const salaryRow = matrix.rows.find((r) => r.category.id === 'b-salary');
     expect(salaryRow?.periods['2026-08'].inbound).toBe(3000);
     expect(salaryRow?.periods['2026-09'].inbound).toBe(3000);
 
@@ -104,16 +104,16 @@ describe('cashflowCalculator', () => {
   });
 
   it('correctly calculates diffToBudget as actual minus budget', () => {
-    const testBuckets: Bucket[] = [
+    const testCategories: Category[] = [
       {
         id: 'b-exp',
-        name: 'Ausgabe Bucket',
+        name: 'Ausgabe Kategorie',
         parentId: null,
         targetBudget: { period: 'monthly', amount: 500 },
       },
       {
         id: 'b-inc',
-        name: 'Einnahme Bucket',
+        name: 'Einnahme Kategorie',
         parentId: null,
         targetBudget: { period: 'monthly', amount: 500 },
       },
@@ -131,7 +131,7 @@ describe('cashflowCalculator', () => {
         type: 'outbound',
         iban: 'DE00',
         value: -518,
-        bucketId: 'b-exp',
+        categoryId: 'b-exp',
         assignmentSource: 'auto_regex',
       },
       {
@@ -145,14 +145,14 @@ describe('cashflowCalculator', () => {
         type: 'inbound',
         iban: 'DE00',
         value: 518,
-        bucketId: 'b-inc',
+        categoryId: 'b-inc',
         assignmentSource: 'auto_regex',
       },
     ];
 
-    const matrix = calculateCashflowMatrix(testBuckets, testTxs, 'monthly');
-    const expRow = matrix.rows.find((r) => r.bucket.id === 'b-exp');
-    const incRow = matrix.rows.find((r) => r.bucket.id === 'b-inc');
+    const matrix = calculateCashflowMatrix(testCategories, testTxs, 'monthly');
+    const expRow = matrix.rows.find((r) => r.category.id === 'b-exp');
+    const incRow = matrix.rows.find((r) => r.category.id === 'b-inc');
 
     // Beide haben einen tatsächlichen Betrag von 518 und ein Soll von 500
     // Differenz muss in beiden Fällen +18 (18 mehr als geplant) sein
@@ -160,8 +160,8 @@ describe('cashflowCalculator', () => {
     expect(incRow?.periods['2026-08'].diffToBudget).toBe(18);
   });
 
-  it('rolls up child budgets to parent buckets when parent has no manual budget', () => {
-    const hierarchyBuckets: Bucket[] = [
+  it('rolls up child budgets to parent categories when parent has no manual budget', () => {
+    const hierarchyCategories: Category[] = [
       {
         id: 'b-parent',
         name: 'Ausgaben',
@@ -198,14 +198,14 @@ describe('cashflowCalculator', () => {
       },
     ];
 
-    const matrix = calculateCashflowMatrix(hierarchyBuckets, [], 'monthly', undefined, {
+    const matrix = calculateCashflowMatrix(hierarchyCategories, [], 'monthly', undefined, {
       startDate: '2026-09-01',
       endDate: '2026-09-30',
     });
 
-    const parentRow = matrix.rows.find((r) => r.bucket.id === 'b-parent');
-    const child2Row = matrix.rows.find((r) => r.bucket.id === 'b-child-2');
-    const manualParentRow = matrix.rows.find((r) => r.bucket.id === 'b-manual-parent');
+    const parentRow = matrix.rows.find((r) => r.category.id === 'b-parent');
+    const child2Row = matrix.rows.find((r) => r.category.id === 'b-child-2');
+    const manualParentRow = matrix.rows.find((r) => r.category.id === 'b-manual-parent');
 
     // b-child-2 erbt Budget von b-grandchild (250)
     expect(child2Row?.effectiveBudget).toBe(250);

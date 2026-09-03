@@ -13,11 +13,11 @@ import { FinanceProvider } from '@/services/storage/FinanceContext';
 describe('ConfigurationLayout', () => {
   it('renders header, export/import buttons and subpage tabs', async () => {
     render(
-      <MemoryRouter initialEntries={['/configuration/buckets']}>
+      <MemoryRouter initialEntries={['/configuration/categories']}>
         <FinanceProvider>
           <Routes>
             <Route path="/configuration" element={<ConfigurationLayout />}>
-              <Route path="buckets" element={<div>Buckets Content</div>} />
+              <Route path="categories" element={<div>Categories Content</div>} />
               <Route path="accounts" element={<div>Accounts Content</div>} />
             </Route>
           </Routes>
@@ -29,8 +29,8 @@ describe('ConfigurationLayout', () => {
     expect(screen.getByText('JSON Export')).toBeInTheDocument();
     expect(screen.getByText('JSON Import')).toBeInTheDocument();
     expect(screen.getByText('Zurücksetzen')).toBeInTheDocument();
-    expect(screen.getByText(/Buckets \(\d+\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Kategorien \(\d+\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Konten \(\d+\)/i)).toBeInTheDocument();
-    expect(screen.getByText('Buckets Content')).toBeInTheDocument();
+    expect(screen.getByText('Categories Content')).toBeInTheDocument();
   });
 });

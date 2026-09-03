@@ -9,7 +9,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { AccountModal } from './AccountModal';
 
 describe('AccountModal', () => {
-  it('renders modal and saves account with bucketIds and balanceEntries', async () => {
+  it('renders modal and saves account with categoryIds and balanceEntries', async () => {
     const handleSave = vi.fn().mockResolvedValue(undefined);
     const handleClose = vi.fn();
 
@@ -18,7 +18,7 @@ describe('AccountModal', () => {
         isOpen={true}
         onClose={handleClose}
         onSave={handleSave}
-        existingBuckets={[
+        existingCategories={[
           { id: 'b-rent', name: 'Miete', parentId: null },
           { id: 'b-food', name: 'Essen', parentId: null },
         ]}
@@ -30,7 +30,7 @@ describe('AccountModal', () => {
     const nameInput = screen.getByPlaceholderText('z. B. Girokonto ING, Tagesgeld DKB, Depot');
     fireEvent.change(nameInput, { target: { value: 'Hauptkonto' } });
 
-    // Bucket auswählen
+    // Kategorie auswählen
     const rentCheckbox = screen.getByText('Miete');
     fireEvent.click(rentCheckbox);
 
@@ -40,7 +40,7 @@ describe('AccountModal', () => {
     expect(handleSave).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Hauptkonto',
-        bucketIds: ['b-rent'],
+        categoryIds: ['b-rent'],
       })
     );
   });

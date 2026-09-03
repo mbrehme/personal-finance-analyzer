@@ -10,7 +10,7 @@ import { Transactions } from './Transactions';
 import { FinanceProvider } from '@/services/storage/FinanceContext';
 
 describe('Transactions Page', () => {
-  it('renders transactions page with filters, bucket options and import button', async () => {
+  it('renders transactions page with filters, category options and import button', async () => {
     render(
       <FinanceProvider>
         <Transactions />

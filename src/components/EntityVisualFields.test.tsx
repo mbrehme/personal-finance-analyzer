@@ -25,11 +25,11 @@ describe('EntityVisualFields', () => {
         setIcon={setIcon}
         description="Test Beschreibung"
         setDescription={setDescription}
-        nameLabel="Bucket-Name *"
+        nameLabel="Kategorie-Name *"
       />
     );
 
-    expect(screen.getByText('Bucket-Name *')).toBeInTheDocument();
+    expect(screen.getByText('Kategorie-Name *')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Test Entity')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Test Beschreibung')).toBeInTheDocument();
     expect(screen.getByTitle('Farbe wählen')).toBeInTheDocument();

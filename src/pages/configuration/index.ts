@@ -5,5 +5,5 @@
  */
 
 export { ConfigurationLayout } from './ConfigurationLayout';
-export { BucketsConfig } from './BucketsConfig';
+export { CategoriesConfig, BucketsConfig } from './CategoriesConfig';
 export { AccountsConfig } from './AccountsConfig';

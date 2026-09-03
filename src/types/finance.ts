@@ -25,20 +25,23 @@ export type PeriodGranularity = 'monthly' | 'quarterly' | 'halfYearly' | 'yearly
 export type TransactionType = 'inbound' | 'outbound';
 
 /**
- * Herkunft der Bucket-Zuweisung einer Transaktion.
+ * Herkunft der Kategorie-Zuweisung einer Transaktion.
  */
-export type BucketAssignmentSource = 'auto_regex' | 'manual' | 'unassigned';
+export type CategoryAssignmentSource = 'auto_regex' | 'manual' | 'unassigned';
+
+/** @deprecated Verwende CategoryAssignmentSource */
+export type BucketAssignmentSource = CategoryAssignmentSource;
 
 /**
  * Status des Neu-Matching-Prozesses für Transaktionen:
- * - 'needs_reprogress': Relevante Änderungen (z. B. Konfiguration/Buckets) müssen neu angewendet werden
+ * - 'needs_reprogress': Relevante Änderungen (z. B. Konfiguration/Kategorien) müssen neu angewendet werden
  * - 'is_reprogressing': Das Re-Matching wird aktuell im Hintergrund ausgeführt
  * - 'has_progressed': Alle Transaktionen sind aktuell und vollständig synchronisiert
  */
 export type ReMatchStatus = 'needs_reprogress' | 'is_reprogressing' | 'has_progressed';
 
 /**
- * Soll-Budget für einen Bucket bezogen auf eine bestimmte Zeitperiode.
+ * Soll-Budget für eine Kategorie bezogen auf eine bestimmte Zeitperiode.
  */
 export interface TargetBudget {
   /** Zeitintervall, für welches das Budget gilt */
@@ -64,27 +67,30 @@ export interface EntityVisualMetadata {
 }
 
 /**
- * Hierarchischer Bucket zur Strukturierung und Zuordnung von Transaktionen.
- * Buckets besitzen keinen festen Typ (income/expense/transfer) – dies ergibt sich aus den zugeordneten Transaktionen.
+ * Hierarchische Kategorie zur Strukturierung und Zuordnung von Transaktionen.
+ * Kategorien besitzen keinen festen Typ (income/expense/transfer) – dies ergibt sich aus den zugeordneten Transaktionen.
  */
-export interface Bucket extends EntityVisualMetadata {
-  /** Eindeutige ID des Buckets */
+export interface Category extends EntityVisualMetadata {
+  /** Eindeutige ID der Kategorie */
   id: string;
-  /** ID des übergeordneten Buckets oder null für Root-Buckets */
+  /** ID der übergeordneten Kategorie oder null für Root-Kategorien */
   parentId: string | null;
   /**
    * Regulärer Ausdruck zur automatischen Zuordnung von Buchungen (z. B. 'Rewe|Edeka|Aldi|Lidl').
-   * Wichtig: Nur Blatt-/Kinder-Buckets dürfen ein Regex-Pattern besitzen!
+   * Wichtig: Nur Blatt-/Kinder-Kategorien dürfen ein Regex-Pattern besitzen!
    */
   regexPattern?: string;
-  /** Optionales Soll-Budget für den Bucket */
+  /** Optionales Soll-Budget für die Kategorie */
   targetBudget?: TargetBudget;
   /**
-   * IDs der Transaktionen, die diesem Bucket manuell zugewiesen wurden.
-   * Ermöglicht die direkte Anzeige und Verwaltung aller manuellen Overrides in der Bucket-Konfiguration.
+   * IDs der Transaktionen, die dieser Kategorie manuell zugewiesen wurden.
+   * Ermöglicht die direkte Anzeige und Verwaltung aller manuellen Overrides in der Kategorie-Konfiguration.
    */
   manualTransactionIds?: string[];
 }
+
+/** @deprecated Verwende Category */
+export type Bucket = Category;
 
 /**
  * Historischer Kontostand-Eintrag (Stichtags-Saldo) zu einem bestimmten Datum.
@@ -106,8 +112,10 @@ export interface BalanceEntry {
 export interface Account extends EntityVisualMetadata {
   /** Eindeutige ID des Kontos */
   id: string;
-  /** IDs der diesem Konto zugeordneten Buckets */
-  bucketIds: string[];
+  /** IDs der diesem Konto zugeordneten Kategorien */
+  categoryIds?: string[];
+  /** @deprecated Verwende categoryIds */
+  bucketIds?: string[];
   /** Historische Stichtags-Salden zur exakten Salden-Rekonstruktion */
   balanceEntries: BalanceEntry[];
 }
@@ -136,15 +144,17 @@ export interface Transaction {
   iban: string;
   /** Betrag der Transaktion (positiv für Inbound, negativ für Outbound) */
   value: number;
-  /** ID des zugeordneten Buckets oder null */
-  bucketId: string | null;
+  /** ID der zugeordneten Kategorie oder null */
+  categoryId?: string | null;
+  /** @deprecated Verwende categoryId */
+  bucketId?: string | null;
   /**
    * Zuweisungs-Herkunft:
    * - 'auto_regex': Automatisch via Regex zugewiesen (wird bei Regex-Update neu evaluiert)
    * - 'manual': Vom Nutzer manuell gesetzt (gesperrt gegen automatisches Überschreiben)
-   * - 'unassigned': Noch keinem Bucket zugeordnet
+   * - 'unassigned': Noch keiner Kategorie zugeordnet
    */
-  assignmentSource: BucketAssignmentSource;
+  assignmentSource: CategoryAssignmentSource;
   /** Dateiname der ursprünglichen CSV-Importdatei */
   importFilename?: string;
   /** Zeilenindex der Transaktion in der Importdatei zur Erhaltung der CSV-Reihenfolge */
@@ -225,11 +235,13 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
 }
 
 /**
- * Konfigurations-Export (leichtgewichtig & portabel – enthält Accounts und Buckets inkl. manualTransactionIds).
+ * Konfigurations-Export (leichtgewichtig & portabel – enthält Accounts und Categories inkl. manualTransactionIds).
  */
 export interface FinanceConfigExport {
   version: number;
   exportedAt: string;
   accounts: Account[];
-  buckets: Bucket[];
+  categories: Category[];
+  /** @deprecated Abwärtskompatibilität für alte Exporte */
+  buckets?: Category[];
 }

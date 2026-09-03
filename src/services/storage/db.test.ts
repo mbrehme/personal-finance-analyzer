@@ -6,18 +6,18 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { financeDB } from './db';
-import { Account, Bucket, Transaction } from '@/types/finance';
+import { Account, Category, Transaction } from '@/types/finance';
 
 describe('financeDB Storage Layer', () => {
   beforeEach(async () => {
     await financeDB.clearAll();
   });
 
-  it('saves and retrieves accounts with bucketIds and balanceEntries', async () => {
+  it('saves and retrieves accounts with categoryIds and balanceEntries', async () => {
     const account: Account = {
       id: 'acc-1',
       name: 'Girokonto Test',
-      bucketIds: ['b-living'],
+      categoryIds: ['b-living'],
       balanceEntries: [{ id: 'be-1', date: '2026-09-01', amount: 2500, note: 'Monatsanfang' }],
     };
 
@@ -25,12 +25,12 @@ describe('financeDB Storage Layer', () => {
     const accounts = await financeDB.getAccounts();
     expect(accounts).toHaveLength(1);
     expect(accounts[0].name).toBe('Girokonto Test');
-    expect(accounts[0].bucketIds).toContain('b-living');
+    expect(accounts[0].categoryIds).toContain('b-living');
     expect(accounts[0].balanceEntries).toHaveLength(1);
   });
 
-  it('saves, retrieves and deletes buckets with manualTransactionIds', async () => {
-    const bucket: Bucket = {
+  it('saves, retrieves and deletes categories with manualTransactionIds', async () => {
+    const category: Category = {
       id: 'b-rent',
       name: 'Miete',
       parentId: 'b-living',
@@ -38,15 +38,15 @@ describe('financeDB Storage Layer', () => {
       manualTransactionIds: ['tx-999'],
     };
 
-    await financeDB.saveBucket(bucket);
-    let buckets = await financeDB.getBuckets();
-    expect(buckets).toHaveLength(1);
-    expect(buckets[0].regexPattern).toBe('Miete|Vermieter');
-    expect(buckets[0].manualTransactionIds).toContain('tx-999');
+    await financeDB.saveCategory(category);
+    let categories = await financeDB.getCategories();
+    expect(categories).toHaveLength(1);
+    expect(categories[0].regexPattern).toBe('Miete|Vermieter');
+    expect(categories[0].manualTransactionIds).toContain('tx-999');
 
-    await financeDB.deleteBucket('b-rent');
-    buckets = await financeDB.getBuckets();
-    expect(buckets).toHaveLength(0);
+    await financeDB.deleteCategory('b-rent');
+    categories = await financeDB.getCategories();
+    expect(categories).toHaveLength(0);
   });
 
   it('handles batch transaction saving, descending date ordering and clearing', async () => {
@@ -97,10 +97,10 @@ describe('financeDB Storage Layer', () => {
     const account: Account = {
       id: 'acc-export',
       name: 'Sparkonto',
-      bucketIds: ['b-savings'],
+      categoryIds: ['b-savings'],
       balanceEntries: [],
     };
-    const bucket: Bucket = {
+    const category: Category = {
       id: 'b-savings',
       name: 'Sparen',
       parentId: null,
@@ -108,18 +108,18 @@ describe('financeDB Storage Layer', () => {
     };
 
     await financeDB.saveAccount(account);
-    await financeDB.saveBucket(bucket);
+    await financeDB.saveCategory(category);
 
     const exported = await financeDB.exportConfiguration();
     expect(exported.accounts).toHaveLength(1);
-    expect(exported.buckets).toHaveLength(1);
-    expect(exported.buckets[0].manualTransactionIds).toContain('tx-manual-1');
+    expect(exported.categories).toHaveLength(1);
+    expect(exported.categories[0].manualTransactionIds).toContain('tx-manual-1');
 
     await financeDB.clearAll();
     expect(await financeDB.getAccounts()).toHaveLength(0);
 
     await financeDB.importConfiguration(exported);
     expect(await financeDB.getAccounts()).toHaveLength(1);
-    expect(await financeDB.getBuckets()).toHaveLength(1);
+    expect(await financeDB.getCategories()).toHaveLength(1);
   });
 });

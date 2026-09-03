@@ -5,7 +5,7 @@
  * @module services/analytics/cashflowCalculator
  */
 
-import { Bucket, PeriodGranularity, Transaction } from '@/types/finance';
+import { Category, PeriodGranularity, Transaction } from '@/types/finance';
 import {
   fillPeriodKeyRange,
   getCurrentPeriodKey,
@@ -14,7 +14,7 @@ import {
   normalizeBudgetToGranularity,
 } from '@/utils/dateUtils';
 
-export interface BucketPeriodCashflow {
+export interface CategoryPeriodCashflow {
   inbound: number;
   outbound: number;
   net: number;
@@ -22,11 +22,16 @@ export interface BucketPeriodCashflow {
   diffToBudget?: number;
 }
 
-export interface BucketCashflowRow {
-  bucket: Bucket;
+/** @deprecated Verwende CategoryPeriodCashflow */
+export type BucketPeriodCashflow = CategoryPeriodCashflow;
+
+export interface CategoryCashflowRow {
+  category: Category;
+  /** @deprecated Verwende category */
+  bucket: Category;
   depth: number;
   hasChildren: boolean;
-  periods: Record<string, BucketPeriodCashflow>;
+  periods: Record<string, CategoryPeriodCashflow>;
   totalInbound: number;
   totalOutbound: number;
   totalNet: number;
@@ -37,11 +42,14 @@ export interface BucketCashflowRow {
   isBudgetRollup?: boolean;
 }
 
+/** @deprecated Verwende CategoryCashflowRow */
+export type BucketCashflowRow = CategoryCashflowRow;
+
 export interface CashflowAnalysisResult {
   periodKeys: string[];
-  rows: BucketCashflowRow[];
+  rows: CategoryCashflowRow[];
   totalRow: {
-    periods: Record<string, BucketPeriodCashflow>;
+    periods: Record<string, CategoryPeriodCashflow>;
     totalInbound: number;
     totalOutbound: number;
     totalNet: number;
@@ -64,10 +72,10 @@ export function extractPeriodKeys(
 }
 
 /**
- * Rekursive Berechnung der Bucket-Hierarchie mit Summierung der Kinderelemente.
+ * Rekursive Berechnung der Kategorie-Hierarchie mit Summierung der Kinderelemente.
  */
 export function calculateCashflowMatrix(
-  buckets: Bucket[],
+  categories: Category[],
   transactions: Transaction[],
   granularity: PeriodGranularity,
   selectedAccountId?: string,
@@ -114,45 +122,45 @@ export function calculateCashflowMatrix(
     }
   }
 
-  // 3. Direkte Transaktions-Summen pro Bucket und Periode berechnen
+  // 3. Direkte Transaktions-Summen pro Kategorie und Periode berechnen
   const directSums = new Map<string, Record<string, { inbound: number; outbound: number }>>();
 
-  buckets.forEach((b) => {
+  categories.forEach((c) => {
     const periodMap: Record<string, { inbound: number; outbound: number }> = {};
     periodKeys.forEach((k) => {
       periodMap[k] = { inbound: 0, outbound: 0 };
     });
-    directSums.set(b.id, periodMap);
+    directSums.set(c.id, periodMap);
   });
 
-  // Uncategorized Bucket für Buchungen ohne Kategorie
-  const uncategorizedBucketId = '__uncategorized__';
+  // Uncategorized Category für Buchungen ohne Kategorie
+  const uncategorizedCategoryId = '__uncategorized__';
   const uncatPeriodMap: Record<string, { inbound: number; outbound: number }> = {};
   periodKeys.forEach((k) => {
     uncatPeriodMap[k] = { inbound: 0, outbound: 0 };
   });
-  directSums.set(uncategorizedBucketId, uncatPeriodMap);
+  directSums.set(uncategorizedCategoryId, uncatPeriodMap);
 
   filteredTx.forEach((tx) => {
     const pKey = getPeriodKey(tx.valueDate, granularity);
-    const bId = tx.bucketId || uncategorizedBucketId;
-    const bucketPeriods = directSums.get(bId);
+    const catId = tx.categoryId ?? tx.bucketId ?? uncategorizedCategoryId;
+    const catPeriods = directSums.get(catId);
 
-    if (bucketPeriods && bucketPeriods[pKey]) {
+    if (catPeriods && catPeriods[pKey]) {
       if (tx.value >= 0) {
-        bucketPeriods[pKey].inbound += tx.value;
+        catPeriods[pKey].inbound += tx.value;
       } else {
-        bucketPeriods[pKey].outbound += tx.value;
+        catPeriods[pKey].outbound += tx.value;
       }
     }
   });
 
   // 4. Baumstruktur aufbauen und Summen von Kindern zu Eltern hochrollen
-  const childrenMap = new Map<string | null, Bucket[]>();
-  buckets.forEach((b) => {
-    const list = childrenMap.get(b.parentId) || [];
-    list.push(b);
-    childrenMap.set(b.parentId, list);
+  const childrenMap = new Map<string | null, Category[]>();
+  categories.forEach((c) => {
+    const list = childrenMap.get(c.parentId) || [];
+    list.push(c);
+    childrenMap.set(c.parentId, list);
   });
 
   // Nach 'order' sortieren
@@ -160,41 +168,41 @@ export function calculateCashflowMatrix(
     list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   });
 
-  const getSubtreeBucketIds = (bucketId: string): string[] => {
-    const ids = [bucketId];
-    const children = childrenMap.get(bucketId) || [];
+  const getSubtreeCategoryIds = (categoryId: string): string[] => {
+    const ids = [categoryId];
+    const children = childrenMap.get(categoryId) || [];
     children.forEach((c) => {
-      ids.push(...getSubtreeBucketIds(c.id));
+      ids.push(...getSubtreeCategoryIds(c.id));
     });
     return ids;
   };
 
-  const rows: BucketCashflowRow[] = [];
+  const rows: CategoryCashflowRow[] = [];
 
   /**
    * Rekursive Berechnung des effektiven Budgets:
-   * 1. Hat der Bucket ein eigenes manuelles targetBudget -> dieses verwenden.
+   * 1. Hat die Kategorie ein eigenes manuelles targetBudget -> dieses verwenden.
    * 2. Falls nicht, aber Kinderelemente mit Budgets existieren -> Summe der Kind-Budgets (Rollup).
    * 3. Ansonsten undefined.
    */
-  const getEffectiveBucketBudget = (
-    bId: string
+  const getEffectiveCategoryBudget = (
+    cId: string
   ): { amount: number; isRollup: boolean } | undefined => {
-    const b = buckets.find((item) => item.id === bId);
-    if (!b) return undefined;
+    const c = categories.find((item) => item.id === cId);
+    if (!c) return undefined;
 
-    if (b.targetBudget) {
+    if (c.targetBudget) {
       return {
         amount: normalizeBudgetToGranularity(
-          b.targetBudget.amount,
-          b.targetBudget.period,
+          c.targetBudget.amount,
+          c.targetBudget.period,
           granularity
         ),
         isRollup: false,
       };
     }
 
-    const children = childrenMap.get(bId) || [];
+    const children = childrenMap.get(cId) || [];
     if (children.length === 0) {
       return undefined;
     }
@@ -203,7 +211,7 @@ export function calculateCashflowMatrix(
     let hasAnyChildBudget = false;
 
     children.forEach((child) => {
-      const childRes = getEffectiveBucketBudget(child.id);
+      const childRes = getEffectiveCategoryBudget(child.id);
       if (childRes !== undefined) {
         sum += childRes.amount;
         hasAnyChildBudget = true;
@@ -220,16 +228,16 @@ export function calculateCashflowMatrix(
     return undefined;
   };
 
-  const processBucket = (bucket: Bucket, depth: number) => {
-    const subtreeIds = getSubtreeBucketIds(bucket.id);
-    const hasChildren = (childrenMap.get(bucket.id) || []).length > 0;
+  const processCategory = (category: Category, depth: number) => {
+    const subtreeIds = getSubtreeCategoryIds(category.id);
+    const hasChildren = (childrenMap.get(category.id) || []).length > 0;
 
-    const periods: Record<string, BucketPeriodCashflow> = {};
+    const periods: Record<string, CategoryPeriodCashflow> = {};
     let totalInbound = 0;
     let totalOutbound = 0;
 
     // Effektives Budget (eigenes manuelles Budget oder Rollup aus Kind-Elementen)
-    const effectiveBudgetInfo = getEffectiveBucketBudget(bucket.id);
+    const effectiveBudgetInfo = getEffectiveCategoryBudget(category.id);
     const budgetAmount = effectiveBudgetInfo?.amount;
     const isBudgetRollup = effectiveBudgetInfo?.isRollup ?? false;
 
@@ -265,7 +273,8 @@ export function calculateCashflowMatrix(
     const totalBudget = budgetAmount !== undefined ? budgetAmount * periodKeys.length : undefined;
 
     rows.push({
-      bucket,
+      category,
+      bucket: category,
       depth,
       hasChildren,
       periods,
@@ -278,16 +287,16 @@ export function calculateCashflowMatrix(
     });
 
     // Kinder verarbeiten
-    const children = childrenMap.get(bucket.id) || [];
-    children.forEach((child) => processBucket(child, depth + 1));
+    const children = childrenMap.get(category.id) || [];
+    children.forEach((child) => processCategory(child, depth + 1));
   };
 
-  // Top-Level Buckets (parentId === null) verarbeiten
-  const rootBuckets = childrenMap.get(null) || [];
-  rootBuckets.forEach((root) => processBucket(root, 0));
+  // Top-Level Kategorien (parentId === null) verarbeiten
+  const rootCategories = childrenMap.get(null) || [];
+  rootCategories.forEach((root) => processCategory(root, 0));
 
   // Gesamtsummenzeile (Total Row) berechnen
-  const totalRowPeriods: Record<string, BucketPeriodCashflow> = {};
+  const totalRowPeriods: Record<string, CategoryPeriodCashflow> = {};
   let grandInbound = 0;
   let grandOutbound = 0;
 

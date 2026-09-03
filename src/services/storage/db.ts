@@ -12,6 +12,7 @@ import {
   FinanceConfigExport,
   sortTransactionsDesc,
   isTransactionOverridden,
+  getTransactionType,
 } from '@/types/finance';
 
 const DB_NAME = 'personal_finance_analyzer_db';
@@ -297,30 +298,55 @@ export const financeDB = {
 
   /* ================== TRANSACTIONS ================== */
   /**
+   * Normalisiert ein Transaktionsobjekt und versieht es mit einem dynamischen Getter
+   * für den virtuellen Transaktionstyp ('inbound' bzw. 'outbound').
+   */
+  normalizeTransaction(t: Transaction): Transaction {
+    const catId = t.categoryId ?? t.bucketId ?? null;
+    const { type: _discardedType, ...rest } = t;
+    return {
+      ...rest,
+      categoryId: catId,
+      bucketId: catId,
+      get type() {
+        return getTransactionType(this.value);
+      },
+    };
+  },
+
+  /**
+   * Bereinigt ein Transaktionsobjekt vor der Persistierung (IndexedDB / Export),
+   * sodass virtuelle Felder wie `type` niemals physisch gespeichert werden.
+   */
+  sanitizeForPersistence(tx: Transaction): Omit<Transaction, 'type'> {
+    const catId = tx.categoryId ?? tx.bucketId ?? null;
+    const { type: _discardedType, ...rest } = tx;
+    return {
+      ...rest,
+      categoryId: catId,
+      bucketId: catId,
+    };
+  },
+
+  /**
    * Lädt alle Transaktionen. Standardmäßig über den 'valueDate'-Index
    * der IndexedDB und deterministisch absteigend nach Datum sortiert (neueste zuerst).
+   * Versehen mit virtuellem `type`-Getter.
    *
    * @returns Promise mit Transaktionsliste
    */
   async getTransactions(): Promise<Transaction[]> {
-    const normalizeTx = (t: Transaction): Transaction => {
-      const catId = t.categoryId ?? t.bucketId ?? null;
-      return {
-        ...t,
-        categoryId: catId,
-        bucketId: catId,
-      };
-    };
-
     if (!isIndexedDBAvailable()) {
-      const items = Array.from(memoryStore.transactions.values()).map(normalizeTx);
+      const items = Array.from(memoryStore.transactions.values()).map((t) =>
+        this.normalizeTransaction(t)
+      );
       return sortTransactionsDesc(items);
     }
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.TRANSACTIONS, 'readonly');
       const store = tx.objectStore(STORES.TRANSACTIONS);
-      let results: Transaction[] = [];
+      const results: Transaction[] = [];
 
       if (store.indexNames.contains('valueDate')) {
         const index = store.index('valueDate');
@@ -328,7 +354,7 @@ export const financeDB = {
         req.onsuccess = (event) => {
           const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
           if (cursor) {
-            results.push(normalizeTx(cursor.value));
+            results.push(this.normalizeTransaction(cursor.value));
             cursor.continue();
           } else {
             resolve(sortTransactionsDesc(results));
@@ -338,46 +364,38 @@ export const financeDB = {
       } else {
         const req = store.getAll();
         req.onsuccess = () =>
-          resolve(sortTransactionsDesc((req.result as Transaction[]).map(normalizeTx)));
+          resolve(
+            sortTransactionsDesc(
+              (req.result as Transaction[]).map((t) => this.normalizeTransaction(t))
+            )
+          );
         req.onerror = () => reject(req.error);
       }
     });
   },
 
   async saveTransaction(tx: Transaction): Promise<void> {
-    const catId = tx.categoryId ?? tx.bucketId ?? null;
-    const normalized: Transaction = {
-      ...tx,
-      categoryId: catId,
-      bucketId: catId,
-    };
+    const sanitized = this.sanitizeForPersistence(tx);
 
     if (!isIndexedDBAvailable()) {
-      memoryStore.transactions.set(normalized.id, normalized);
+      memoryStore.transactions.set(sanitized.id, sanitized as Transaction);
       return;
     }
-    await performStoreOperation(STORES.TRANSACTIONS, 'readwrite', (store) => store.put(normalized));
+    await performStoreOperation(STORES.TRANSACTIONS, 'readwrite', (store) => store.put(sanitized));
   },
 
   async saveTransactions(transactions: Transaction[]): Promise<void> {
-    const normalizedList = transactions.map((tx) => {
-      const catId = tx.categoryId ?? tx.bucketId ?? null;
-      return {
-        ...tx,
-        categoryId: catId,
-        bucketId: catId,
-      };
-    });
+    const sanitizedList = transactions.map((t) => this.sanitizeForPersistence(t));
 
     if (!isIndexedDBAvailable()) {
-      normalizedList.forEach((t) => memoryStore.transactions.set(t.id, t));
+      sanitizedList.forEach((t) => memoryStore.transactions.set(t.id, t as Transaction));
       return;
     }
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.TRANSACTIONS, 'readwrite');
       const store = tx.objectStore(STORES.TRANSACTIONS);
-      normalizedList.forEach((t) => store.put(t));
+      sanitizedList.forEach((t) => store.put(t));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -409,9 +427,9 @@ export const financeDB = {
       this.getTransactions(),
     ]);
 
-    const manualTransactions = transactions.filter(
-      (t) => t.origin === 'manual' || isTransactionOverridden(t)
-    );
+    const manualTransactions = transactions
+      .filter((t) => t.origin === 'manual' || isTransactionOverridden(t))
+      .map((t) => this.sanitizeForPersistence(t) as Transaction);
 
     return {
       version: 2,
@@ -435,7 +453,9 @@ export const financeDB = {
       config.accounts.forEach((acc) => memoryStore.accounts.set(acc.id, acc));
       categoriesToImport.forEach((c) => memoryStore.categories.set(c.id, c));
       if (Array.isArray(config.manualTransactions)) {
-        config.manualTransactions.forEach((t) => memoryStore.transactions.set(t.id, t));
+        config.manualTransactions.forEach((t) =>
+          memoryStore.transactions.set(t.id, this.sanitizeForPersistence(t) as Transaction)
+        );
       }
       return;
     }
@@ -468,7 +488,7 @@ export const financeDB = {
         db.objectStoreNames.contains(STORES.TRANSACTIONS)
       ) {
         const txStore = tx.objectStore(STORES.TRANSACTIONS);
-        config.manualTransactions.forEach((t) => txStore.put(t));
+        config.manualTransactions.forEach((t) => txStore.put(this.sanitizeForPersistence(t)));
       }
 
       tx.oncomplete = () => resolve();

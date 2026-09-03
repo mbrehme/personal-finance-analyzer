@@ -13,6 +13,7 @@ import {
   buildCompoundSearchField,
   sortTransactionsDesc,
   isManualTransaction,
+  getTransactionType,
   Transaction,
 } from '@/types/finance';
 import { IconRenderer } from '@/components/IconRenderer';
@@ -264,8 +265,8 @@ export const Transactions: React.FC = () => {
         return false;
       }
 
-      // 3. Typ Filter
-      if (type !== 'all' && tx.type !== type) {
+      // 3. Typ Filter (virtuell basierend auf Betragsvorzeichen)
+      if (type !== 'all' && getTransactionType(tx) !== type) {
         return false;
       }
 

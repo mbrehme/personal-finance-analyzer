@@ -25,6 +25,22 @@ export type PeriodGranularity = 'monthly' | 'quarterly' | 'halfYearly' | 'yearly
 export type TransactionType = 'inbound' | 'outbound';
 
 /**
+ * Ermittelt den virtuellen Transaktionstyp (inbound/outbound) rein anhand des Vorzeichens des Betrags:
+ * - value >= 0 => 'inbound' (Einnahme)
+ * - value < 0 => 'outbound' (Ausgabe)
+ *
+ * @param {Transaction | { value: number } | number} txOrValue - Transaktion oder Betrag
+ * @returns {TransactionType} 'inbound' (Einnahme) oder 'outbound' (Ausgabe)
+ * @example
+ * const type = getTransactionType({ value: 1200 }); // 'inbound'
+ * const typeNegative = getTransactionType(-45.5); // 'outbound'
+ */
+export function getTransactionType(txOrValue: { value: number } | number): TransactionType {
+  const val = typeof txOrValue === 'number' ? txOrValue : txOrValue.value;
+  return val >= 0 ? 'inbound' : 'outbound';
+}
+
+/**
  * Herkunft der Kategorie-Zuweisung einer Transaktion.
  */
 export type CategoryAssignmentSource = 'auto_regex' | 'manual' | 'unassigned';
@@ -138,8 +154,11 @@ export interface Transaction {
   receiver: string;
   /** Verwendungszweck / Buchungstext */
   subject: string;
-  /** Typ der Transaktion (Inbound = Einnahme, Outbound = Ausgabe) */
-  type: TransactionType;
+  /**
+   * Virtueller Typ der Transaktion (Inbound = Einnahme bei value >= 0, Outbound = Ausgabe bei value < 0).
+   * Wird nicht in der Datenbank persistiert, sondern dynamisch aus dem Vorzeichen von `value` abgeleitet.
+   */
+  type?: TransactionType;
   /** Zugehörige IBAN des Kontos oder Gegenkontos */
   iban: string;
   /** Betrag der Transaktion (positiv für Inbound, negativ für Outbound) */
@@ -227,7 +246,7 @@ export function isManualTransaction(tx: Transaction): boolean {
  * // "[Ausgang] REWE Markt: Einkauf (DE1234567890)"
  */
 export function buildCompoundSearchField(tx: Transaction): string {
-  const type = tx.type === 'inbound' ? 'Eingang' : 'Ausgang';
+  const type = getTransactionType(tx) === 'inbound' ? 'Eingang' : 'Ausgang';
   const receiver = (tx.receiver || tx.issuer || '').trim();
   const subject = (tx.subject || '').trim();
   const iban = (tx.iban || '').trim();

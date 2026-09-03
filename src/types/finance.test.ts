@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildCompoundSearchField, sortTransactionsDesc, Transaction } from './finance';
+import {
+  buildCompoundSearchField,
+  sortTransactionsDesc,
+  getTransactionType,
+  Transaction,
+} from './finance';
 
 describe('finance domain helpers', () => {
   it('builds a compound search field with format [Typ] Empfänger: Zweck (Iban)', () => {
@@ -179,5 +184,37 @@ describe('finance domain helpers', () => {
 
     // Parent and child must be directly consecutive: tx-parent immediately followed by tx-split-child
     expect(ids).toEqual(['tx-parent', 'tx-split-child', 'tx-unrelated-1', 'tx-unrelated-2']);
+  });
+
+  it('determines virtual transaction type purely based on value sign', () => {
+    // getTransactionType with numbers
+    expect(getTransactionType(100)).toBe('inbound');
+    expect(getTransactionType(0)).toBe('inbound');
+    expect(getTransactionType(-0.01)).toBe('outbound');
+    expect(getTransactionType(-500)).toBe('outbound');
+
+    // getTransactionType with transaction objects without static type property
+    const inboundTx: Partial<Transaction> = { value: 250 };
+    const outboundTx: Partial<Transaction> = { value: -12.99 };
+
+    expect(getTransactionType(inboundTx as Transaction)).toBe('inbound');
+    expect(getTransactionType(outboundTx as Transaction)).toBe('outbound');
+
+    // buildCompoundSearchField uses virtual getTransactionType
+    const searchInbound = buildCompoundSearchField({
+      value: 100,
+      receiver: 'Max',
+      subject: 'Bonus',
+      iban: 'DE11',
+    } as Transaction);
+    expect(searchInbound).toContain('[Eingang]');
+
+    const searchOutbound = buildCompoundSearchField({
+      value: -50,
+      receiver: 'Rewe',
+      subject: 'Einkauf',
+      iban: 'DE22',
+    } as Transaction);
+    expect(searchOutbound).toContain('[Ausgang]');
   });
 });

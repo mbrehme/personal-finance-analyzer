@@ -132,6 +132,10 @@ describe('financeDB Storage Layer', () => {
     expect(exported.categories[0].manualTransactionIds).toContain('tx-manual-1');
     expect(exported.manualTransactions).toHaveLength(1);
     expect(exported.manualTransactions![0].id).toBe('tx-man-1');
+    // Sicherstellen, dass der Typ nicht im Export-Objekt serialisiert wird
+    expect(Object.prototype.hasOwnProperty.call(exported.manualTransactions![0], 'type')).toBe(
+      false
+    );
 
     await financeDB.clearAll();
     expect(await financeDB.getAccounts()).toHaveLength(0);
@@ -141,5 +145,38 @@ describe('financeDB Storage Layer', () => {
     expect(await financeDB.getAccounts()).toHaveLength(1);
     expect(await financeDB.getCategories()).toHaveLength(1);
     expect(await financeDB.getTransactions()).toHaveLength(1);
+    // Nach Re-Import ist der virtuelle Typ dynamisch verfügbar
+    expect(await financeDB.getTransactions().then((txs) => txs[0].type)).toBe('outbound');
+  });
+
+  it('does not persist type field in database and provides virtual type getter upon retrieval', async () => {
+    const rawTx: Transaction = {
+      id: 'tx-persist-1',
+      accountId: 'acc-1',
+      valueDate: '2026-09-03',
+      bookingDate: '2026-09-03',
+      issuer: 'Me',
+      receiver: 'Store',
+      subject: 'Groceries',
+      iban: '',
+      value: -49.95,
+      assignmentSource: 'unassigned',
+    };
+
+    await financeDB.saveTransaction(rawTx);
+
+    const loaded = await financeDB.getTransactions();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].value).toBe(-49.95);
+    // Virtueller Getter liefert 'outbound'
+    expect(loaded[0].type).toBe('outbound');
+
+    // Dynamisches Verhalten: Änderung des Betrags ändert den virtuellen Typ
+    loaded[0].value = 100;
+    expect(loaded[0].type).toBe('inbound');
+
+    // Sanitized Version für Persistierung besitzt kein `type`-Feld
+    const sanitized = financeDB.sanitizeForPersistence(loaded[0]);
+    expect(Object.prototype.hasOwnProperty.call(sanitized, 'type')).toBe(false);
   });
 });

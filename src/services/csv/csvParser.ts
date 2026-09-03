@@ -5,7 +5,7 @@
  * @module services/csv/csvParser
  */
 
-import { ISODateString, Transaction, TransactionType } from '@/types/finance';
+import { ISODateString, Transaction, getTransactionType } from '@/types/finance';
 import { toISODateString } from '@/utils/dateUtils';
 
 export interface CsvColumnMapping {
@@ -300,8 +300,6 @@ export function convertRowsToTransactions(
     const subject = (row[mapping.subjectColumn] || '').trim();
     const iban = mapping.ibanColumn ? (row[mapping.ibanColumn] || '').trim() : '';
 
-    const type: TransactionType = value >= 0 ? 'inbound' : 'outbound';
-
     // Tag-gebundener Occurrence-Zähler
     const partner = receiver || issuer;
     const normSubject = subject.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -342,7 +340,9 @@ export function convertRowsToTransactions(
       issuer,
       receiver,
       subject,
-      type,
+      get type() {
+        return getTransactionType(value);
+      },
       iban,
       value,
       categoryId: null,

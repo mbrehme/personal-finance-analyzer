@@ -6,7 +6,14 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Transaction, Account, Category, TransactionType, ISODateString } from '@/types/finance';
+import {
+  Transaction,
+  Account,
+  Category,
+  TransactionType,
+  ISODateString,
+  getTransactionType,
+} from '@/types/finance';
 import { MoneyInput } from '../MoneyInput';
 import { formatMoney } from '@/utils/moneyUtils';
 import { X, AlertCircle, Scissors, Pencil, Plus, RotateCcw, Info } from 'lucide-react';
@@ -108,7 +115,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     } else if (initialTransaction) {
       setAccountId(initialTransaction.accountId);
       setValueDate(initialTransaction.valueDate);
-      setType(initialTransaction.type || (initialTransaction.value >= 0 ? 'inbound' : 'outbound'));
+      setType(getTransactionType(initialTransaction.value));
       setAmount(Math.abs(initialTransaction.value));
       setReceiver(initialTransaction.receiver || initialTransaction.issuer || '');
       setSubject(initialTransaction.subject || '');
@@ -196,18 +203,18 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           issuer: type === 'inbound' ? receiver : '',
           receiver: type === 'outbound' ? receiver : '',
           subject: subject.trim(),
-          type,
           iban: '',
           value: signedValue,
           categoryId,
           assignmentSource: categoryId ? 'manual' : 'unassigned',
+          origin: 'manual',
         });
       } else if (initialTransaction) {
+        const { type: _discardedType, ...rest } = initialTransaction;
         await onSave({
-          ...initialTransaction,
+          ...rest,
           accountId,
           valueDate: valueDate as ISODateString,
-          type,
           value: signedValue,
           receiver: type === 'outbound' ? receiver : initialTransaction.receiver,
           issuer: type === 'inbound' ? receiver : initialTransaction.issuer,

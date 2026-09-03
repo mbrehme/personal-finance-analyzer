@@ -430,7 +430,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       issuer: originalTx.issuer,
       receiver: splitData.receiver.trim() || originalTx.receiver,
       subject: splitData.subject.trim() || `${originalTx.subject} (Split)`,
-      type: originalTx.type,
       iban: originalTx.iban,
       value: splitValue,
       categoryId: splitData.categoryId || null,

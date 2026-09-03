@@ -80,7 +80,6 @@ describe('TransactionModal', () => {
         accountId: 'acc-1',
         subject: 'Bargeld Einkauf',
         value: -45,
-        type: 'outbound',
       })
     );
   });

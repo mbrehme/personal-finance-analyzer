@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import {
@@ -399,8 +399,9 @@ describe('Cashflow Page', () => {
 
     renderInAnalytics();
 
-    // Lebensmittel-Kategorie vorhanden
-    expect(screen.getByText('Lebensmittel')).toBeInTheDocument();
+    // Lebensmittel-Kategorie in Tabelle vorhanden
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Lebensmittel')).toBeInTheDocument();
 
     // Vorletzte Zeile: Nicht kategorisiert
     const uncatRow = screen.getByTestId('cashflow-uncategorized-row');
@@ -410,5 +411,109 @@ describe('Cashflow Page', () => {
 
     // Gesamtergebnis-Zeile (letzte Zeile)
     expect(screen.getByText('Netto-Gesamtergebnis')).toBeInTheDocument();
+  });
+
+  it('renders stacked category bar chart above the matrix table', () => {
+    renderInAnalytics();
+    expect(screen.getByTestId('stacked-category-barchart')).toBeInTheDocument();
+    expect(screen.getByText('Cashflow & Ø Ausgaben nach Kategorien')).toBeInTheDocument();
+  });
+
+  it('allows filtering categories via category filter dropdown and updates matrix table', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [{ id: 'acc-1', name: 'Giro' }] as any,
+      categories: [
+        { id: 'cat-1', name: 'Lebensmittel', parentId: null },
+        { id: 'cat-2', name: 'Wohnen', parentId: null },
+      ] as any,
+      buckets: [
+        { id: 'cat-1', name: 'Lebensmittel', parentId: null },
+        { id: 'cat-2', name: 'Wohnen', parentId: null },
+      ] as any,
+      transactions: [
+        {
+          id: 'tx-1',
+          accountId: 'acc-1',
+          valueDate: '2026-01-15',
+          bookingDate: '2026-01-15',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Einkauf',
+          type: 'outbound',
+          iban: 'DE00',
+          value: -50,
+          categoryId: 'cat-1',
+          bucketId: 'cat-1',
+          assignmentSource: 'auto_regex',
+        },
+        {
+          id: 'tx-2',
+          accountId: 'acc-1',
+          valueDate: '2026-01-10',
+          bookingDate: '2026-01-10',
+          issuer: 'Vermieter',
+          receiver: 'Ich',
+          subject: 'Miete',
+          type: 'outbound',
+          iban: 'DE00',
+          value: -800,
+          categoryId: 'cat-2',
+          bucketId: 'cat-2',
+          assignmentSource: 'auto_regex',
+        },
+      ] as any,
+      loading: false,
+      error: null,
+      reMatchStatus: 'has_progressed',
+      setReMatchStatus: vi.fn(),
+      needsReMatch: false,
+      reMatching: false,
+      setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+      addBucket: vi.fn(),
+      updateBucket: vi.fn(),
+      deleteBucket: vi.fn(),
+      reorderBuckets: vi.fn(),
+      addAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+      reorderAccounts: vi.fn(),
+      addBalanceEntry: vi.fn(),
+      deleteBalanceEntry: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      deleteTransaction: vi.fn(),
+      importCsv: vi.fn(),
+      reMatchAllTransactions: vi.fn(),
+      exportConfiguration: vi.fn(),
+      importConfiguration: vi.fn(),
+      resetWorkspace: vi.fn(),
+    } as any);
+
+    renderInAnalytics();
+
+    // Beide Kategorien anfangs in der Tabelle sichtbar
+    const initialTable = screen.getByRole('table');
+    expect(within(initialTable).getByText('Lebensmittel')).toBeInTheDocument();
+    expect(within(initialTable).getByText('Wohnen')).toBeInTheDocument();
+
+    // Kategorie-Filter im Toolbar öffnen
+    const filterBtn = screen.getByTestId('category-filter-dropdown-btn');
+    await user.click(filterBtn);
+
+    // "Wohnen" im Panel abwählen
+    const panel = screen.getByTestId('category-filter-dropdown-panel');
+    const wohnenOption = within(panel).getByRole('button', { name: /Wohnen/i });
+    await user.click(wohnenOption);
+
+    // "Wohnen" Zeile in der Matrix-Tabelle verschwindet
+    const table = screen.getByRole('table');
+    expect(within(table).queryByText('Wohnen')).not.toBeInTheDocument();
+    // "Lebensmittel" bleibt sichtbar
+    expect(within(table).getByText('Lebensmittel')).toBeInTheDocument();
   });
 });

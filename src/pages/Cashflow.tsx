@@ -11,6 +11,7 @@ import {
   calculateCashflowMatrix,
   CategoryCashflowRow,
 } from '@/services/analytics/cashflowCalculator';
+import { StackedCategoryBarChart } from '@/components/analytics/StackedCategoryBarChart';
 import { IconRenderer } from '@/components/IconRenderer';
 import {
   getCurrentPeriodKey,
@@ -25,6 +26,7 @@ import {
   ANALYTICS_GRANULARITY_KEY as CASHFLOW_GRANULARITY_KEY,
   ANALYTICS_START_DATE_KEY as CASHFLOW_START_DATE_KEY,
   ANALYTICS_END_DATE_KEY as CASHFLOW_END_DATE_KEY,
+  ANALYTICS_CATEGORIES_KEY as CASHFLOW_CATEGORIES_KEY,
 } from '@/pages/analytics';
 import {
   TrendingUp,
@@ -40,6 +42,7 @@ export {
   CASHFLOW_GRANULARITY_KEY,
   CASHFLOW_START_DATE_KEY,
   CASHFLOW_END_DATE_KEY,
+  CASHFLOW_CATEGORIES_KEY,
 };
 
 /**
@@ -65,7 +68,8 @@ interface YearGroup {
 
 export const Cashflow: React.FC = () => {
   const { categories, transactions } = useFinance();
-  const { granularity, selectedAccountId, startDate, endDate } = useAnalyticsFilter();
+  const { granularity, selectedAccountId, startDate, endDate, selectedCategoryIds } =
+    useAnalyticsFilter();
 
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
@@ -103,6 +107,7 @@ export const Cashflow: React.FC = () => {
         includeCurrentPeriod: isCurrentPeriodInRange,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        selectedCategoryIds: selectedCategoryIds || undefined,
       }
     );
   }, [
@@ -113,6 +118,7 @@ export const Cashflow: React.FC = () => {
     isCurrentPeriodInRange,
     startDate,
     endDate,
+    selectedCategoryIds,
   ]);
 
   const currentPeriodKey = useMemo(() => getCurrentPeriodKey(granularity), [granularity]);
@@ -557,6 +563,9 @@ export const Cashflow: React.FC = () => {
         </div>
       </div>
 
+      {/* Gestapeltes Kategorie-Balkendiagramm */}
+      <StackedCategoryBarChart result={matrix} granularity={granularity} />
+
       {/* Matrix Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div ref={tableContainerRef} className="no-scrollbar overflow-x-auto scroll-smooth">
@@ -705,7 +714,8 @@ export const Cashflow: React.FC = () => {
                       </td>
                     </tr>
                   )}
-                  {renderUncategorizedRow()}
+                  {(!selectedCategoryIds || selectedCategoryIds.includes('__uncategorized__')) &&
+                    renderUncategorizedRow()}
                 </>
               )}
             </tbody>

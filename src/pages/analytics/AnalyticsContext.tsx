@@ -21,6 +21,9 @@ export interface AnalyticsFilterState {
   endDate: ISODateString | null;
   /** Setzt den Datumsbereich */
   setDateRange: (startDate: ISODateString | null, endDate: ISODateString | null) => void;
+  /** Aktuell ausgewählte Kategorie-IDs (null = alle ausgewählt) */
+  selectedCategoryIds: string[] | null;
+  setSelectedCategoryIds: (categoryIds: string[] | null) => void;
 }
 
 const defaultAnalyticsFilter: AnalyticsFilterState = {
@@ -31,6 +34,8 @@ const defaultAnalyticsFilter: AnalyticsFilterState = {
   startDate: null,
   endDate: null,
   setDateRange: () => {},
+  selectedCategoryIds: null,
+  setSelectedCategoryIds: () => {},
 };
 
 export const AnalyticsContext = createContext<AnalyticsFilterState>(defaultAnalyticsFilter);

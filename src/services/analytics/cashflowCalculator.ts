@@ -90,9 +90,10 @@ export function calculateCashflowMatrix(
     referenceDate?: Date | string | number;
     startDate?: string;
     endDate?: string;
+    selectedCategoryIds?: string[];
   }
 ): CashflowAnalysisResult {
-  // 1. Transaktionen filtern (nach Konto und/oder Datumsbereich)
+  // 1. Transaktionen filtern (nach Konto, Datumsbereich und/oder Kategorien)
   let filteredTx = selectedAccountId
     ? transactions.filter((t) => t.accountId === selectedAccountId)
     : transactions;
@@ -102,6 +103,19 @@ export function calculateCashflowMatrix(
       if (options.startDate && tx.valueDate < options.startDate) return false;
       if (options.endDate && tx.valueDate > options.endDate) return false;
       return true;
+    });
+  }
+
+  if (options?.selectedCategoryIds !== undefined) {
+    const allowed = new Set(options.selectedCategoryIds);
+    const allowUncategorized = allowed.has('__uncategorized__');
+
+    filteredTx = filteredTx.filter((tx) => {
+      const catId = tx.categoryId ?? tx.bucketId;
+      if (!catId) {
+        return allowUncategorized;
+      }
+      return allowed.has(catId);
     });
   }
 
@@ -237,8 +251,17 @@ export function calculateCashflowMatrix(
     return undefined;
   };
 
+  const allowedCategories =
+    options?.selectedCategoryIds !== undefined ? new Set(options.selectedCategoryIds) : null;
+
   const processCategory = (category: Category, depth: number) => {
     const subtreeIds = getSubtreeCategoryIds(category.id);
+    const isIncluded = !allowedCategories || subtreeIds.some((id) => allowedCategories.has(id));
+
+    if (!isIncluded) {
+      return;
+    }
+
     const hasChildren = (childrenMap.get(category.id) || []).length > 0;
 
     const periods: Record<string, CategoryPeriodCashflow> = {};

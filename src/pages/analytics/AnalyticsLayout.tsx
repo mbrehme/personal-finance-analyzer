@@ -11,6 +11,7 @@ import { useFinance } from '@/services/storage/FinanceContext';
 import { ISODateString, PeriodGranularity } from '@/types/finance';
 import { PeriodSelector } from '@/components/PeriodSelector';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import { CategoryFilterDropdown } from '@/components/analytics/CategoryFilterDropdown';
 import { AnalyticsContext, AnalyticsFilterState } from './AnalyticsContext';
 import { BarChart3, TrendingUp, Wallet, Landmark } from 'lucide-react';
 
@@ -18,15 +19,17 @@ export const ANALYTICS_ACCOUNT_KEY = 'analytics_account';
 export const ANALYTICS_GRANULARITY_KEY = 'analytics_granularity';
 export const ANALYTICS_START_DATE_KEY = 'analytics_filter_start_date';
 export const ANALYTICS_END_DATE_KEY = 'analytics_filter_end_date';
+export const ANALYTICS_CATEGORIES_KEY = 'analytics_selected_categories';
 
 // Abwärtskompatible Fallback-Keys
 const LEGACY_ACCOUNT_KEY = 'cashflow_account';
 const LEGACY_GRANULARITY_KEY = 'cashflow_granularity';
 const LEGACY_START_DATE_KEY = 'cashflow_filter_start_date';
 const LEGACY_END_DATE_KEY = 'cashflow_filter_end_date';
+const LEGACY_CATEGORIES_KEY = 'cashflow_selected_categories';
 
 export const AnalyticsLayout: React.FC = () => {
-  const { accounts } = useFinance();
+  const { accounts, categories } = useFinance();
   const location = useLocation();
   const isBalances = location.pathname.includes('/balances');
 
@@ -108,6 +111,33 @@ export const AnalyticsLayout: React.FC = () => {
     }
   };
 
+  // 4. Kategorie-Filter (persisted)
+  const [selectedCategoryIds, setSelectedCategoryIdsState] = useState<string[] | null>(() => {
+    const saved =
+      localStorage.getItem(ANALYTICS_CATEGORIES_KEY) || localStorage.getItem(LEGACY_CATEGORIES_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // ignore
+      }
+    }
+    return null;
+  });
+
+  const setSelectedCategoryIds = (ids: string[] | null) => {
+    setSelectedCategoryIdsState(ids);
+    if (ids) {
+      const json = JSON.stringify(ids);
+      localStorage.setItem(ANALYTICS_CATEGORIES_KEY, json);
+      localStorage.setItem(LEGACY_CATEGORIES_KEY, json);
+    } else {
+      localStorage.removeItem(ANALYTICS_CATEGORIES_KEY);
+      localStorage.removeItem(LEGACY_CATEGORIES_KEY);
+    }
+  };
+
   const contextValue: AnalyticsFilterState = useMemo(
     () => ({
       selectedAccountId,
@@ -117,8 +147,10 @@ export const AnalyticsLayout: React.FC = () => {
       startDate,
       endDate,
       setDateRange,
+      selectedCategoryIds,
+      setSelectedCategoryIds,
     }),
-    [selectedAccountId, granularity, startDate, endDate]
+    [selectedAccountId, granularity, startDate, endDate, selectedCategoryIds]
   );
 
   return (
@@ -162,6 +194,15 @@ export const AnalyticsLayout: React.FC = () => {
 
               {/* Granularitäts-Umschalter */}
               <PeriodSelector value={granularity} onChange={setGranularity} />
+
+              {/* Kategorie-Filter (direkt neben dem Period-Picker in der Zeile) */}
+              {!isBalances && (
+                <CategoryFilterDropdown
+                  categories={categories}
+                  selectedCategoryIds={selectedCategoryIds}
+                  onChange={setSelectedCategoryIds}
+                />
+              )}
 
               {/* Date Range Picker */}
               <DateRangePicker

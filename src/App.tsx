@@ -10,6 +10,7 @@ import { FinanceProvider } from '@/services/storage/FinanceContext';
 import { Header } from '@/components/Header';
 import { Home } from '@/pages/Home';
 import { ConfigurationLayout, BucketsConfig, AccountsConfig } from '@/pages/configuration';
+import { AnalyticsLayout } from '@/pages/analytics';
 import { Transactions } from '@/pages/Transactions';
 import { Cashflow } from '@/pages/Cashflow';
 import { Balances } from '@/pages/Balances';
@@ -31,6 +32,11 @@ export const App: React.FC = () => {
               <Route path="/transactions" element={<Transactions />} />
               <Route path="/cashflow" element={<Cashflow />} />
               <Route path="/balances" element={<Balances />} />
+              <Route path="/analytics" element={<AnalyticsLayout />}>
+                <Route index element={<Navigate to="cashflow" replace />} />
+                <Route path="cashflow" element={<Cashflow />} />
+                <Route path="balances" element={<Balances />} />
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

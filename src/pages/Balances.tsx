@@ -5,14 +5,13 @@
  * @module pages/Balances
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
-import { PeriodGranularity } from '@/types/finance';
 import { calculateAllBalances } from '@/services/analytics/balanceCalculator';
-import { PeriodSelector } from '@/components/PeriodSelector';
 import { IconRenderer } from '@/components/IconRenderer';
 import { formatPeriodLabel } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
+import { useAnalyticsFilter } from '@/pages/analytics';
 import {
   Wallet,
   Landmark,
@@ -22,30 +21,28 @@ import {
 
 export const Balances: React.FC = () => {
   const { accounts, transactions } = useFinance();
-  const [granularity, setGranularity] = useState<PeriodGranularity>('monthly');
+  const {
+    granularity,
+    selectedAccountId,
+    startDate,
+    endDate,
+  } = useAnalyticsFilter();
 
   const balanceMatrix = useMemo(() => {
-    return calculateAllBalances(accounts, transactions, granularity);
-  }, [accounts, transactions, granularity]);
+    return calculateAllBalances(
+      accounts,
+      transactions,
+      granularity,
+      selectedAccountId !== 'all' ? selectedAccountId : undefined,
+      {
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      }
+    );
+  }, [accounts, transactions, granularity, selectedAccountId, startDate, endDate]);
 
   return (
     <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Wallet className="w-7 h-7 text-blue-600" />
-            Kontostände & Saldenverlauf
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Entwicklung deiner Konten basierend auf Stichtags-Salden und Buchungs-Cashflows.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <PeriodSelector value={granularity} onChange={setGranularity} />
-        </div>
-      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

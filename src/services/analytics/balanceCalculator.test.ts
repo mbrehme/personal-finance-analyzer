@@ -74,4 +74,22 @@ describe('balanceCalculator', () => {
     expect(giroRow.latestBalance).toBe(2200);
     expect(result.totalRow.latestBalance).toBe(2200);
   });
+
+  it('filters by selectedAccountId and custom date range', () => {
+    const secondAccount: Account = {
+      id: 'acc-tagesgeld',
+      name: 'Tagesgeld',
+      bucketIds: [],
+      balanceEntries: [],
+    };
+
+    const result = calculateAllBalances([account, secondAccount], transactions, 'monthly', 'acc-giro', {
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+    });
+
+    expect(result.periodKeys).toEqual(['2026-09']);
+    expect(result.rows.length).toBe(1);
+    expect(result.rows[0].account.id).toBe('acc-giro');
+  });
 });

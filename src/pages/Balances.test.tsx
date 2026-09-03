@@ -17,8 +17,8 @@ describe('Balances Page', () => {
       </FinanceProvider>
     );
 
-    expect(await screen.findByText(/Kontestände & Saldenverlauf|Kontostände & Saldenverlauf/i)).toBeInTheDocument();
-    expect(screen.getByText('Aktueller Gesamtsaldo')).toBeInTheDocument();
+    expect(await screen.findByText('Aktueller Gesamtsaldo')).toBeInTheDocument();
     expect(screen.getByText('Aktive Konten')).toBeInTheDocument();
+    expect(screen.getByText('Stichtags-Salden')).toBeInTheDocument();
   });
 });

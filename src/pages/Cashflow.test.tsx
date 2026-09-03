@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import {
   Cashflow,
   CASHFLOW_ACCOUNT_FILTER_KEY,
@@ -14,20 +15,42 @@ import {
   CASHFLOW_START_DATE_KEY,
   CASHFLOW_END_DATE_KEY,
 } from './Cashflow';
+import { AnalyticsLayout } from '@/pages/analytics';
 import { FinanceProvider } from '@/services/storage/FinanceContext';
 import * as FinanceContextModule from '@/services/storage/FinanceContext';
 import { getCurrentPeriodKey } from '@/utils/dateUtils';
 
+const renderInAnalytics = (ui: React.ReactElement = <Cashflow />) => {
+  return render(
+    <MemoryRouter initialEntries={['/analytics/cashflow']}>
+      <Routes>
+        <Route path="/analytics" element={<AnalyticsLayout />}>
+          <Route path="cashflow" element={ui} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  );
+};
+
+const renderWithProvider = (ui: React.ReactElement = <Cashflow />) => {
+  return render(
+    <FinanceProvider>
+      <MemoryRouter initialEntries={['/analytics/cashflow']}>
+        <Routes>
+          <Route path="/analytics" element={<AnalyticsLayout />}>
+            <Route path="cashflow" element={ui} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </FinanceProvider>
+  );
+};
+
 describe('Cashflow Page', () => {
   it('renders cashflow page with KPIs and granularity switcher', async () => {
-    render(
-      <FinanceProvider>
-        <Cashflow />
-      </FinanceProvider>
-    );
+    renderWithProvider();
 
-    expect(await screen.findByText('Cashflow Matrix')).toBeInTheDocument();
-    expect(screen.getByText('Gesamt Einnahmen')).toBeInTheDocument();
+    expect(await screen.findByText('Gesamt Einnahmen')).toBeInTheDocument();
     expect(screen.getByText('Gesamt Ausgaben')).toBeInTheDocument();
     expect(screen.getByText('Netto Cashflow')).toBeInTheDocument();
     expect(screen.getByText('Monatlich')).toBeInTheDocument();
@@ -83,7 +106,7 @@ describe('Cashflow Page', () => {
       resetWorkspace: vi.fn(),
     });
 
-    render(<Cashflow />);
+    renderInAnalytics();
 
     expect(screen.getByTestId('current-period-header')).toBeInTheDocument();
     expect(screen.getByText('Aktuell')).toBeInTheDocument();
@@ -152,7 +175,7 @@ describe('Cashflow Page', () => {
       resetWorkspace: vi.fn(),
     });
 
-    render(<Cashflow />);
+    renderInAnalytics();
 
     // 2023 sollte eingeklappt sein und die Jahressumme anzeigen
     const collapseBtn2023 = screen.getByRole('button', { name: /2023/i });
@@ -205,10 +228,10 @@ describe('Cashflow Page', () => {
       resetWorkspace: vi.fn(),
     });
 
-    const { unmount } = render(<Cashflow />);
+    const { unmount } = renderInAnalytics();
 
     // Überprüfen, ob die aus localStorage geladenen Werte aktiv sind
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    const select = screen.getByTestId('analytics-account-select') as HTMLSelectElement;
     expect(select.value).toBe('acc-persist');
 
     // Anderes Konto auswählen
@@ -232,6 +255,7 @@ describe('Cashflow Page', () => {
         <Cashflow />
       </FinanceProvider>
     );
+    renderWithProvider();
 
     const datePickerBtn = screen.getByRole('button', { name: /Zeitraum auswählen/i });
     expect(datePickerBtn).toBeInTheDocument();
@@ -249,11 +273,7 @@ describe('Cashflow Page', () => {
     localStorage.removeItem(CASHFLOW_START_DATE_KEY);
     localStorage.removeItem(CASHFLOW_END_DATE_KEY);
 
-    render(
-      <FinanceProvider>
-        <Cashflow />
-      </FinanceProvider>
-    );
+    renderWithProvider();
 
     const datePickerBtn = screen.getByRole('button', { name: /Zeitraum auswählen/i });
     await user.click(datePickerBtn);

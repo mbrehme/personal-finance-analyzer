@@ -7,10 +7,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
-import { PeriodGranularity } from '@/types/finance';
 import { calculateCashflowMatrix, BucketCashflowRow } from '@/services/analytics/cashflowCalculator';
-import { PeriodSelector } from '@/components/PeriodSelector';
-import { DateRangePicker } from '@/components/DateRangePicker';
 import { IconRenderer } from '@/components/IconRenderer';
 import {
   getCurrentPeriodKey,
@@ -20,12 +17,26 @@ import {
 } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import {
+  useAnalyticsFilter,
+  ANALYTICS_ACCOUNT_KEY as CASHFLOW_ACCOUNT_FILTER_KEY,
+  ANALYTICS_GRANULARITY_KEY as CASHFLOW_GRANULARITY_KEY,
+  ANALYTICS_START_DATE_KEY as CASHFLOW_START_DATE_KEY,
+  ANALYTICS_END_DATE_KEY as CASHFLOW_END_DATE_KEY,
+} from '@/pages/analytics';
+import {
   TrendingUp,
   ChevronRight,
   ChevronDown,
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
+
+export {
+  CASHFLOW_ACCOUNT_FILTER_KEY,
+  CASHFLOW_GRANULARITY_KEY,
+  CASHFLOW_START_DATE_KEY,
+  CASHFLOW_END_DATE_KEY,
+};
 
 /**
  * Anzuzeigende Spalte in der Cashflow-Tabelle:
@@ -48,118 +59,14 @@ interface YearGroup {
   colSpan: number;
 }
 
-export const CASHFLOW_ACCOUNT_FILTER_KEY = 'cashflow_filter_account_id';
-export const CASHFLOW_GRANULARITY_KEY = 'cashflow_filter_granularity';
-export const CASHFLOW_START_DATE_KEY = 'cashflow_filter_start_date';
-export const CASHFLOW_END_DATE_KEY = 'cashflow_filter_end_date';
-
 export const Cashflow: React.FC = () => {
-  const { buckets, transactions, accounts } = useFinance();
-
-  const [granularity, setGranularity] = useState<PeriodGranularity>(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem(CASHFLOW_GRANULARITY_KEY);
-        if (
-          stored === 'monthly' ||
-          stored === 'quarterly' ||
-          stored === 'halfYearly' ||
-          stored === 'yearly'
-        ) {
-          return stored;
-        }
-      }
-    } catch {
-      // Storage access error handling
-    }
-    return 'monthly';
-  });
-
-  const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem(CASHFLOW_ACCOUNT_FILTER_KEY);
-        if (stored) {
-          return stored;
-        }
-      }
-    } catch {
-      // Storage access error handling
-    }
-    return 'all';
-  });
-
-  const [startDate, setStartDate] = useState<string>(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return localStorage.getItem(CASHFLOW_START_DATE_KEY) || '';
-      }
-    } catch {
-      // Storage access error handling
-    }
-    return '';
-  });
-
-  const [endDate, setEndDate] = useState<string>(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return localStorage.getItem(CASHFLOW_END_DATE_KEY) || '';
-      }
-    } catch {
-      // Storage access error handling
-    }
-    return '';
-  });
-
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(CASHFLOW_GRANULARITY_KEY, granularity);
-      }
-    } catch {
-      // Storage access error handling
-    }
-  }, [granularity]);
-
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(CASHFLOW_ACCOUNT_FILTER_KEY, selectedAccountId);
-      }
-    } catch {
-      // Storage access error handling
-    }
-  }, [selectedAccountId]);
-
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        if (startDate) {
-          localStorage.setItem(CASHFLOW_START_DATE_KEY, startDate);
-        } else {
-          localStorage.removeItem(CASHFLOW_START_DATE_KEY);
-        }
-        if (endDate) {
-          localStorage.setItem(CASHFLOW_END_DATE_KEY, endDate);
-        } else {
-          localStorage.removeItem(CASHFLOW_END_DATE_KEY);
-        }
-      }
-    } catch {
-      // Storage access error handling
-    }
-  }, [startDate, endDate]);
-
-  // Wenn das gespeicherte Konto in den geladenen Konten nicht mehr existiert, auf 'all' zurücksetzen
-  useEffect(() => {
-    if (
-      selectedAccountId !== 'all' &&
-      accounts.length > 0 &&
-      !accounts.some((a) => a.id === selectedAccountId)
-    ) {
-      setSelectedAccountId('all');
-    }
-  }, [accounts, selectedAccountId]);
+  const { buckets, transactions } = useFinance();
+  const {
+    granularity,
+    selectedAccountId,
+    startDate,
+    endDate,
+  } = useAnalyticsFilter();
 
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
 
@@ -192,7 +99,7 @@ export const Cashflow: React.FC = () => {
       buckets,
       transactions,
       granularity,
-      selectedAccountId !== 'all' ? selectedAccountId : undefined,
+      selectedAccountId && selectedAccountId !== 'all' ? selectedAccountId : undefined,
       {
         includeCurrentPeriod: isCurrentPeriodInRange,
         startDate: startDate || undefined,
@@ -376,7 +283,7 @@ export const Cashflow: React.FC = () => {
         <React.Fragment key={row.bucket.id}>
           <tr className="hover:bg-slate-50 group transition-colors text-xs">
             {/* Bucket Name & Hierarchie (deutlich abgesetzte sticky Spalte) */}
-            <td className="sticky left-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-4 whitespace-nowrap min-w-[240px] w-[240px] max-w-[240px] border-b border-slate-200 border-r-2 border-slate-300 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors">
+            <td className="sticky left-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-4 whitespace-nowrap min-w-[240px] w-[240px] max-w-[240px] border-b border-b-slate-200 border-r-2 border-r-slate-300 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors">
               <div className="flex items-center gap-2 truncate" style={{ paddingLeft: `${row.depth * 20}px` }}>
                 {row.hasChildren ? (
                   <button
@@ -483,7 +390,7 @@ export const Cashflow: React.FC = () => {
             })}
 
             {/* Sticky Durchschnitts-Spalte rechts (deutlich abgesetzt) */}
-            <td className="sticky right-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-3 text-right whitespace-nowrap font-mono border-b border-slate-200 border-l-2 border-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] min-w-[110px] w-[110px] max-w-[110px] transition-colors">
+            <td className="sticky right-0 z-20 bg-slate-100 group-hover:bg-slate-200 py-2.5 px-3 text-right whitespace-nowrap font-mono border-b border-b-slate-200 border-l-2 border-l-slate-300 shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] min-w-[110px] w-[110px] max-w-[110px] transition-colors">
               {avgNet !== 0 ? (
                 <div>
                   <span
@@ -530,51 +437,6 @@ export const Cashflow: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="w-7 h-7 text-blue-600" />
-            Cashflow Matrix
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Gegenüberstellung von Einnahmen, Ausgaben und Budgets nach Kategorien.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Konto-Filter */}
-          <select
-            value={selectedAccountId}
-            onChange={(e) => setSelectedAccountId(e.target.value)}
-            className="px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 h-9"
-          >
-            <option value="all">Alle Konten</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {acc.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Zeitraum-Filter */}
-          <DateRangePicker
-            startDate={startDate}
-            endDate={endDate}
-            onChange={(range) => {
-              setStartDate(range.startDate);
-              setEndDate(range.endDate);
-            }}
-            placeholder="Gesamter Zeitraum"
-            align="left"
-            className="w-auto min-w-[190px] sm:min-w-[220px]"
-          />
-
-          {/* Granularitäts-Umschalter */}
-          <PeriodSelector value={granularity} onChange={setGranularity} />
-        </div>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">

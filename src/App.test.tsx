@@ -15,7 +15,6 @@ describe('App', () => {
     expect(await screen.findByRole('navigation')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Konfiguration/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Buchungen/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Cashflow/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Salden/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Analyse/i })).toBeInTheDocument();
   });
 });

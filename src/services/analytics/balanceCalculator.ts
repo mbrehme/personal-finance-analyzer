@@ -7,7 +7,12 @@
 
 import { Account, BalanceEntry, PeriodGranularity, Transaction } from '@/types/finance';
 import { extractPeriodKeys } from './cashflowCalculator';
-import { getPeriodKey } from '@/utils/dateUtils';
+import {
+  getPeriodKey,
+  getCurrentPeriodKey,
+  fillPeriodKeyRange,
+  getPeriodKeysBetween,
+} from '@/utils/dateUtils';
 
 export interface AccountPeriodBalance {
   startBalance: number;
@@ -102,17 +107,40 @@ export function calculateBalanceTimeline(
   };
 }
 
+export interface BalanceCalculatorOptions {
+  /** Optionales Startdatum zur Filterung / Begrenzung der Perioden */
+  startDate?: string | null;
+  /** Optionales Enddatum zur Filterung / Begrenzung der Perioden */
+  endDate?: string | null;
+}
+
 /**
  * Berechnet die gesamte Kontostand-Matrix über alle Konten und Perioden.
  */
 export function calculateAllBalances(
   accounts: Account[],
   transactions: Transaction[],
-  granularity: PeriodGranularity
+  granularity: PeriodGranularity,
+  selectedAccountId?: string | null,
+  options?: BalanceCalculatorOptions
 ): BalanceAnalysisResult {
-  const periodKeys = extractPeriodKeys(transactions, granularity);
+  let periodKeys: string[];
+  if (options?.startDate && options?.endDate) {
+    periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
+  } else {
+    const rawPeriodKeys = extractPeriodKeys(transactions, granularity);
+    const currentPeriodKey = getCurrentPeriodKey(granularity);
+    periodKeys =
+      rawPeriodKeys.length > 0
+        ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentPeriodKey)
+        : [currentPeriodKey];
+  }
 
-  const sortedAccounts = [...accounts].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const accountsToProcess = selectedAccountId
+    ? accounts.filter((a) => a.id === selectedAccountId)
+    : accounts;
+
+  const sortedAccounts = [...accountsToProcess].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const rows: AccountBalanceRow[] = sortedAccounts.map((acc) =>
     calculateBalanceTimeline(acc, transactions, periodKeys, granularity)
   );

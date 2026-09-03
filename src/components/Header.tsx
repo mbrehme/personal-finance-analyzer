@@ -12,7 +12,7 @@ import {
   Wallet,
   Layers,
   Receipt,
-  TrendingUp,
+  BarChart3,
   Shield,
   Loader2,
 } from 'lucide-react';
@@ -56,14 +56,9 @@ export const Header: React.FC = () => {
             <span>Buchungen</span>
           </NavLink>
 
-          <NavLink to="/cashflow" className={navLinkClass}>
-            <TrendingUp className="h-4 w-4" />
-            <span>Cashflow</span>
-          </NavLink>
-
-          <NavLink to="/balances" className={navLinkClass}>
-            <Wallet className="h-4 w-4" />
-            <span>Salden</span>
+          <NavLink to="/analytics" className={navLinkClass}>
+            <BarChart3 className="h-4 w-4" />
+            <span>Analyse</span>
           </NavLink>
         </nav>
 

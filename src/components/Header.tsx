@@ -8,7 +8,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useFinance } from '@/services/storage/FinanceContext';
-import { Wallet, Layers, Receipt, BarChart3, Shield, Loader2 } from 'lucide-react';
+import { Wallet, Layers, Receipt, BarChart3, Shield, RefreshCw } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { reMatchStatus, triggerReMatch } = useFinance();
@@ -78,20 +78,32 @@ export const Header: React.FC = () => {
                   : 'border border-slate-200/80 bg-white font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40'
             }`}
           >
-            {/* Status-Icon / Indikator */}
-            {reMatchStatus === 'is_reprogressing' ? (
-              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-600" />
-            ) : reMatchStatus === 'needs_reprogress' ? (
+            {/* Action Icon mit Animationszustand */}
+            <RefreshCw
+              className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                reMatchStatus === 'is_reprogressing'
+                  ? 'animate-spin text-blue-600'
+                  : reMatchStatus === 'needs_reprogress'
+                    ? 'text-amber-600'
+                    : 'text-slate-400'
+              }`}
+            />
+
+            {/* Kompaktes Label */}
+            <span>{reMatchStatus === 'is_reprogressing' ? 'Progressing...' : 'Reprogress'}</span>
+
+            {/* Status-Indikator Badge / Dot */}
+            {reMatchStatus === 'needs_reprogress' ? (
               <span className="relative flex h-2 w-2 shrink-0">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
               </span>
-            ) : (
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
-            )}
-
-            {/* Kompaktes Label */}
-            <span>{reMatchStatus === 'is_reprogressing' ? 'Progressing...' : 'Reprogress'}</span>
+            ) : reMatchStatus === 'has_progressed' ? (
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+                title="Synchronisiert"
+              ></span>
+            ) : null}
           </button>
         </div>
       </div>

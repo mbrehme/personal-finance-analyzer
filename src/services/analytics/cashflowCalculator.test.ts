@@ -221,4 +221,72 @@ describe('cashflowCalculator', () => {
     expect(manualParentRow?.effectiveBudget).toBe(500);
     expect(manualParentRow?.isBudgetRollup).toBe(false);
   });
+
+  it('correctly aggregates uncategorized transactions into uncategorizedRow', () => {
+    const testCategories: Category[] = [
+      {
+        id: 'cat-1',
+        name: 'Lebensmittel',
+        parentId: null,
+      },
+    ];
+
+    const testTxs: Transaction[] = [
+      {
+        id: 'tx-cat',
+        accountId: 'acc-1',
+        valueDate: '2026-09-05',
+        bookingDate: '2026-09-05',
+        issuer: 'Supermarkt',
+        receiver: 'Me',
+        subject: 'Einkauf',
+        value: -50,
+        categoryId: 'cat-1',
+        assignmentSource: 'manual',
+        iban: '',
+      },
+      {
+        id: 'tx-uncat-1',
+        accountId: 'acc-1',
+        valueDate: '2026-09-10',
+        bookingDate: '2026-09-10',
+        issuer: 'Unbekannt',
+        receiver: 'Me',
+        subject: 'Keine Kategorie',
+        value: -30,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+        iban: '',
+      },
+      {
+        id: 'tx-uncat-2',
+        accountId: 'acc-1',
+        valueDate: '2026-09-15',
+        bookingDate: '2026-09-15',
+        issuer: 'Geschenk',
+        receiver: 'Me',
+        subject: 'Bargeld',
+        value: 100,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+        iban: '',
+      },
+    ];
+
+    const matrix = calculateCashflowMatrix(testCategories, testTxs, 'monthly', undefined, {
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+    });
+
+    expect(matrix.uncategorizedRow).toBeDefined();
+    expect(matrix.uncategorizedRow.periods['2026-09'].inbound).toBe(100);
+    expect(matrix.uncategorizedRow.periods['2026-09'].outbound).toBe(-30);
+    expect(matrix.uncategorizedRow.periods['2026-09'].net).toBe(70);
+    expect(matrix.uncategorizedRow.totalInbound).toBe(100);
+    expect(matrix.uncategorizedRow.totalOutbound).toBe(-30);
+    expect(matrix.uncategorizedRow.totalNet).toBe(70);
+
+    // Gesamtsumme = Kategorisiert (-50) + Unkategorisiert (+70) = +20
+    expect(matrix.totalRow.periods['2026-09'].net).toBe(20);
+  });
 });

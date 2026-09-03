@@ -26,7 +26,14 @@ import {
   ANALYTICS_START_DATE_KEY as CASHFLOW_START_DATE_KEY,
   ANALYTICS_END_DATE_KEY as CASHFLOW_END_DATE_KEY,
 } from '@/pages/analytics';
-import { TrendingUp, ChevronRight, ChevronDown, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import {
+  TrendingUp,
+  ChevronRight,
+  ChevronDown,
+  ArrowUpRight,
+  ArrowDownRight,
+  HelpCircle,
+} from 'lucide-react';
 
 export {
   CASHFLOW_ACCOUNT_FILTER_KEY,
@@ -428,6 +435,85 @@ export const Cashflow: React.FC = () => {
     return rootRows.map((r) => renderTreeRow(r));
   };
 
+  // Vorletzte Zeile: Unkategorisierte Buchungen
+  const renderUncategorizedRow = (): React.ReactNode => {
+    const periodCount = matrix.periodKeys.length;
+    const avgNet = periodCount > 0 ? matrix.uncategorizedRow.totalNet / periodCount : 0;
+
+    return (
+      <tr
+        key="__uncategorized__"
+        data-testid="cashflow-uncategorized-row"
+        className="group border-t-2 border-slate-200 text-xs transition-colors hover:bg-slate-50"
+      >
+        {/* Name & Icon (deutlich abgesetzte sticky Spalte) */}
+        <td className="sticky left-0 z-20 w-[240px] min-w-[240px] max-w-[240px] whitespace-nowrap border-b border-r-2 border-b-slate-200 border-r-slate-300 bg-slate-100 px-4 py-2.5 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors group-hover:bg-slate-200">
+          <div className="flex items-center gap-2 truncate">
+            <div className="w-4 flex-shrink-0" />
+            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-slate-400 text-white">
+              <HelpCircle className="h-3.5 w-3.5" />
+            </div>
+            <div className="flex min-w-0 flex-col truncate">
+              <span className="truncate font-semibold text-slate-700">Nicht kategorisiert</span>
+            </div>
+          </div>
+        </td>
+
+        {/* Perioden Spalten (einzeln oder komprimiert) */}
+        {displayColumns.map((col, cIdx) => {
+          let net = 0;
+          if (col.type === 'period') {
+            const pData = matrix.uncategorizedRow.periods[col.id];
+            if (pData) net = pData.net;
+          } else {
+            col.periodKeys.forEach((k) => {
+              const p = matrix.uncategorizedRow.periods[k];
+              if (p) net += p.net;
+            });
+          }
+
+          const isLastCol = cIdx === displayColumns.length - 1;
+          const borderRight = isLastCol
+            ? ''
+            : col.isLastInYear
+              ? 'border-r-2 border-slate-300'
+              : 'border-r border-slate-100';
+          const bgHighlight = col.isCurrent
+            ? 'bg-blue-50/50 border-x-2 border-blue-200/80 font-semibold'
+            : col.type === 'collapsed_year'
+              ? 'bg-slate-50 font-medium'
+              : '';
+
+          return (
+            <td
+              key={col.id}
+              className={`whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors ${borderRight} ${bgHighlight}`}
+            >
+              {net !== 0 ? (
+                <span className={`font-bold ${net < 0 ? 'text-slate-900' : 'text-emerald-600'}`}>
+                  {formatMoney(net)}
+                </span>
+              ) : (
+                <span className={col.isCurrent ? 'text-slate-400' : 'text-slate-300'}>-</span>
+              )}
+            </td>
+          );
+        })}
+
+        {/* Sticky Durchschnitts-Spalte rechts */}
+        <td className="sticky right-0 z-20 w-[110px] min-w-[110px] max-w-[110px] whitespace-nowrap border-b border-l-2 border-b-slate-200 border-l-slate-300 bg-slate-100 px-3 py-2.5 text-right font-mono shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors group-hover:bg-slate-200">
+          {avgNet !== 0 ? (
+            <span className={`font-bold ${avgNet < 0 ? 'text-slate-900' : 'text-emerald-600'}`}>
+              {formatMoney(avgNet)}
+            </span>
+          ) : (
+            <span className="text-slate-300">-</span>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
   const totalAvgNet = useMemo(() => {
     return matrix.periodKeys.length > 0 ? matrix.totalRow.totalNet / matrix.periodKeys.length : 0;
   }, [matrix.periodKeys.length, matrix.totalRow.totalNet]);
@@ -605,17 +691,22 @@ export const Cashflow: React.FC = () => {
                     Noch keine Daten für diesen Zeitraum vorhanden.
                   </td>
                 </tr>
-              ) : matrix.rows.length > 0 ? (
-                renderRows()
               ) : (
-                <tr>
-                  <td
-                    colSpan={displayColumns.length + 2}
-                    className="py-12 text-center text-sm text-slate-400"
-                  >
-                    Noch keine Kategorien konfiguriert.
-                  </td>
-                </tr>
+                <>
+                  {matrix.rows.length > 0 ? (
+                    renderRows()
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={displayColumns.length + 2}
+                        className="py-12 text-center text-sm text-slate-400"
+                      >
+                        Noch keine Kategorien konfiguriert.
+                      </td>
+                    </tr>
+                  )}
+                  {renderUncategorizedRow()}
+                </>
               )}
             </tbody>
             {/* Gesamtsummenzeile */}

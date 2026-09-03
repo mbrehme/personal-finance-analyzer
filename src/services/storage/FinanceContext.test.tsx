@@ -8,6 +8,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { FinanceProvider, useFinance } from './FinanceContext';
+import { Transaction } from '@/types/finance';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <FinanceProvider>{children}</FinanceProvider>

@@ -48,6 +48,12 @@ export type BucketCashflowRow = CategoryCashflowRow;
 export interface CashflowAnalysisResult {
   periodKeys: string[];
   rows: CategoryCashflowRow[];
+  uncategorizedRow: {
+    periods: Record<string, CategoryPeriodCashflow>;
+    totalInbound: number;
+    totalOutbound: number;
+    totalNet: number;
+  };
   totalRow: {
     periods: Record<string, CategoryPeriodCashflow>;
     totalInbound: number;
@@ -141,9 +147,12 @@ export function calculateCashflowMatrix(
   });
   directSums.set(uncategorizedCategoryId, uncatPeriodMap);
 
+  const categoryIdsSet = new Set(categories.map((c) => c.id));
+
   filteredTx.forEach((tx) => {
     const pKey = getPeriodKey(tx.valueDate, granularity);
-    const catId = tx.categoryId ?? tx.bucketId ?? uncategorizedCategoryId;
+    const rawCatId = tx.categoryId ?? tx.bucketId ?? null;
+    const catId = rawCatId && categoryIdsSet.has(rawCatId) ? rawCatId : uncategorizedCategoryId;
     const catPeriods = directSums.get(catId);
 
     if (catPeriods && catPeriods[pKey]) {
@@ -324,9 +333,33 @@ export function calculateCashflowMatrix(
     };
   });
 
+  // Unkategorisierte Zeile berechnen
+  const uncatRowPeriods: Record<string, CategoryPeriodCashflow> = {};
+  let uncatTotalInbound = 0;
+  let uncatTotalOutbound = 0;
+
+  periodKeys.forEach((pKey) => {
+    const pData = directSums.get(uncategorizedCategoryId)?.[pKey] || { inbound: 0, outbound: 0 };
+    const net = pData.inbound + pData.outbound;
+    uncatTotalInbound += pData.inbound;
+    uncatTotalOutbound += pData.outbound;
+
+    uncatRowPeriods[pKey] = {
+      inbound: pData.inbound,
+      outbound: pData.outbound,
+      net,
+    };
+  });
+
   return {
     periodKeys,
     rows,
+    uncategorizedRow: {
+      periods: uncatRowPeriods,
+      totalInbound: uncatTotalInbound,
+      totalOutbound: uncatTotalOutbound,
+      totalNet: uncatTotalInbound + uncatTotalOutbound,
+    },
     totalRow: {
       periods: totalRowPeriods,
       totalInbound: grandInbound,

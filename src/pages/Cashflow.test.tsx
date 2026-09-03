@@ -327,4 +327,88 @@ describe('Cashflow Page', () => {
     expect(screen.getByTestId('current-period-header')).toBeInTheDocument();
     expect(screen.getByText('Aktuell')).toBeInTheDocument();
   });
+
+  it('renders uncategorized row as second to last row before total row', async () => {
+    const currentMonthKey = getCurrentPeriodKey('monthly');
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [{ id: 'acc-1', name: 'Giro' }] as any,
+      categories: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
+      buckets: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
+      transactions: [
+        {
+          id: 'tx-1',
+          accountId: 'acc-1',
+          valueDate: `${currentMonthKey}-05`,
+          bookingDate: `${currentMonthKey}-05`,
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Einkauf',
+          type: 'outbound',
+          iban: 'DE00',
+          value: -50,
+          categoryId: 'cat-1',
+          assignmentSource: 'manual',
+        },
+        {
+          id: 'tx-2',
+          accountId: 'acc-1',
+          valueDate: `${currentMonthKey}-10`,
+          bookingDate: `${currentMonthKey}-10`,
+          issuer: 'Unbekannt',
+          receiver: 'Ich',
+          subject: 'Ohne Kategorie',
+          type: 'outbound',
+          iban: 'DE00',
+          value: -35,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+        },
+      ] as any,
+      loading: false,
+      error: null,
+      reMatchStatus: 'has_progressed',
+      setReMatchStatus: vi.fn(),
+      needsReMatch: false,
+      reMatching: false,
+      setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+      addBucket: vi.fn(),
+      updateBucket: vi.fn(),
+      deleteBucket: vi.fn(),
+      reorderBuckets: vi.fn(),
+      addAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+      importTransactions: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      splitTransaction: vi.fn(),
+      deleteTransaction: vi.fn(),
+      resetTransaction: vi.fn(),
+      deletedTransactions: [],
+      restoreTransaction: vi.fn(),
+      clearTransactions: vi.fn(),
+      triggerReMatch: vi.fn(),
+      exportConfiguration: vi.fn(),
+      importConfiguration: vi.fn(),
+      resetWorkspace: vi.fn(),
+    } as any);
+
+    renderInAnalytics();
+
+    // Lebensmittel-Kategorie vorhanden
+    expect(screen.getByText('Lebensmittel')).toBeInTheDocument();
+
+    // Vorletzte Zeile: Nicht kategorisiert
+    const uncatRow = screen.getByTestId('cashflow-uncategorized-row');
+    expect(uncatRow).toBeInTheDocument();
+    expect(uncatRow).toHaveTextContent('Nicht kategorisiert');
+    expect(uncatRow).toHaveTextContent('-35,00 €');
+
+    // Gesamtergebnis-Zeile (letzte Zeile)
+    expect(screen.getByText('Netto-Gesamtergebnis')).toBeInTheDocument();
+  });
 });

@@ -16,14 +16,14 @@ import {
 } from '@/types/finance';
 
 const DB_NAME = 'personal_finance_analyzer_db';
-const DB_VERSION = 4;
-
+const DB_VERSION = 6;
 const STORES = {
   ACCOUNTS: 'accounts',
   CATEGORIES: 'categories',
   /** @deprecated Altes Schema vor v3 */
   BUCKETS: 'buckets',
   TRANSACTIONS: 'transactions',
+  DELETED_TRANSACTIONS: 'deleted_transactions',
 } as const;
 
 /**
@@ -33,6 +33,7 @@ class MemoryStorage {
   accounts: Map<string, Account> = new Map();
   categories: Map<string, Category> = new Map();
   transactions: Map<string, Transaction> = new Map();
+  deletedTransactions: Map<string, Transaction> = new Map();
 
   // Alias für Abwärtskompatibilität
   get buckets(): Map<string, Category> {
@@ -43,6 +44,7 @@ class MemoryStorage {
     this.accounts.clear();
     this.categories.clear();
     this.transactions.clear();
+    this.deletedTransactions.clear();
   }
 }
 
@@ -56,7 +58,62 @@ function isIndexedDBAvailable(): boolean {
 }
 
 /**
+ * Wendet Schema-Migrationen und Tabellenerstellungen auf eine IDBDatabase an.
+ */
+function applyMigrations(db: IDBDatabase, upgradeTx: IDBTransaction): void {
+  if (!db.objectStoreNames.contains(STORES.ACCOUNTS)) {
+    db.createObjectStore(STORES.ACCOUNTS, { keyPath: 'id' });
+  }
+
+  let categoryStore: IDBObjectStore;
+  if (!db.objectStoreNames.contains(STORES.CATEGORIES)) {
+    categoryStore = db.createObjectStore(STORES.CATEGORIES, { keyPath: 'id' });
+  } else {
+    categoryStore = upgradeTx.objectStore(STORES.CATEGORIES);
+  }
+
+  // Falls eine ältere 'buckets'-Tabelle existiert, Datensätze migrieren
+  if (db.objectStoreNames.contains(STORES.BUCKETS)) {
+    const oldBucketStore = upgradeTx.objectStore(STORES.BUCKETS);
+    const cursorReq = oldBucketStore.openCursor();
+    cursorReq.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        categoryStore.put(cursor.value);
+        cursor.continue();
+      }
+    };
+  }
+
+  let txStore: IDBObjectStore;
+  if (!db.objectStoreNames.contains(STORES.TRANSACTIONS)) {
+    txStore = db.createObjectStore(STORES.TRANSACTIONS, { keyPath: 'id' });
+  } else {
+    txStore = upgradeTx.objectStore(STORES.TRANSACTIONS);
+  }
+
+  if (!txStore.indexNames.contains('accountId')) {
+    txStore.createIndex('accountId', 'accountId', { unique: false });
+  }
+  if (!txStore.indexNames.contains('categoryId')) {
+    txStore.createIndex('categoryId', 'categoryId', { unique: false });
+  }
+  if (!txStore.indexNames.contains('bucketId')) {
+    txStore.createIndex('bucketId', 'bucketId', { unique: false });
+  }
+  if (!txStore.indexNames.contains('valueDate')) {
+    txStore.createIndex('valueDate', 'valueDate', { unique: false });
+  }
+
+  if (!db.objectStoreNames.contains(STORES.DELETED_TRANSACTIONS)) {
+    const delStore = db.createObjectStore(STORES.DELETED_TRANSACTIONS, { keyPath: 'id' });
+    delStore.createIndex('valueDate', 'valueDate', { unique: false });
+  }
+}
+
+/**
  * Öffnet die IndexedDB-Datenbank und führt ggf. Schema-Upgrades durch.
+ * Besitzt eine Selbstheilung für den Fall, dass bestehende Browser-DBs benötigte Stores vermissen.
  */
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -74,50 +131,7 @@ function openDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       const upgradeTx = (event.target as IDBOpenDBRequest).transaction!;
-
-      if (!db.objectStoreNames.contains(STORES.ACCOUNTS)) {
-        db.createObjectStore(STORES.ACCOUNTS, { keyPath: 'id' });
-      }
-
-      let categoryStore: IDBObjectStore;
-      if (!db.objectStoreNames.contains(STORES.CATEGORIES)) {
-        categoryStore = db.createObjectStore(STORES.CATEGORIES, { keyPath: 'id' });
-      } else {
-        categoryStore = upgradeTx.objectStore(STORES.CATEGORIES);
-      }
-
-      // Falls eine ältere 'buckets'-Tabelle existiert, Datensätze migrieren
-      if (db.objectStoreNames.contains(STORES.BUCKETS)) {
-        const oldBucketStore = upgradeTx.objectStore(STORES.BUCKETS);
-        const cursorReq = oldBucketStore.openCursor();
-        cursorReq.onsuccess = (e) => {
-          const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
-          if (cursor) {
-            categoryStore.put(cursor.value);
-            cursor.continue();
-          }
-        };
-      }
-
-      let txStore: IDBObjectStore;
-      if (!db.objectStoreNames.contains(STORES.TRANSACTIONS)) {
-        txStore = db.createObjectStore(STORES.TRANSACTIONS, { keyPath: 'id' });
-      } else {
-        txStore = upgradeTx.objectStore(STORES.TRANSACTIONS);
-      }
-
-      if (!txStore.indexNames.contains('accountId')) {
-        txStore.createIndex('accountId', 'accountId', { unique: false });
-      }
-      if (!txStore.indexNames.contains('categoryId')) {
-        txStore.createIndex('categoryId', 'categoryId', { unique: false });
-      }
-      if (!txStore.indexNames.contains('bucketId')) {
-        txStore.createIndex('bucketId', 'bucketId', { unique: false });
-      }
-      if (!txStore.indexNames.contains('valueDate')) {
-        txStore.createIndex('valueDate', 'valueDate', { unique: false });
-      }
+      applyMigrations(db, upgradeTx);
     };
 
     request.onsuccess = () => {
@@ -125,6 +139,36 @@ function openDB(): Promise<IDBDatabase> {
       db.onversionchange = () => {
         db.close();
       };
+
+      // Selbstheilung: Prüfen, ob alle benötigten Stores existieren
+      const requiredStores = [
+        STORES.ACCOUNTS,
+        STORES.CATEGORIES,
+        STORES.TRANSACTIONS,
+        STORES.DELETED_TRANSACTIONS,
+      ];
+      const hasMissing = requiredStores.some((s) => !db.objectStoreNames.contains(s));
+
+      if (hasMissing) {
+        const nextVersion = db.version + 1;
+        db.close();
+        const upgradeReq = window.indexedDB.open(DB_NAME, nextVersion);
+        upgradeReq.onupgradeneeded = (ev) => {
+          const upgradeDb = (ev.target as IDBOpenDBRequest).result;
+          const upgradeTx = (ev.target as IDBOpenDBRequest).transaction!;
+          applyMigrations(upgradeDb, upgradeTx);
+        };
+        upgradeReq.onsuccess = () => {
+          const upgradedDb = upgradeReq.result;
+          upgradedDb.onversionchange = () => {
+            upgradedDb.close();
+          };
+          resolve(upgradedDb);
+        };
+        upgradeReq.onerror = () => reject(upgradeReq.error);
+        return;
+      }
+
       resolve(db);
     };
     request.onerror = () => reject(request.error);
@@ -351,7 +395,7 @@ export const financeDB = {
       if (store.indexNames.contains('valueDate')) {
         const index = store.index('valueDate');
         const req = index.openCursor(null, 'prev');
-        req.onsuccess = (event) => {
+        req.onsuccess = (event: Event) => {
           const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
           if (cursor) {
             results.push(this.normalizeTransaction(cursor.value));
@@ -419,17 +463,109 @@ export const financeDB = {
     await performStoreOperation(STORES.TRANSACTIONS, 'readwrite', (store) => store.clear());
   },
 
+  /* ================== DELETED TRANSACTIONS ================== */
+  /**
+   * Lädt alle gelöschten Transaktionen (Papierkorb / Tombstones).
+   *
+   * @returns Promise mit Liste gelöschter Transaktionen (neueste zuerst)
+   */
+  async getDeletedTransactions(): Promise<Transaction[]> {
+    if (!isIndexedDBAvailable()) {
+      const items = Array.from(memoryStore.deletedTransactions.values()).map((t) =>
+        this.normalizeTransaction(t)
+      );
+      return sortTransactionsDesc(items);
+    }
+    const db = await openDB();
+    if (!db.objectStoreNames.contains(STORES.DELETED_TRANSACTIONS)) return [];
+    return new Promise((resolve, reject) => {
+      const idbTx = db.transaction(STORES.DELETED_TRANSACTIONS, 'readonly');
+      const store = idbTx.objectStore(STORES.DELETED_TRANSACTIONS);
+      const req = store.getAll();
+      req.onsuccess = () =>
+        resolve(
+          sortTransactionsDesc(
+            (req.result as Transaction[]).map((t) => this.normalizeTransaction(t))
+          )
+        );
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  /**
+   * Verschiebt eine Transaktion in den Papierkorb (gelöschte Transaktionen).
+   * Setzt `deletedAt` auf den aktuellen Zeitstempel.
+   *
+   * @param tx - Die zu löschende Transaktion
+   */
+  async saveDeletedTransaction(tx: Transaction): Promise<void> {
+    const withTimestamp: Transaction = { ...tx, deletedAt: new Date().toISOString() };
+    const sanitized = this.sanitizeForPersistence(withTimestamp);
+    if (!isIndexedDBAvailable()) {
+      memoryStore.deletedTransactions.set(sanitized.id, sanitized as Transaction);
+      return;
+    }
+    await performStoreOperation(STORES.DELETED_TRANSACTIONS, 'readwrite', (store) =>
+      store.put(sanitized)
+    );
+  },
+
+  /**
+   * Speichert mehrere gelöschte Transaktionen (z. B. beim Konfigurationsimport).
+   */
+  async saveDeletedTransactions(transactions: Transaction[]): Promise<void> {
+    const sanitizedList = transactions.map((t) => this.sanitizeForPersistence(t));
+    if (!isIndexedDBAvailable()) {
+      sanitizedList.forEach((t) => memoryStore.deletedTransactions.set(t.id, t as Transaction));
+      return;
+    }
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const idbTx = db.transaction(STORES.DELETED_TRANSACTIONS, 'readwrite');
+      const store = idbTx.objectStore(STORES.DELETED_TRANSACTIONS);
+      sanitizedList.forEach((t) => store.put(t));
+      idbTx.oncomplete = () => resolve();
+      idbTx.onerror = () => reject(idbTx.error);
+    });
+  },
+
+  /**
+   * Entfernt eine gelöschte Transaktion endgültig aus dem Papierkorb.
+   */
+  async permanentlyDeleteTransaction(transactionId: string): Promise<void> {
+    if (!isIndexedDBAvailable()) {
+      memoryStore.deletedTransactions.delete(transactionId);
+      return;
+    }
+    await performStoreOperation(STORES.DELETED_TRANSACTIONS, 'readwrite', (store) =>
+      store.delete(transactionId)
+    );
+  },
+
+  async clearDeletedTransactions(): Promise<void> {
+    if (!isIndexedDBAvailable()) {
+      memoryStore.deletedTransactions.clear();
+      return;
+    }
+    await performStoreOperation(STORES.DELETED_TRANSACTIONS, 'readwrite', (store) => store.clear());
+  },
+
   /* ================== EXPORT & IMPORT ================== */
   async exportConfiguration(): Promise<FinanceConfigExport> {
-    const [accounts, categories, transactions] = await Promise.all([
+    const [accounts, categories, transactions, deletedTransactions] = await Promise.all([
       this.getAccounts(),
       this.getCategories(),
       this.getTransactions(),
+      this.getDeletedTransactions(),
     ]);
 
     const manualTransactions = transactions
       .filter((t) => t.origin === 'manual' || isTransactionOverridden(t))
       .map((t) => this.sanitizeForPersistence(t) as Transaction);
+
+    const sanitizedDeleted = deletedTransactions.map(
+      (t) => this.sanitizeForPersistence(t) as Transaction
+    );
 
     return {
       version: 2,
@@ -438,6 +574,7 @@ export const financeDB = {
       categories,
       buckets: categories,
       manualTransactions,
+      deletedTransactions: sanitizedDeleted,
     };
   },
 
@@ -450,11 +587,17 @@ export const financeDB = {
     if (!isIndexedDBAvailable()) {
       memoryStore.accounts.clear();
       memoryStore.categories.clear();
+      memoryStore.deletedTransactions.clear();
       config.accounts.forEach((acc) => memoryStore.accounts.set(acc.id, acc));
       categoriesToImport.forEach((c) => memoryStore.categories.set(c.id, c));
       if (Array.isArray(config.manualTransactions)) {
         config.manualTransactions.forEach((t) =>
           memoryStore.transactions.set(t.id, this.sanitizeForPersistence(t) as Transaction)
+        );
+      }
+      if (Array.isArray(config.deletedTransactions)) {
+        config.deletedTransactions.forEach((t) =>
+          memoryStore.deletedTransactions.set(t.id, this.sanitizeForPersistence(t) as Transaction)
         );
       }
       return;
@@ -466,20 +609,23 @@ export const financeDB = {
       if (Array.isArray(config.manualTransactions) && config.manualTransactions.length > 0) {
         candidates.push(STORES.TRANSACTIONS);
       }
+      if (Array.isArray(config.deletedTransactions) && config.deletedTransactions.length > 0) {
+        candidates.push(STORES.DELETED_TRANSACTIONS);
+      }
       const storeNames = candidates.filter((name) => db.objectStoreNames.contains(name));
-      const tx = db.transaction(storeNames, 'readwrite');
-      const accStore = tx.objectStore(STORES.ACCOUNTS);
+      const idbTx = db.transaction(storeNames, 'readwrite');
+      const accStore = idbTx.objectStore(STORES.ACCOUNTS);
 
       accStore.clear();
       config.accounts.forEach((acc) => accStore.put(acc));
 
       if (db.objectStoreNames.contains(STORES.CATEGORIES)) {
-        const catStore = tx.objectStore(STORES.CATEGORIES);
+        const catStore = idbTx.objectStore(STORES.CATEGORIES);
         catStore.clear();
         categoriesToImport.forEach((c) => catStore.put(c));
       }
       if (db.objectStoreNames.contains(STORES.BUCKETS)) {
-        const bucketStore = tx.objectStore(STORES.BUCKETS);
+        const bucketStore = idbTx.objectStore(STORES.BUCKETS);
         bucketStore.clear();
         categoriesToImport.forEach((c) => bucketStore.put(c));
       }
@@ -487,12 +633,20 @@ export const financeDB = {
         Array.isArray(config.manualTransactions) &&
         db.objectStoreNames.contains(STORES.TRANSACTIONS)
       ) {
-        const txStore = tx.objectStore(STORES.TRANSACTIONS);
+        const txStore = idbTx.objectStore(STORES.TRANSACTIONS);
         config.manualTransactions.forEach((t) => txStore.put(this.sanitizeForPersistence(t)));
       }
+      if (
+        Array.isArray(config.deletedTransactions) &&
+        db.objectStoreNames.contains(STORES.DELETED_TRANSACTIONS)
+      ) {
+        const delStore = idbTx.objectStore(STORES.DELETED_TRANSACTIONS);
+        delStore.clear();
+        config.deletedTransactions.forEach((t) => delStore.put(this.sanitizeForPersistence(t)));
+      }
 
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      idbTx.oncomplete = () => resolve();
+      idbTx.onerror = () => reject(idbTx.error);
     });
   },
 
@@ -509,18 +663,19 @@ export const financeDB = {
           STORES.CATEGORIES,
           STORES.BUCKETS,
           STORES.TRANSACTIONS,
+          STORES.DELETED_TRANSACTIONS,
         ];
         const storeNames = candidates.filter((name) => db.objectStoreNames.contains(name));
         if (storeNames.length === 0) {
           resolve();
           return;
         }
-        const tx = db.transaction(storeNames, 'readwrite');
+        const idbTx = db.transaction(storeNames, 'readwrite');
         storeNames.forEach((name) => {
-          tx.objectStore(name).clear();
+          idbTx.objectStore(name).clear();
         });
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        idbTx.oncomplete = () => resolve();
+        idbTx.onerror = () => reject(idbTx.error);
       });
     }
   },

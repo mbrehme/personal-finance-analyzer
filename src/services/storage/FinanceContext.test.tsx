@@ -211,4 +211,121 @@ describe('FinanceContext', () => {
     const parsed = JSON.parse(jsonStr);
     expect(parsed.manualTransactions).toHaveLength(2);
   });
+
+  it('restores a deleted split transaction back to its original full amount without split parts', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.clearTransactions();
+    });
+
+    // 1. Bank-Transaktion importieren und aufteilen
+    const mainTx: Transaction = {
+      id: 'tx-bank-test-1',
+      accountId: result.current.accounts[0].id,
+      valueDate: '2026-09-01',
+      bookingDate: '2026-09-01',
+      issuer: 'Bank',
+      receiver: 'Supermarkt',
+      subject: 'Einkauf 100 Euro',
+      value: -100,
+      originalValue: -100,
+      originalSubject: 'Einkauf 100 Euro',
+      originalReceiver: 'Supermarkt',
+      iban: '',
+      origin: 'imported',
+      categoryId: null,
+      assignmentSource: 'unassigned',
+    };
+    await act(async () => {
+      await result.current.importTransactions([mainTx]);
+    });
+
+    await act(async () => {
+      await result.current.splitTransaction(mainTx.id, 40, {
+        subject: 'Split Teilbetrag',
+        receiver: 'Drogerie',
+        categoryId: null,
+      });
+    });
+
+    expect(result.current.transactions).toHaveLength(2);
+    const parentAfterSplit = result.current.transactions.find((t) => t.id === mainTx.id);
+    expect(parentAfterSplit?.value).toBe(-60);
+
+    // 2. Original-Transaktion löschen: Split-Kind bleibt aktiv erhalten
+    await act(async () => {
+      await result.current.deleteTransaction(mainTx.id);
+    });
+
+    expect(result.current.transactions).toHaveLength(1);
+    expect(result.current.transactions[0].subject).toBe('Split Teilbetrag');
+    expect(result.current.deletedTransactions).toHaveLength(1);
+    expect(result.current.deletedTransactions[0].id).toBe(mainTx.id);
+
+    // 3. Parent wiederherstellen -> Stellt den Originalbetrag (-100 €) wieder her;
+    // Split-Teil bleibt ebenfalls aktiv erhalten
+    await act(async () => {
+      await result.current.restoreTransaction(mainTx.id);
+    });
+
+    expect(result.current.transactions).toHaveLength(2);
+    const restored = result.current.transactions.find((t) => t.id === mainTx.id);
+    expect(restored?.value).toBe(-100);
+    expect(restored?.splitFromId).toBeUndefined();
+    expect(result.current.transactions.some((t) => t.subject === 'Split Teilbetrag')).toBe(true);
+    expect(result.current.deletedTransactions).toHaveLength(0);
+
+    // 4. Weiterer Split und Reset der Transaktion testen: Split-Teil darf bei Reset nicht gelöscht werden
+    await act(async () => {
+      await result.current.splitTransaction(mainTx.id, 25, {
+        subject: 'Zweiter Split',
+        receiver: 'Drogerie',
+        categoryId: null,
+      });
+    });
+    expect(result.current.transactions).toHaveLength(3);
+
+    await act(async () => {
+      await result.current.resetTransaction(mainTx.id);
+    });
+
+    // Nach Reset des Parents auf Originalwerte: Split-Kinder bleiben aktiv erhalten
+    expect(result.current.transactions).toHaveLength(3);
+    const parentAfterReset = result.current.transactions.find((t) => t.id === mainTx.id);
+    expect(parentAfterReset?.value).toBe(-100);
+    expect(result.current.transactions.some((t) => t.subject === 'Zweiter Split')).toBe(true);
+  });
+
+  it('permanently deletes manual transactions without adding them to deleted pile', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let manualTx: any;
+    await act(async () => {
+      manualTx = await result.current.addTransaction({
+        accountId: result.current.accounts[0].id,
+        valueDate: '2026-09-01',
+        bookingDate: '2026-09-01',
+        issuer: 'Bar',
+        receiver: 'Flohmarkt',
+        subject: 'Bargeldkauf',
+        value: -15,
+        iban: '',
+        categoryId: null,
+      });
+    });
+
+    expect(manualTx.origin).toBe('manual');
+    expect(result.current.transactions.some((t) => t.id === manualTx.id)).toBe(true);
+
+    await act(async () => {
+      await result.current.deleteTransaction(manualTx.id);
+    });
+
+    // Manuelle Buchung ist weg und landet NICHT im Papierkorb
+    expect(result.current.transactions.some((t) => t.id === manualTx.id)).toBe(false);
+    expect(result.current.deletedTransactions.some((t) => t.id === manualTx.id)).toBe(false);
+  });
 });

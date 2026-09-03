@@ -13,6 +13,8 @@ import {
   TransactionType,
   ISODateString,
   getTransactionType,
+  isTransactionOverridden,
+  resetTransactionToOriginal,
 } from '@/types/finance';
 import { MoneyInput } from '../MoneyInput';
 import { formatMoney } from '@/utils/moneyUtils';
@@ -148,6 +150,21 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   }, [mode, splitAmount, origAbs]);
 
   if (!isOpen) return null;
+
+  /**
+   * Setzt alle Formularfelder auf die gespeicherten Original-Bankdaten zurück.
+   * Nur im Edit-Modus und nur wenn Originaldaten vorhanden sind.
+   */
+  const resetFormToOriginal = () => {
+    if (!initialTransaction) return;
+    const restored = resetTransactionToOriginal(initialTransaction);
+    setValueDate(restored.valueDate);
+    setType(getTransactionType(restored.value));
+    setAmount(Math.abs(restored.value));
+    setReceiver(restored.receiver || restored.issuer || '');
+    setSubject(restored.subject || '');
+    setCategoryId(null);
+  };
 
   // ================== SPEICHERN ==================
   const handleSubmit = async (e: React.FormEvent) => {
@@ -812,43 +829,61 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           )}
 
           {/* MODAL FOOTER */}
-          <div className="flex items-center justify-end space-x-3 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-            >
-              Abbrechen
-            </button>
-            <button
-              type="submit"
-              disabled={saving || (mode === 'split' && Boolean(splitValidationError))}
-              className={`flex items-center space-x-2 rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
-                mode === 'split' && Boolean(splitValidationError)
-                  ? 'cursor-not-allowed bg-slate-300 text-slate-500'
-                  : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50'
-              }`}
-            >
-              {saving ? (
-                <span>Wird gespeichert...</span>
-              ) : mode === 'split' ? (
-                <>
-                  <Scissors className="h-4 w-4" />
-                  <span>Jetzt aufteilen</span>
-                </>
-              ) : mode === 'edit' ? (
-                <>
-                  <Pencil className="h-4 w-4" />
-                  <span>Änderungen speichern</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  <span>Buchung erfassen</span>
-                </>
-              )}
-            </button>
+          <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+            {/* "Auf Originaldaten zurücksetzen" – nur im Edit-Modus mit überschriebenen Feldern */}
+            <div>
+              {mode === 'edit' &&
+                initialTransaction &&
+                isTransactionOverridden(initialTransaction) && (
+                  <button
+                    type="button"
+                    onClick={resetFormToOriginal}
+                    className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
+                    title="Alle Felder auf Original-Bankdaten zurücksetzen"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Alle Felder zurücksetzen
+                  </button>
+                )}
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="submit"
+                disabled={saving || (mode === 'split' && Boolean(splitValidationError))}
+                className={`flex items-center space-x-2 rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
+                  mode === 'split' && Boolean(splitValidationError)
+                    ? 'cursor-not-allowed bg-slate-300 text-slate-500'
+                    : 'bg-blue-600 hover:bg-blue-700 disabled:opacity-50'
+                }`}
+              >
+                {saving ? (
+                  <span>Wird gespeichert...</span>
+                ) : mode === 'split' ? (
+                  <>
+                    <Scissors className="h-4 w-4" />
+                    <span>Jetzt aufteilen</span>
+                  </>
+                ) : mode === 'edit' ? (
+                  <>
+                    <Pencil className="h-4 w-4" />
+                    <span>Änderungen speichern</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    <span>Buchung erfassen</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

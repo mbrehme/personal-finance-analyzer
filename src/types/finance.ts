@@ -196,6 +196,8 @@ export interface Transaction {
   originalReceiver?: string;
   originalIssuer?: string;
   originalIban?: string;
+  /** Zeitstempel der Löschung als ISO-String (falls gelöscht / im Papierkorb) */
+  deletedAt?: string;
 }
 
 /**
@@ -230,6 +232,34 @@ export function isTransactionOverridden(tx: Transaction): boolean {
  */
 export function isManualTransaction(tx: Transaction): boolean {
   return tx.origin === 'manual' || Boolean(tx.splitFromId) || isTransactionOverridden(tx);
+}
+
+/**
+ * Setzt alle bearbeiteten Felder einer importierten Transaktion auf die ursprünglichen
+ * Bank-Rohdaten zurück. Felder ohne gespeichertes Original bleiben unberührt.
+ * Split-Zugehörigkeit (`splitFromId`) und `deletedAt` werden dabei ebenfalls entfernt.
+ *
+ * @param {Transaction} tx - Die zurückzusetzende Transaktion
+ * @returns {Transaction} Neues Transaktionsobjekt mit wiederhergestellten Original-Feldern
+ * @example
+ * const restored = resetTransactionToOriginal(modifiedTx);
+ */
+export function resetTransactionToOriginal(tx: Transaction): Transaction {
+  const { splitFromId: _splitFromId, deletedAt: _deletedAt, ...rest } = tx;
+  return {
+    ...rest,
+    value: tx.originalValue ?? tx.value,
+    subject: tx.originalSubject ?? tx.subject,
+    receiver: tx.originalReceiver ?? tx.receiver,
+    issuer: tx.originalIssuer ?? tx.issuer,
+    valueDate: tx.originalValueDate ?? tx.valueDate,
+    bookingDate: tx.originalBookingDate ?? tx.bookingDate,
+    accountId: tx.originalAccountId ?? tx.accountId,
+    iban: tx.originalIban ?? tx.iban,
+    categoryId: null,
+    bucketId: null,
+    assignmentSource: 'unassigned',
+  };
 }
 
 /**
@@ -278,12 +308,14 @@ export interface TransactionFilterOptions {
  * @returns {Transaction[]} Eine neue sortierte Liste von Transaktionen
  */
 export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
-  // Split-Kinder sammeln
+  const idsInList = new Set(txList.map((t) => t.id));
+
+  // Split-Kinder sammeln (nur wenn der zugehörige Parent ebenfalls in txList vorhanden ist)
   const childrenByParent = new Map<string, Transaction[]>();
   const rootTransactions: Transaction[] = [];
 
   for (const tx of txList) {
-    if (tx.splitFromId) {
+    if (tx.splitFromId && idsInList.has(tx.splitFromId)) {
       const list = childrenByParent.get(tx.splitFromId) || [];
       list.push(tx);
       childrenByParent.set(tx.splitFromId, list);
@@ -326,7 +358,6 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
   }
 
   const result: Transaction[] = [];
-  const handledChildren = new Set<string>();
 
   for (const root of rootTransactions) {
     result.push(root);
@@ -334,21 +365,8 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
     if (children) {
       for (const child of children) {
         result.push(child);
-        handledChildren.add(child.id);
       }
     }
-  }
-
-  // Verwaiste Split-Kinder (falls Parent durch Filterung nicht in txList ist)
-  const remainingChildren: Transaction[] = [];
-  for (const tx of txList) {
-    if (tx.splitFromId && !handledChildren.has(tx.id)) {
-      remainingChildren.push(tx);
-    }
-  }
-  if (remainingChildren.length > 0) {
-    remainingChildren.sort(compareBase);
-    result.push(...remainingChildren);
   }
 
   return result;
@@ -366,4 +384,6 @@ export interface FinanceConfigExport {
   buckets?: Category[];
   /** Manuell erstellte Buchungen, Splits und modifizierte Overrides */
   manualTransactions?: Transaction[];
+  /** Gelöschte Buchungen (damit sie beim Re-Import oder Gerätewechsel gelöscht bleiben) */
+  deletedTransactions?: Transaction[];
 }

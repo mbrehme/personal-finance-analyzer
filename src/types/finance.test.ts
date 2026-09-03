@@ -186,6 +186,55 @@ describe('finance domain helpers', () => {
     expect(ids).toEqual(['tx-parent', 'tx-split-child', 'tx-unrelated-1', 'tx-unrelated-2']);
   });
 
+  it('sorts orphaned split child chronologically when parent is missing/deleted', () => {
+    const tx1: Transaction = {
+      id: 'tx-1',
+      accountId: 'acc-1',
+      valueDate: '2026-09-03',
+      bookingDate: '2026-09-03',
+      issuer: 'A',
+      receiver: 'B',
+      subject: 'Newest',
+      type: 'outbound',
+      iban: '',
+      value: -10,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+    };
+    const orphanChild: Transaction = {
+      id: 'tx-orphan',
+      splitFromId: 'tx-deleted-parent',
+      accountId: 'acc-1',
+      valueDate: '2026-09-02',
+      bookingDate: '2026-09-02',
+      issuer: 'A',
+      receiver: 'B',
+      subject: 'Middle',
+      type: 'outbound',
+      iban: '',
+      value: -20,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+    };
+    const tx3: Transaction = {
+      id: 'tx-3',
+      accountId: 'acc-1',
+      valueDate: '2026-09-01',
+      bookingDate: '2026-09-01',
+      issuer: 'A',
+      receiver: 'B',
+      subject: 'Oldest',
+      type: 'outbound',
+      iban: '',
+      value: -30,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+    };
+
+    const sorted = sortTransactionsDesc([tx3, orphanChild, tx1]);
+    expect(sorted.map((t) => t.id)).toEqual(['tx-1', 'tx-orphan', 'tx-3']);
+  });
+
   it('determines virtual transaction type purely based on value sign', () => {
     // getTransactionType with numbers
     expect(getTransactionType(100)).toBe('inbound');
@@ -216,5 +265,55 @@ describe('finance domain helpers', () => {
       iban: 'DE22',
     } as Transaction);
     expect(searchOutbound).toContain('[Ausgang]');
+  });
+
+  it('resets a modified transaction back to original bank values and unassigns category', async () => {
+    const { resetTransactionToOriginal, isTransactionOverridden } = await import('./finance');
+
+    const modifiedTx: Transaction = {
+      id: 'tx-override-1',
+      accountId: 'acc-2',
+      originalAccountId: 'acc-1',
+      valueDate: '2026-08-15',
+      originalValueDate: '2026-08-10',
+      bookingDate: '2026-08-15',
+      originalBookingDate: '2026-08-10',
+      issuer: 'Manuell Sender',
+      originalIssuer: 'Bank Sender',
+      receiver: 'Manuell Empfänger',
+      originalReceiver: 'Bank Empfänger',
+      subject: 'Manuell Verwendungszweck',
+      originalSubject: 'Bank Verwendungszweck',
+      iban: 'DE9999',
+      originalIban: 'DE1111',
+      value: -100,
+      originalValue: -50,
+      categoryId: 'cat-1',
+      bucketId: 'cat-1',
+      assignmentSource: 'manual',
+      origin: 'imported',
+      splitFromId: 'tx-parent',
+      deletedAt: '2026-08-20T12:00:00.000Z',
+    };
+
+    expect(isTransactionOverridden(modifiedTx)).toBe(true);
+
+    const restored = resetTransactionToOriginal(modifiedTx);
+
+    expect(restored.id).toBe('tx-override-1');
+    expect(restored.accountId).toBe('acc-1');
+    expect(restored.valueDate).toBe('2026-08-10');
+    expect(restored.bookingDate).toBe('2026-08-10');
+    expect(restored.issuer).toBe('Bank Sender');
+    expect(restored.receiver).toBe('Bank Empfänger');
+    expect(restored.subject).toBe('Bank Verwendungszweck');
+    expect(restored.iban).toBe('DE1111');
+    expect(restored.value).toBe(-50);
+    expect(restored.categoryId).toBeNull();
+    expect(restored.bucketId).toBeNull();
+    expect(restored.assignmentSource).toBe('unassigned');
+    expect(restored.splitFromId).toBeUndefined();
+    expect(restored.deletedAt).toBeUndefined();
+    expect(isTransactionOverridden(restored)).toBe(false);
   });
 });

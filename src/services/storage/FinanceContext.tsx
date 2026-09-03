@@ -15,6 +15,7 @@ import {
   sortTransactionsDesc,
   ReMatchStatus,
   isTransactionOverridden,
+  resetTransactionToOriginal,
   CategoryAssignmentSource,
 } from '@/types/finance';
 import { financeDB } from './db';
@@ -79,6 +80,12 @@ export interface FinanceContextType {
   deleteTransaction: (transactionId: string) => Promise<void>;
   clearTransactions: () => Promise<void>;
   triggerReMatch: () => Promise<void>;
+  /** Setzt eine Transaktion auf ihre Original-Bankdaten zurück und löscht Split-Kinder */
+  resetTransaction: (transactionId: string) => Promise<void>;
+  /** Alle gelöschten Buchungen (Papierkorb) */
+  deletedTransactions: Transaction[];
+  /** Stellt eine gelöschte Buchung wieder her */
+  restoreTransaction: (transactionId: string) => Promise<void>;
 
   // Export & Import
   exportConfiguration: () => Promise<string>;
@@ -100,6 +107,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [deletedTransactions, setDeletedTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [reMatchStatus, setReMatchStatusState] = useState<ReMatchStatus>(() => {
     try {
@@ -147,6 +155,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let loadedAccounts = await financeDB.getAccounts();
       let loadedCategories = await financeDB.getCategories();
       const loadedTransactions = await financeDB.getTransactions();
+      const loadedDeleted = await financeDB.getDeletedTransactions();
+      const validDeleted: Transaction[] = [];
+
+      for (const d of loadedDeleted) {
+        if (d.origin === 'manual') {
+          // Manuelle Buchungen gehören nicht in den Papierkorb
+          await financeDB.permanentlyDeleteTransaction(d.id);
+        } else {
+          validDeleted.push(d);
+        }
+      }
 
       if (loadedCategories.length === 0) {
         await financeDB.saveCategories(SEED_CATEGORIES);
@@ -168,6 +187,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAccounts(loadedAccounts);
       setCategories(loadedCategories);
       setTransactions(sortTransactionsDesc(loadedTransactions));
+      setDeletedTransactions(sortTransactionsDesc(validDeleted));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Finanzdaten.');
     } finally {
@@ -474,6 +494,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
+    // 2. Gelöschte Buchungen als Sperre: IDs und Fingerprints aus dem Papierkorb
+    const deletedIds = new Set(deletedTransactions.map((t) => t.id));
+    const deletedFingerprints = new Set(
+      deletedTransactions.filter((t) => t.rawFingerprint).map((t) => t.rawFingerprint as string)
+    );
+
     const toInsert: Transaction[] = [];
 
     for (const rawTx of newTransactions) {
@@ -484,8 +510,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (rawTx.rawFingerprint && existingFingerprints.has(rawTx.rawFingerprint)) {
         continue;
       }
+      // Gelöschte Buchungen ignorieren (Tombstone)
+      if (deletedIds.has(rawTx.id)) {
+        continue;
+      }
+      if (rawTx.rawFingerprint && deletedFingerprints.has(rawTx.rawFingerprint)) {
+        continue;
+      }
 
-      // 2. Automatisches Matching gegen Kategorien anwenden
+      // 3. Automatisches Matching gegen Kategorien anwenden
       const match = matchTransaction(rawTx, categories);
       const preparedTx: Transaction = {
         ...rawTx,
@@ -557,8 +590,92 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteTransaction = async (transactionId: string): Promise<void> => {
+    const tx = transactions.find((t) => t.id === transactionId);
+    if (!tx) return;
+
+    // Nur importierte Bank-Transaktionen wandern in den Papierkorb (Gelöscht-Stapel & CSV-Tombstone).
+    // Manuell erstellte Transaktionen (origin === 'manual') werden direkt endgültig gelöscht.
+    const isManual = tx.origin === 'manual';
+
+    if (!isManual) {
+      await financeDB.saveDeletedTransaction(tx);
+    }
     await financeDB.deleteTransaction(transactionId);
+
+    // Eventuell hinterlegte manualTransactionIds in Kategorien bereinigen
+    const needsCatUpdate = categories.some(
+      (c) => c.manualTransactionIds && c.manualTransactionIds.includes(transactionId)
+    );
+    if (needsCatUpdate) {
+      const updatedCategories = categories.map((c) => ({
+        ...c,
+        manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== transactionId),
+      }));
+      await financeDB.saveCategories(updatedCategories);
+      setCategories(updatedCategories);
+    }
+
     setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
+    if (!isManual) {
+      setDeletedTransactions((prev) =>
+        sortTransactionsDesc([...prev, { ...tx, deletedAt: new Date().toISOString() }])
+      );
+    }
+  };
+
+  /**
+   * Setzt eine importierte Transaktion auf ihre Original-Bankdaten zurück.
+   * Split-Teile werden dabei nicht gelöscht, sondern bleiben als eigenständige Buchungen erhalten.
+   */
+  const resetTransaction = async (transactionId: string): Promise<void> => {
+    const tx = transactions.find((t) => t.id === transactionId);
+    if (!tx) return;
+
+    const restored = resetTransactionToOriginal(tx);
+
+    // Re-Match auf der zurückgesetzten Transaktion
+    const match = matchTransaction(restored, categories);
+    const finalTx: Transaction = {
+      ...restored,
+      categoryId: match.categoryId,
+      bucketId: match.categoryId,
+      assignmentSource: match.assignmentSource,
+    };
+
+    await financeDB.saveTransaction(finalTx);
+    setTransactions((prev) =>
+      sortTransactionsDesc(prev.map((t) => (t.id === transactionId ? finalTx : t)))
+    );
+  };
+
+  /**
+   * Stellt eine gelöschte Transaktion aus dem Papierkorb wieder her.
+   * Stellt bei modifizierten/gesplitteten Buchungen den ursprünglichen Bank-Betrag wieder her.
+   * Eventuelle Split-Teile bleiben erhalten.
+   */
+  const restoreTransaction = async (transactionId: string): Promise<void> => {
+    const tx = deletedTransactions.find((t) => t.id === transactionId);
+    if (!tx) return;
+
+    // Falls Originaldaten vorhanden sind (z. B. nach Split oder Änderung),
+    // den ursprünglichen Bank-Rohstand (inkl. Originalbetrag) wiederherstellen.
+    const restoredBase = tx.originalValue !== undefined ? resetTransactionToOriginal(tx) : tx;
+    const { deletedAt: _deletedAt, splitFromId: _splitFromId, ...withoutMetadata } = restoredBase;
+
+    // Re-Match anwenden
+    const match = matchTransaction(withoutMetadata as Transaction, categories);
+    const restoredTx: Transaction = {
+      ...(withoutMetadata as Transaction),
+      categoryId: match.categoryId,
+      bucketId: match.categoryId,
+      assignmentSource: match.assignmentSource,
+    };
+
+    await financeDB.saveTransaction(restoredTx);
+    await financeDB.permanentlyDeleteTransaction(transactionId);
+
+    setTransactions((prev) => sortTransactionsDesc([...prev, restoredTx]));
+    setDeletedTransactions((prev) => prev.filter((t) => t.id !== transactionId));
   };
 
   const clearTransactions = async (): Promise<void> => {
@@ -599,6 +716,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       categories,
       buckets: categories,
       manualTransactions,
+      deletedTransactions,
     };
     return JSON.stringify(exportData, null, 2);
   };
@@ -617,6 +735,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const merged = prev.filter((p) => !existingIds.has(p.id)).concat(manualTxs);
         return sortTransactionsDesc(merged);
       });
+    }
+
+    if (Array.isArray(parsed.deletedTransactions)) {
+      setDeletedTransactions(sortTransactionsDesc(parsed.deletedTransactions));
     }
 
     setReMatchStatus('needs_reprogress');
@@ -641,6 +763,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAccounts(seededAccounts);
       setCategories(SEED_CATEGORIES);
       setTransactions([]);
+      setDeletedTransactions([]);
       setReMatchStatus('has_progressed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Zurücksetzen der Finanzdaten.');
@@ -686,6 +809,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteTransaction,
         clearTransactions,
         triggerReMatch,
+        resetTransaction,
+        deletedTransactions,
+        restoreTransaction,
         exportConfiguration,
         importConfiguration,
         resetWorkspace,

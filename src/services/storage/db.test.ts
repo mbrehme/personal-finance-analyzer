@@ -179,4 +179,50 @@ describe('financeDB Storage Layer', () => {
     const sanitized = financeDB.sanitizeForPersistence(loaded[0]);
     expect(Object.prototype.hasOwnProperty.call(sanitized, 'type')).toBe(false);
   });
+
+  it('saves, retrieves, exports, and imports deleted transactions', async () => {
+    const deletedTx: Transaction = {
+      id: 'tx-del-1',
+      accountId: 'acc-1',
+      valueDate: '2026-08-01',
+      bookingDate: '2026-08-01',
+      issuer: 'Rewe',
+      receiver: 'Me',
+      subject: 'Einkauf storniert',
+      iban: '',
+      value: -25.5,
+      assignmentSource: 'unassigned',
+      rawFingerprint: 'fp-del-1',
+    };
+
+    await financeDB.saveDeletedTransaction(deletedTx);
+    let deletedList = await financeDB.getDeletedTransactions();
+    expect(deletedList).toHaveLength(1);
+    expect(deletedList[0].id).toBe('tx-del-1');
+    expect(deletedList[0].deletedAt).toBeDefined();
+    // Virtueller Typ muss auch für gelöschte Transaktionen greifen
+    expect(deletedList[0].type).toBe('outbound');
+
+    // Export enthält deletedTransactions
+    const exported = await financeDB.exportConfiguration();
+    expect(exported.deletedTransactions).toHaveLength(1);
+    expect(exported.deletedTransactions![0].id).toBe('tx-del-1');
+    expect(Object.prototype.hasOwnProperty.call(exported.deletedTransactions![0], 'type')).toBe(
+      false
+    );
+
+    // Löschen & Re-Import
+    await financeDB.clearAll();
+    expect(await financeDB.getDeletedTransactions()).toHaveLength(0);
+
+    await financeDB.importConfiguration(exported);
+    deletedList = await financeDB.getDeletedTransactions();
+    expect(deletedList).toHaveLength(1);
+    expect(deletedList[0].id).toBe('tx-del-1');
+    expect(deletedList[0].type).toBe('outbound');
+
+    // Endgültiges Löschen
+    await financeDB.permanentlyDeleteTransaction('tx-del-1');
+    expect(await financeDB.getDeletedTransactions()).toHaveLength(0);
+  });
 });

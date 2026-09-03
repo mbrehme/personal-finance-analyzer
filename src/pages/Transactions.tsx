@@ -13,6 +13,7 @@ import {
   buildCompoundSearchField,
   sortTransactionsDesc,
   isManualTransaction,
+  isTransactionOverridden,
   getTransactionType,
   Transaction,
 } from '@/types/finance';
@@ -111,6 +112,9 @@ export const Transactions: React.FC = () => {
     deleteTransaction,
     clearTransactions,
     reMatching,
+    resetTransaction,
+    deletedTransactions = [],
+    restoreTransaction,
   } = useFinance();
 
   // Entwurfs-Filter State (Eingaben)
@@ -118,7 +122,7 @@ export const Transactions: React.FC = () => {
   const [inputAccountId, setInputAccountId] = useState<string>('all');
   const [inputCategoryId, setInputCategoryId] = useState<string>('all');
   const [inputType, setInputType] = useState<TransactionType | 'all'>('all');
-  const [inputOrigin, setInputOrigin] = useState<'all' | 'imported' | 'manual'>('all');
+  const [inputOrigin, setInputOrigin] = useState<'all' | 'imported' | 'manual' | 'deleted'>('all');
   const [inputStartDate, setInputStartDate] = useState<string>('');
   const [inputEndDate, setInputEndDate] = useState<string>('');
 
@@ -128,7 +132,7 @@ export const Transactions: React.FC = () => {
     accountId: string;
     categoryId: string;
     type: TransactionType | 'all';
-    origin: 'all' | 'imported' | 'manual';
+    origin: 'all' | 'imported' | 'manual' | 'deleted';
     startDate: string;
     endDate: string;
   }>({
@@ -233,9 +237,36 @@ export const Transactions: React.FC = () => {
     [transactions]
   );
 
+  // Anzahl Buchungen je Quellen-Option (für Anzeige in Klammern im Dropdown)
+  const originCounts = useMemo(() => {
+    let imported = 0;
+    let manual = 0;
+    for (const tx of transactions) {
+      if (tx.origin !== 'manual' || Boolean(tx.splitFromId)) imported++;
+      if (isManualTransaction(tx)) manual++;
+    }
+    return {
+      imported,
+      manual,
+      deleted: deletedTransactions.length,
+    };
+  }, [transactions, deletedTransactions]);
+
   // Gefilterte Transaktionen basierend auf angewandten Filtern
   const filteredTransactions = useMemo(() => {
     const { searchTerm, accountId, categoryId, type, origin, startDate, endDate } = appliedFilters;
+
+    // Papierkorb-Ansicht: gelöschte Transaktionen anzeigen
+    if (origin === 'deleted') {
+      const matches = deletedTransactions.filter((tx) => {
+        if (searchTerm.trim()) {
+          const compound = buildCompoundSearchField(tx).toLowerCase();
+          if (!compound.includes(searchTerm.trim().toLowerCase())) return false;
+        }
+        return true;
+      });
+      return sortTransactionsDesc(matches);
+    }
 
     const matches = transactions.filter((tx) => {
       const txCatId = tx.categoryId ?? tx.bucketId ?? null;
@@ -271,7 +302,7 @@ export const Transactions: React.FC = () => {
       }
 
       // 4. Quelle Filter (Alle Quellen | Bank-Import | Manuell)
-      if (origin === 'imported' && tx.origin === 'manual') {
+      if (origin === 'imported' && tx.origin === 'manual' && !tx.splitFromId) {
         return false;
       }
       if (origin === 'manual' && !isManualTransaction(tx)) {
@@ -299,7 +330,7 @@ export const Transactions: React.FC = () => {
     });
 
     return sortTransactionsDesc(matches);
-  }, [transactions, appliedFilters]);
+  }, [transactions, deletedTransactions, appliedFilters]);
 
   // Reset Lazy Loading wenn angewandte Filter geändert werden
   useEffect(() => {
@@ -553,9 +584,9 @@ export const Transactions: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {/* 1. Compound Freitext-Suche */}
-          <div className="relative flex items-center lg:col-span-3">
+          <div className="relative flex min-w-0 items-center">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -567,11 +598,11 @@ export const Transactions: React.FC = () => {
           </div>
 
           {/* 2. Konto Filter */}
-          <div className="lg:col-span-2">
+          <div className="relative min-w-0">
             <select
               value={inputAccountId}
               onChange={(e) => setInputAccountId(e.target.value)}
-              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 w-full appearance-none truncate rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Konten</option>
               {accounts.map((a) => (
@@ -580,14 +611,15 @@ export const Transactions: React.FC = () => {
                 </option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           </div>
 
           {/* 3. Kategorie Filter */}
-          <div className="lg:col-span-2">
+          <div className="relative min-w-0">
             <select
               value={inputCategoryId}
               onChange={(e) => setInputCategoryId(e.target.value)}
-              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 w-full appearance-none truncate rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Zuweisungen</option>
               <option value="assigned">Zugewiesen</option>
@@ -599,43 +631,47 @@ export const Transactions: React.FC = () => {
                 </option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           </div>
 
           {/* 4. Typ Filter */}
-          <div className="lg:col-span-1">
+          <div className="relative min-w-0">
             <select
               value={inputType}
               onChange={(e) => setInputType(e.target.value as TransactionType | 'all')}
-              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 w-full appearance-none rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Typ: Alle</option>
               <option value="inbound">Einnahmen (+)</option>
               <option value="outbound">Ausgaben (-)</option>
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           </div>
 
           {/* 5. Quelle Filter */}
-          <div className="lg:col-span-1">
+          <div className="relative min-w-0">
             <select
               value={inputOrigin}
               onChange={(e) => {
-                const val = e.target.value as 'all' | 'imported' | 'manual';
+                const val = e.target.value as 'all' | 'imported' | 'manual' | 'deleted';
                 setInputOrigin(val);
                 setAppliedFilters((prev) => ({ ...prev, origin: val }));
                 setVisibleCount(PAGE_SIZE);
               }}
-              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 w-full appearance-none rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="Buchungsquelle filtern"
               aria-label="Buchungsquelle filtern"
             >
               <option value="all">Alle Quellen</option>
-              <option value="imported">Bank-Import</option>
-              <option value="manual">Manuell</option>
+              <option value="imported">Imported</option>
+              <option value="manual">Manuell ({originCounts.manual})</option>
+              <option value="deleted">Gelöscht ({originCounts.deleted})</option>
             </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           </div>
 
           {/* 6. Datums-Bereich */}
-          <div className="lg:col-span-3">
+          <div className="min-w-0">
             <DateRangePicker
               startDate={inputStartDate}
               endDate={inputEndDate}
@@ -836,33 +872,61 @@ export const Transactions: React.FC = () => {
                       {/* Aktionen */}
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenSplitModal(tx)}
-                            className="rounded p-1 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
-                            title="Buchung aufteilen (Split)"
-                            aria-label="Buchung aufteilen"
-                          >
-                            <Scissors className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(tx)}
-                            className="rounded p-1 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-                            title="Bearbeiten"
-                            aria-label="Buchung bearbeiten"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteTransaction(tx.id)}
-                            className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                            title="Löschen"
-                            aria-label="Buchung löschen"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {/* Restore-Knopf: nur im Papierkorb-Modus */}
+                          {appliedFilters.origin === 'deleted' ? (
+                            <button
+                              type="button"
+                              onClick={() => restoreTransaction(tx.id)}
+                              className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
+                              title="Buchung wiederherstellen"
+                              aria-label="Buchung wiederherstellen"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Wiederherstellen
+                            </button>
+                          ) : (
+                            <>
+                              {/* Reset-Knopf: wenn Transaktion von Originaldaten abweicht */}
+                              {isTransactionOverridden(tx) && tx.originalValue !== undefined && (
+                                <button
+                                  type="button"
+                                  onClick={() => resetTransaction(tx.id)}
+                                  className="rounded p-1 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
+                                  title="Auf Originaldaten zurücksetzen"
+                                  aria-label="Transaktion zurücksetzen"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSplitModal(tx)}
+                                className="rounded p-1 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
+                                title="Buchung aufteilen (Split)"
+                                aria-label="Buchung aufteilen"
+                              >
+                                <Scissors className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(tx)}
+                                className="rounded p-1 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                title="Bearbeiten"
+                                aria-label="Buchung bearbeiten"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteTransaction(tx.id)}
+                                className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                title="Löschen"
+                                aria-label="Buchung löschen"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -871,7 +935,9 @@ export const Transactions: React.FC = () => {
               ) : (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-sm text-slate-400">
-                    Keine passenden Buchungen gefunden. Lade eine CSV-Datei hoch!
+                    {appliedFilters.origin === 'deleted'
+                      ? 'Keine gelöschten Buchungen im Papierkorb.'
+                      : 'Keine passenden Buchungen gefunden. Lade eine CSV-Datei hoch!'}
                   </td>
                 </tr>
               )}

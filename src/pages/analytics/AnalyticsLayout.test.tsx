@@ -30,7 +30,10 @@ describe('AnalyticsLayout', () => {
   it('renders global header, tabs and outlet with default filters', () => {
     render(
       <FinanceProvider>
-        <MemoryRouter initialEntries={['/analytics/cashflow']}>
+        <MemoryRouter
+          initialEntries={['/analytics/cashflow']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <Routes>
             <Route path="/analytics" element={<AnalyticsLayout />}>
               <Route path="cashflow" element={<DummyChild />} />
@@ -52,7 +55,10 @@ describe('AnalyticsLayout', () => {
 
     render(
       <FinanceProvider>
-        <MemoryRouter initialEntries={['/analytics/cashflow']}>
+        <MemoryRouter
+          initialEntries={['/analytics/cashflow']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <Routes>
             <Route path="/analytics" element={<AnalyticsLayout />}>
               <Route path="cashflow" element={<DummyChild />} />

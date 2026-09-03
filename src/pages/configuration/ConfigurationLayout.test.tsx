@@ -13,7 +13,10 @@ import { FinanceProvider } from '@/services/storage/FinanceContext';
 describe('ConfigurationLayout', () => {
   it('renders header, export/import buttons and subpage tabs', async () => {
     render(
-      <MemoryRouter initialEntries={['/configuration/categories']}>
+      <MemoryRouter
+        initialEntries={['/configuration/categories']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <FinanceProvider>
           <Routes>
             <Route path="/configuration" element={<ConfigurationLayout />}>

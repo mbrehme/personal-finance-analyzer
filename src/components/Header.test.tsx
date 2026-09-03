@@ -59,7 +59,7 @@ describe('Header', () => {
     });
 
     render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Header />
       </BrowserRouter>
     );
@@ -82,7 +82,7 @@ describe('Header', () => {
     });
 
     render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Header />
       </BrowserRouter>
     );
@@ -104,7 +104,7 @@ describe('Header', () => {
     });
 
     render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Header />
       </BrowserRouter>
     );

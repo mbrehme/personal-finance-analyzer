@@ -22,7 +22,10 @@ import { getCurrentPeriodKey } from '@/utils/dateUtils';
 
 const renderInAnalytics = (ui: React.ReactElement = <Cashflow />) => {
   return render(
-    <MemoryRouter initialEntries={['/analytics/cashflow']}>
+    <MemoryRouter
+      initialEntries={['/analytics/cashflow']}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/analytics" element={<AnalyticsLayout />}>
           <Route path="cashflow" element={ui} />
@@ -35,7 +38,10 @@ const renderInAnalytics = (ui: React.ReactElement = <Cashflow />) => {
 const renderWithProvider = (ui: React.ReactElement = <Cashflow />) => {
   return render(
     <FinanceProvider>
-      <MemoryRouter initialEntries={['/analytics/cashflow']}>
+      <MemoryRouter
+        initialEntries={['/analytics/cashflow']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <Routes>
           <Route path="/analytics" element={<AnalyticsLayout />}>
             <Route path="cashflow" element={ui} />

@@ -8,14 +8,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useFinance } from '@/services/storage/FinanceContext';
-import {
-  Wallet,
-  Layers,
-  Receipt,
-  BarChart3,
-  Shield,
-  Loader2,
-} from 'lucide-react';
+import { Wallet, Layers, Receipt, BarChart3, Shield, Loader2 } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { reMatchStatus, triggerReMatch } = useFinance();
@@ -37,7 +30,7 @@ export const Header: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-base font-bold text-slate-900">Finance Analyzer</span>
-            <span className="hidden rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-semibold text-emerald-700 sm:inline-flex items-center gap-1">
+            <span className="hidden items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 sm:inline-flex">
               <Shield className="h-3 w-3 text-emerald-600" />
               100% Client-Side
             </span>
@@ -74,35 +67,31 @@ export const Header: React.FC = () => {
               reMatchStatus === 'needs_reprogress'
                 ? 'Regeln oder Konfiguration wurden geändert. Klicke hier, um alle Buchungen neu zuzuordnen.'
                 : reMatchStatus === 'is_reprogressing'
-                ? 'Buchungen werden aktuell neu zugeordnet...'
-                : 'Alle Buchungen sind synchronisiert. Klicke für ein erneutes manuelles Matching.'
+                  ? 'Buchungen werden aktuell neu zugeordnet...'
+                  : 'Alle Buchungen sind synchronisiert. Klicke für ein erneutes manuelles Matching.'
             }
-            className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs transition-all ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-all ${
               reMatchStatus === 'needs_reprogress'
-                ? 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 shadow-sm font-semibold'
+                ? 'border border-amber-300 bg-amber-50 font-semibold text-amber-900 shadow-sm hover:bg-amber-100'
                 : reMatchStatus === 'is_reprogressing'
-                ? 'bg-blue-50 text-blue-800 border border-blue-200 cursor-wait font-medium'
-                : 'text-slate-600 bg-white hover:bg-slate-100 border border-slate-200/80 shadow-sm hover:text-slate-900 font-medium disabled:opacity-40'
+                  ? 'cursor-wait border border-blue-200 bg-blue-50 font-medium text-blue-800'
+                  : 'border border-slate-200/80 bg-white font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40'
             }`}
           >
             {/* Status-Icon / Indikator */}
             {reMatchStatus === 'is_reprogressing' ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-600" />
             ) : reMatchStatus === 'needs_reprogress' ? (
               <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
               </span>
             ) : (
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
             )}
 
             {/* Kompaktes Label */}
-            <span>
-              {reMatchStatus === 'is_reprogressing'
-                ? 'Progressing...'
-                : 'Reprogress'}
-            </span>
+            <span>{reMatchStatus === 'is_reprogressing' ? 'Progressing...' : 'Reprogress'}</span>
           </button>
         </div>
       </div>

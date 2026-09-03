@@ -26,4 +26,3 @@ describe('AccountsConfig Subpage', () => {
     expect(screen.getByText(/Stichtag:/i)).toBeInTheDocument();
   });
 });
-

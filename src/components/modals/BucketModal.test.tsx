@@ -14,12 +14,7 @@ describe('BucketModal', () => {
     const handleClose = vi.fn();
 
     render(
-      <BucketModal
-        isOpen={true}
-        onClose={handleClose}
-        onSave={handleSave}
-        existingBuckets={[]}
-      />
+      <BucketModal isOpen={true} onClose={handleClose} onSave={handleSave} existingBuckets={[]} />
     );
 
     expect(screen.getByText('Neuen Bucket anlegen')).toBeInTheDocument();
@@ -45,12 +40,7 @@ describe('BucketModal', () => {
     const handleSave = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <BucketModal
-        isOpen={true}
-        onClose={vi.fn()}
-        onSave={handleSave}
-        existingBuckets={[]}
-      />
+      <BucketModal isOpen={true} onClose={vi.fn()} onSave={handleSave} existingBuckets={[]} />
     );
 
     expect(screen.getByText('Neuen Bucket anlegen')).toBeInTheDocument();

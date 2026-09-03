@@ -1,17 +1,19 @@
 # Plan: Personal Finance Analyzer – Lokale Finanzverwaltung & Analyse
 
-* **Status:** Abgeschlossen
-* **Erstellt am:** 2026-09-02
-* **Abgeschlossen am:** 2026-09-02
-* **Bearbeiter:** Antigravity & Entwickler-Team
+- **Status:** Abgeschlossen
+- **Erstellt am:** 2026-09-02
+- **Abgeschlossen am:** 2026-09-02
+- **Bearbeiter:** Antigravity & Entwickler-Team
 
 ---
 
 ## 1. Ziel & Übersicht
+
 Entwicklung einer 100% lokalen, datenschutzfreundlichen Frontend-Anwendung zur Verwaltung, Kategorisierung und Analyse von Finanzdaten.
 Sämtliche Daten (Konten, Buchungen, Kategorien/Buckets) verbleiben ausschließlich im Browser des Nutzers (Local-First via IndexedDB/LocalStorage) und werden clientseitig verarbeitet.
 
 Die Anwendung gliedert sich in vier Kernbereiche:
+
 1. **Configuration (`/configuration`):** Verwaltung von hierarchischen Buckets (inkl. Regex-Matching, Soll-Budgets, JSON Import/Export) und Konten mit historischen Balance-Einträgen.
 2. **Data / Transactions (`/transactions`):** CSV-Upload mit flexiblem Spalten-Mapper, automatisches Regex-Bucket-Matching und erweiterte Filter- und Tabellenansichten.
 3. **Cashflow (`/cashflow`):** Einkommens- und Ausgabenmatrix auf Bucket- und Account-Ebene über frei wählbare Zeiträume und Granularitäten (Monat, Quartal, Halbjahr, Jahr) mit Soll-Ist-Vergleich.
@@ -22,10 +24,12 @@ Die Anwendung gliedert sich in vier Kernbereiche:
 ## 2. Anforderungen & User Stories
 
 ### A. Datenschutz & Speicherung (Local-First)
+
 - [x] Alle Transaktionen, Buckets und Konten werden im Browser persistiert (IndexedDB).
 - [x] Vollständiger JSON-Export und -Import der gesamten Konfiguration und Transaktionsdaten.
 
 ### B. Configuration (Buckets & Accounts)
+
 - [x] **Hierarchische Buckets:** Baumstruktur (Parent- & Child-Buckets) mit auf-/zuklappbarer Tabellendarstellung.
 - [x] **Kein fester Bucket-Typ:** Buckets besitzen keinen festen Typ (`income/expense`), sondern dienen als flexible Cluster.
 - [x] **Regex-Kategorisierung:** Regex-Regeln können ausschließlich für Child-/Leaf-Buckets definiert werden (Verwendungszweck, Empfänger, IBAN).
@@ -34,6 +38,7 @@ Die Anwendung gliedert sich in vier Kernbereiche:
 - [x] **Accounts & Balance-Einträge:** Anlegen von Konten und Erfassen von Stichtags-Salden (Stand zu Datum X mit `ISODateString`).
 
 ### C. Data (Transactions & CSV Import)
+
 - [x] **CSV-Importer:** Intelligenter Import mit automatischer Erkennung und manuellem Spalten-Mapping (`valueDate`, `bookingDate`, `issuer`, `receiver`, `subject`, `type`, `iban`, `value`).
 - [x] **Uniqueness:** Sicherstellen, dass Transaktionen unique sind (eindeutige ID aus Hash/Kombination relevanter Spalten).
 - [x] **Auto-Bucket-Matching:** Automatische Zuordnung von Transaktionen zu Buckets bei Import sowie bei Änderung der Regex-Konfiguration.
@@ -41,11 +46,13 @@ Die Anwendung gliedert sich in vier Kernbereiche:
 - [x] **Manueller Eingriff:** Möglichkeit, Transaktionen manuell einem Bucket zuzuordnen (mit `manualBucketOverride`), was in der Konfiguration gespeichert und exportiert wird.
 
 ### D. Cashflow-Analyse
+
 - [x] **Matrix-Ansicht:** Zeilen = Buckets (collapsible, Kindersummen rollen zu Eltern hoch), Spalten = Zeitperioden (`YearMonthString` bzw. Periodenschlüssel).
 - [x] **Granularität:** Umschaltbar zwischen Monat, Quartal, Halbjahr und Jahr.
 - [x] **Soll-Ist-Abgleich:** Gegenüberstellung der tatsächlichen Ausgaben/Einnahmen mit den Bucket-Sollwerten.
 
 ### E. Balances (Kontostände)
+
 - [x] **Verlaufsanalyse:** Rekonstruktion und Darstellung des Kontostands über Zeitintervalle basierend auf hinterlegten Stichtagssalden und Cashflows.
 - [x] Umschaltbare Granularität und Filterung nach Konten.
 
@@ -54,6 +61,7 @@ Die Anwendung gliedert sich in vier Kernbereiche:
 ## 3. Technische Konzeption & Betroffene Komponenten
 
 ### Datenmodell & Types (`src/types/finance.ts`)
+
 ```ts
 /**
  * Streng typisierter ISO-Datumsstring im Format YYYY-MM-DD (z. B. '2026-09-02').
@@ -158,14 +166,14 @@ export interface Transaction {
   /** Eindeutige, deterministische ID (generiert aus Datum, Betrag, IBAN, Text) */
   id: string;
   accountId: string;
-  valueDate: ISODateString;   // Valuta-Datum
+  valueDate: ISODateString; // Valuta-Datum
   bookingDate: ISODateString; // Buchungsdatum
   issuer: string;
   receiver: string;
   subject: string;
   type: TransactionType;
   iban: string;
-  value: number;              // Positiver (Inbound) oder negativer (Outbound) Betrag
+  value: number; // Positiver (Inbound) oder negativer (Outbound) Betrag
   bucketId: string | null;
   /**
    * Zuweisungs-Herkunft:
@@ -197,15 +205,7 @@ export interface TransactionFilterOptions {
  * Format: `${accountId} | ${issuer} | ${receiver} | ${subject} | ${type} | ${value} | ${iban}`
  */
 export function buildCompoundSearchField(tx: Transaction): string {
-  return [
-    tx.accountId,
-    tx.issuer,
-    tx.receiver,
-    tx.subject,
-    tx.type,
-    tx.value.toString(),
-    tx.iban,
-  ]
+  return [tx.accountId, tx.issuer, tx.receiver, tx.subject, tx.type, tx.value.toString(), tx.iban]
     .filter(Boolean)
     .join(' | ');
 }
@@ -222,6 +222,7 @@ export interface FinanceConfigExport {
 ```
 
 ### Date-Utilities (`src/utils/dateUtils.ts`)
+
 - `isValidDateString(dateStr: string): dateStr is ISODateString`
 - `toISODateString(dateInput: Date | string | number): ISODateString`
 - `formatDate(dateStr: ISODateString): string`
@@ -230,20 +231,22 @@ export interface FinanceConfigExport {
 - `normalizeBudgetToGranularity(amount: number, from: PeriodGranularity, to: PeriodGranularity): number`
 
 ### State- & Speicher-Layer (`src/services/storage/`)
+
 - `db.ts`: IndexedDB-Wrapper zur schnellen und unbegrenzten lokalen Speicherung von Accounts, Buckets und Transaktionen.
 - `matcher.ts`: Regex-Evaluator, der Transaktionen gegen Child-Buckets matcht.
 - `csvParser.ts`: Robuster CSV-Parser mit Erkennung von Trennzeichen (Semikolon, Komma), Datumsformaten (`DD.MM.YYYY`, `YYYY-MM-DD`) und deutschen Zahlenformaten (`1.234,56`).
 - `FinanceContext.tsx`: React Context State mit persistenten CRUD-Operationen für Accounts, Buckets und Transaktionen.
 
 ### Komponenten & Seiten
-* **`src/components/`:**
+
+- **`src/components/`:**
   - `Header.tsx`: Navigation erweitert um `/configuration`, `/transactions`, `/cashflow`, `/balances`.
   - `TreeTable/`: Generische einklappbare Baumtabelle für Buckets und Cashflow.
   - `CsvImportModal/`: Dialog mit Datei-Upload, Spalten-Vorschau und Zuordnungs-Assistent.
   - `BucketModal/`: Dialog zum Erstellen/Bearbeiten von Buckets inkl. Regex und Soll-Budget.
   - `AccountModal/`: Dialog zum Verwalten von Konten und Kontostands-Stichtagen.
   - `PeriodSelector.tsx`: Dropdown/Tabs für Granularität (Monat, Quartal, Halbjahr, Jahr).
-* **`src/pages/`:**
+- **`src/pages/`:**
   - `Configuration.tsx`: Tabs für Buckets (Baumtabelle, Regex, Budgets) und Kontoverwaltung.
   - `Transactions.tsx`: Filterleiste, Upload-Trigger und Transaktionstabelle.
   - `Cashflow.tsx`: Matrix-Tabelle (Einnahmen/Ausgaben nach Buckets über Zeitachsen).
@@ -252,7 +255,7 @@ export interface FinanceConfigExport {
 ---
 
 ## 4. Schrittweiser Umsetzungsplan
- 
+
 1. [x] **Schritt 1: Domain-Modell & Local-First Storage Layer**
    - Datei: `src/types/finance.ts` & `src/utils/dateUtils.ts` (vollständige Interfaces & ISODateString-Helfer)
    - Datei: `src/services/storage/db.ts` & `src/services/storage/FinanceContext.tsx`
@@ -293,11 +296,13 @@ export interface FinanceConfigExport {
 ## 5. Verifikationsplan
 
 ### Automatisierte Tests
+
 - [ ] Unit-Tests für Regex-Matching, CSV-Parsing und Aggregation (`pnpm test`)
 - [ ] Testabdeckung prüfen (`pnpm test:coverage`)
 - [ ] TypeScript Check & Production Build (`pnpm build`)
 
 ### Manuelle Verifikation im Browser (`pnpm dev`)
+
 - [ ] Konten und verschachtelte Buckets mit Regex anlegen und als JSON exportieren/importieren.
 - [ ] Beispiel-Bank-CSV importieren und automatische Zuweisung zu Buckets prüfen.
 - [ ] Im Cashflow zwischen Monaten, Quartalen, Halbjahren und Jahren wechseln und aggregierte Summen auf Parent-Ebene verifizieren.

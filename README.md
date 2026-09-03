@@ -7,28 +7,34 @@ Ein schlankes, modulares und typensicheres Frontend-Projekt zur Analyse von Einn
 ## 🚀 Schnellstart
 
 ### 1. Abhängigkeiten installieren
+
 ```bash
 pnpm install
 ```
 
 ### 2. Entwicklungsserver starten
+
 ```bash
 pnpm dev
 ```
+
 Das Projekt öffnet standardmäßig unter [http://localhost:5173](http://localhost:5173).
 
 ### 3. Tests ausführen
+
 ```bash
 pnpm test          # Einmaliger Testlauf (wird auch im Pre-Commit Hook ausgeführt)
 pnpm test:watch    # Interaktiver Watch-Modus
 ```
 
 ### 4. Production Build & TypeScript Check
+
 ```bash
 pnpm build
 ```
 
 ### 5. Build-Vorschau starten
+
 ```bash
 pnpm preview
 ```
@@ -98,6 +104,7 @@ personal-finance-analyzer/
 Der Alias `@/*` verweist direkt auf das Verzeichnis `src/` (konfiguriert in `tsconfig.json` und `vite.config.ts`).
 
 **Beispiel:**
+
 ```tsx
 import { Button } from '@/components/Button';
 import { financeService } from '@/services/api';
@@ -109,24 +116,27 @@ import { financeService } from '@/services/api';
 
 Das Repository verwaltet Architekturentscheidungen und künftige Feature-Planungen strukturiert im Ordner `docs/`:
 
-* **`docs/architecture/`**: Dokumentiert langfristige Entscheidungen als **ADRs** (Architecture Decision Records) mit [Vorlage](docs/architecture/template.md) und Historie (z. B. `0001-frontend-architecture-and-stack.md`).
-* **`docs/plans/active/`**: Aktuelle Feature-Pläne, die gerade vom Agenten / Entwickler umgesetzt werden.
-* **`docs/plans/archive/`**: Erfolgreich umgesetzte und archivierte Feature-Pläne.
+- **`docs/architecture/`**: Dokumentiert langfristige Entscheidungen als **ADRs** (Architecture Decision Records) mit [Vorlage](docs/architecture/template.md) und Historie (z. B. `0001-frontend-architecture-and-stack.md`).
+- **`docs/plans/active/`**: Aktuelle Feature-Pläne, die gerade vom Agenten / Entwickler umgesetzt werden.
+- **`docs/plans/archive/`**: Erfolgreich umgesetzte und archivierte Feature-Pläne.
 
 ---
 
 ## 🧪 Testing & Test-Struktur
 
 ### Test-Philosophie (Co-Location)
+
 Tests liegen als **Co-Located Files** direkt neben den dazugehörigen Quellcode-Dateien (z. B. `Button.test.tsx` neben `Button.tsx`).
 
-* **Vorteil:** Beim Verschieben, Umbenennen oder Löschen von Komponenten bleiben Code und Tests stets synchron.
-* **Globales Setup:** Geteilte Mocks und Matcher-Initialisierungen liegen zentral unter `src/test/setup.ts`.
+- **Vorteil:** Beim Verschieben, Umbenennen oder Löschen von Komponenten bleiben Code und Tests stets synchron.
+- **Globales Setup:** Geteilte Mocks und Matcher-Initialisierungen liegen zentral unter `src/test/setup.ts`.
 
 ### Was ist `happy-dom`?
+
 Anstelle des schwereren `jsdom` nutzt das Projekt **`happy-dom`**. Es emuliert die Browser-DOM-APIs (`window`, `document`, Events) direkt in Node.js, ist **2–3x schneller**, verbraucht minimalen Speicher und ist für moderne ESM-Module optimiert.
 
 ### Test-Befehle:
+
 ```bash
 # Alle Tests einmalig ausführen:
 pnpm test
@@ -153,6 +163,7 @@ Das Projekt erzwingt über **Husky** und **Commitlint** das [Conventional Commit
 ```
 
 ### Gültige Commit-Typen:
+
 - `feat:` Neues Feature (erhöht **MINOR** Version, z. B. `0.1.0` ➔ `0.2.0`)
 - `fix:` Bugfix / Fehlerbehebung (erhöht **PATCH** Version, z. B. `0.1.0` ➔ `0.1.1`)
 - `BREAKING CHANGE:` im Footer oder `!` nach dem Typ erhöht **MAJOR** Version (`1.0.0`)
@@ -165,6 +176,7 @@ Das Projekt erzwingt über **Husky** und **Commitlint** das [Conventional Commit
 - `chore:` Allgemeine Hilfsaufgaben
 
 ### Interaktiver Commit-Assistent:
+
 ```bash
 pnpm commit
 ```
@@ -176,6 +188,7 @@ pnpm commit
 Mit `commit-and-tag-version` werden Versionen nach [SemVer](https://semver.org/) automatisch berechnet, ein `CHANGELOG.md` mit Release Notes generiert und Git-Tags gesetzt.
 
 ### Release erstellen:
+
 ```bash
 # Automatische Erkennung (Patch/Minor/Major basierend auf Commits seit letztem Release):
 pnpm release
@@ -190,13 +203,16 @@ pnpm release:dry-run
 ```
 
 ### Was `pnpm release` automatisch erledigt:
+
 1. Version in `package.json` nach SemVer erhöhen.
 2. `CHANGELOG.md` mit gruppierten Release Notes (Features, Fixes, Breaking Changes, etc.) erstellen bzw. erweitern.
 3. Commit für den Release erzeugen.
 4. Git-Tag (z. B. `v0.2.0`) erstellen.
 
 Nach dem Release können die Änderungen und Tags übertragen werden:
+
 ```bash
 git push --follow-tags origin main
 ```
+
 (Ein GitHub Actions Workflow in `.github/workflows/release.yml` erstellt bei Tag-Pushes automatisch auch ein entsprechendes GitHub Release.)

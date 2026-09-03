@@ -12,13 +12,7 @@ import { normalizeBudgetToGranularity } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/components/IconRenderer';
 import { BucketModal } from '@/components/modals/BucketModal';
-import {
-  FolderPlus,
-  ChevronRight,
-  ChevronDown,
-  GripVertical,
-  CornerDownRight,
-} from 'lucide-react';
+import { FolderPlus, ChevronRight, ChevronDown, GripVertical, CornerDownRight } from 'lucide-react';
 
 /**
  * Rekursive Ermittlung aller Nachkommen (IDs) eines Buckets zur Verhinderung von Zyklen.
@@ -42,13 +36,7 @@ function getDescendantBucketIds(bucketId: string, allBuckets: Bucket[]): Set<str
 }
 
 export const BucketsConfig: React.FC = () => {
-  const {
-    buckets,
-    addBucket,
-    updateBucket,
-    deleteBucket,
-    reorderBuckets,
-  } = useFinance();
+  const { buckets, addBucket, updateBucket, deleteBucket, reorderBuckets } = useFinance();
 
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
 
@@ -158,9 +146,7 @@ export const BucketsConfig: React.FC = () => {
 
     if (dropPosition === 'inside') {
       // Bucket wird Kind des Ziel-Buckets
-      const siblings = (childrenMap.get(targetBucket.id) || []).filter(
-        (b) => b.id !== dragged.id
-      );
+      const siblings = (childrenMap.get(targetBucket.id) || []).filter((b) => b.id !== dragged.id);
       const newOrder = siblings.length;
 
       updatedBuckets = buckets.map((b) => {
@@ -176,9 +162,7 @@ export const BucketsConfig: React.FC = () => {
     } else {
       // Bucket wird Geschwister vor/nach dem Ziel-Bucket
       const parentId = targetBucket.parentId;
-      const currentSiblings = (childrenMap.get(parentId) || []).filter(
-        (b) => b.id !== dragged.id
-      );
+      const currentSiblings = (childrenMap.get(parentId) || []).filter((b) => b.id !== dragged.id);
       const targetIndex = currentSiblings.findIndex((b) => b.id === targetBucket.id);
 
       const insertIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
@@ -290,21 +274,21 @@ export const BucketsConfig: React.FC = () => {
             setEditingBucket(bucket);
             setIsBucketModalOpen(true);
           }}
-          className={`hover:bg-blue-50/60 cursor-pointer transition-all border-b border-slate-100 group ${
-            isDraggingThis ? 'opacity-40 bg-slate-100' : ''
+          className={`group cursor-pointer border-b border-slate-100 transition-all hover:bg-blue-50/60 ${
+            isDraggingThis ? 'bg-slate-100 opacity-40' : ''
           } ${dropHighlightClass}`}
           title="Klicken zum Bearbeiten &bull; Ziehen zum Umsortieren / Unterordnen"
         >
           {/* Bucket Name */}
-          <td className="py-3 px-4 w-[280px] shrink-0">
+          <td className="w-[280px] shrink-0 px-4 py-3">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 24}px` }}>
               {/* Drag Handle */}
               <div
-                className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 p-0.5 -ml-1 rounded transition-colors"
+                className="-ml-1 cursor-grab rounded p-0.5 text-slate-400 transition-colors hover:text-slate-700 active:cursor-grabbing"
                 onClick={(e) => e.stopPropagation()}
                 title="Ziehen zum Umsortieren / Unterordnen"
               >
-                <GripVertical className="w-4 h-4" />
+                <GripVertical className="h-4 w-4" />
               </div>
 
               {hasChildren ? (
@@ -314,52 +298,55 @@ export const BucketsConfig: React.FC = () => {
                     e.stopPropagation();
                     toggleCollapse(bucket.id);
                   }}
-                  className="p-1 hover:bg-slate-200 rounded text-slate-500"
+                  className="rounded p-1 text-slate-500 hover:bg-slate-200"
                 >
-                  {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
                 </button>
               ) : (
                 <div className="w-6" />
               )}
               <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white group-hover:scale-105 transition-transform shrink-0"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white transition-transform group-hover:scale-105"
                 style={{ backgroundColor: bucket.color || '#64748b' }}
               >
-                <IconRenderer name={bucket.icon} className="w-4 h-4" />
+                <IconRenderer name={bucket.icon} className="h-4 w-4" />
               </div>
-              <span className="font-semibold text-slate-800 text-sm group-hover:text-blue-700 transition-colors truncate">
+              <span className="truncate text-sm font-semibold text-slate-800 transition-colors group-hover:text-blue-700">
                 {bucket.name}
               </span>
             </div>
           </td>
 
           {/* Regex Spalte - Flexible Spalte mit Word-Break */}
-          <td className="py-3 px-4 text-xs font-mono text-slate-600">
+          <td className="px-4 py-3 font-mono text-xs text-slate-600">
             {bucket.regexPattern ? (
-              <span className="inline-block bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 break-all leading-relaxed whitespace-normal font-mono text-[11px] shadow-sm max-w-full">
+              <span className="inline-block max-w-full whitespace-normal break-all rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 font-mono text-[11px] leading-relaxed text-slate-700 shadow-sm">
                 {bucket.regexPattern}
               </span>
             ) : hasChildren ? (
-              <span className="text-slate-400 italic text-[11px]">Roll-Up aus Unter-Buckets</span>
+              <span className="text-[11px] italic text-slate-400">Roll-Up aus Unter-Buckets</span>
             ) : (
               <span className="text-slate-300">-</span>
             )}
           </td>
 
           {/* Soll-Budget */}
-          <td className="py-3 px-4 text-xs text-slate-700 w-[180px] shrink-0 whitespace-nowrap">
+          <td className="w-[180px] shrink-0 whitespace-nowrap px-4 py-3 text-xs text-slate-700">
             {bucket.targetBudget ? (
-              <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                {formatMoney(bucket.targetBudget.amount)}{' '}
-                / {bucket.targetBudget.period === 'monthly' ? 'Monat' : bucket.targetBudget.period}
+              <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 font-semibold text-blue-700">
+                {formatMoney(bucket.targetBudget.amount)} /{' '}
+                {bucket.targetBudget.period === 'monthly' ? 'Monat' : bucket.targetBudget.period}
               </span>
             ) : hasChildren ? (
               (() => {
                 const subtreeMonthly = getSubtreeMonthlyBudget(bucket.id);
                 return subtreeMonthly > 0 ? (
-                  <span className="font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200 text-[11px]">
-                    {formatMoney(subtreeMonthly)}{' '}
-                    / Monat (Rollup)
+                  <span className="rounded border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
+                    {formatMoney(subtreeMonthly)} / Monat (Rollup)
                   </span>
                 ) : (
                   <span className="text-slate-400">Kein Budget</span>
@@ -371,9 +358,9 @@ export const BucketsConfig: React.FC = () => {
           </td>
 
           {/* Manuelle Overrides */}
-          <td className="py-3 px-4 text-xs text-slate-600 w-[160px] shrink-0 whitespace-nowrap">
+          <td className="w-[160px] shrink-0 whitespace-nowrap px-4 py-3 text-xs text-slate-600">
             {bucket.manualTransactionIds && bucket.manualTransactionIds.length > 0 ? (
-              <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full font-medium">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 font-medium text-amber-800">
                 {bucket.manualTransactionIds.length} Buchung(en)
               </span>
             ) : (
@@ -382,8 +369,7 @@ export const BucketsConfig: React.FC = () => {
           </td>
         </tr>
 
-        {!isCollapsed &&
-          children.map((child) => renderBucketRow(child, depth + 1))}
+        {!isCollapsed && children.map((child) => renderBucketRow(child, depth + 1))}
       </React.Fragment>
     );
   };
@@ -391,14 +377,15 @@ export const BucketsConfig: React.FC = () => {
   const rootBuckets = childrenMap.get(null) || [];
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden space-y-2">
-      <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+    <div className="space-y-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4">
         <div>
-          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">
             Bucket-Baumtabelle
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Ziehe Zeilen per Drag & Drop oben/unten zum Sortieren oder in die Mitte, um sie unterzuordnen.
+          <p className="mt-0.5 text-xs text-slate-400">
+            Ziehe Zeilen per Drag & Drop oben/unten zum Sortieren oder in die Mitte, um sie
+            unterzuordnen.
           </p>
         </div>
         <button
@@ -407,21 +394,21 @@ export const BucketsConfig: React.FC = () => {
             setEditingBucket(null);
             setIsBucketModalOpen(true);
           }}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
         >
-          <FolderPlus className="w-4 h-4" />
+          <FolderPlus className="h-4 w-4" />
           Neuer Bucket
         </button>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-              <th className="py-3 px-4 w-[280px]">Bucket Name</th>
-              <th className="py-3 px-4">Regex-Muster (Leafs)</th>
-              <th className="py-3 px-4 w-[180px] whitespace-nowrap">Soll-Budget</th>
-              <th className="py-3 px-4 w-[160px] whitespace-nowrap">Manuelle Overrides</th>
+            <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
+              <th className="w-[280px] px-4 py-3">Bucket Name</th>
+              <th className="px-4 py-3">Regex-Muster (Leafs)</th>
+              <th className="w-[180px] whitespace-nowrap px-4 py-3">Soll-Budget</th>
+              <th className="w-[160px] whitespace-nowrap px-4 py-3">Manuelle Overrides</th>
             </tr>
           </thead>
           <tbody>
@@ -447,13 +434,13 @@ export const BucketsConfig: React.FC = () => {
           }}
           onDragLeave={() => setIsOverRootDropzone(false)}
           onDrop={handleRootDrop}
-          className={`m-4 p-4 rounded-xl border-2 border-dashed text-center transition-all flex items-center justify-center gap-2 text-xs font-semibold ${
+          className={`m-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center text-xs font-semibold transition-all ${
             isOverRootDropzone
-              ? 'border-blue-500 bg-blue-50 text-blue-700 scale-[1.01]'
+              ? 'scale-[1.01] border-blue-500 bg-blue-50 text-blue-700'
               : 'border-slate-300 bg-slate-50/60 text-slate-500'
           }`}
         >
-          <CornerDownRight className="w-4 h-4" />
+          <CornerDownRight className="h-4 w-4" />
           Hier ablegen, um Bucket auf die oberste Ebene (Top-Level) zu verschieben
         </div>
       )}
@@ -476,4 +463,3 @@ export const BucketsConfig: React.FC = () => {
     </div>
   );
 };
-

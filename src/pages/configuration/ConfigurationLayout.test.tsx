@@ -34,4 +34,3 @@ describe('ConfigurationLayout', () => {
     expect(screen.getByText('Buckets Content')).toBeInTheDocument();
   });
 });
-

@@ -19,4 +19,3 @@ describe('financeService', () => {
     expect(transactions[0]).toHaveProperty('type');
   });
 });
-

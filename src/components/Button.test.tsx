@@ -14,4 +14,3 @@ describe('Button component', () => {
     expect(button).toHaveClass('bg-emerald-600');
   });
 });
-

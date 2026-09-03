@@ -87,4 +87,3 @@ describe('EntityVisualFields', () => {
     expect(setIcon).toHaveBeenCalledWith('Wallet');
   });
 });
-

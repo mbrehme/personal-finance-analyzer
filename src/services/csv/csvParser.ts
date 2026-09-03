@@ -131,21 +131,19 @@ export function guessColumnMapping(headers: string[]): CsvColumnMapping {
   };
 
   return {
-    valueDateColumn: findHeader([
-      /valuta/i,
-      /wertstellung/i,
-      /buchungstag/i,
-      /buchungsdatum/i,
-      /datum/i,
-      /date/i,
-      /tag/i,
-    ]) || headers[0] || '',
-    bookingDateColumn: findHeader([
-      /buchungstag/i,
-      /buchungsdatum/i,
-      /booking/i,
-      /datum/i,
-    ]),
+    valueDateColumn:
+      findHeader([
+        /valuta/i,
+        /wertstellung/i,
+        /buchungstag/i,
+        /buchungsdatum/i,
+        /datum/i,
+        /date/i,
+        /tag/i,
+      ]) ||
+      headers[0] ||
+      '',
+    bookingDateColumn: findHeader([/buchungstag/i, /buchungsdatum/i, /booking/i, /datum/i]),
     issuerColumn: findHeader([
       /auftraggeber/i,
       /zahlungspflichtiger/i,
@@ -161,42 +159,34 @@ export function guessColumnMapping(headers: string[]): CsvColumnMapping {
       /an/i,
       /partner/i,
     ]),
-    subjectColumn: findHeader([
-      /verwendungszweck/i,
-      /buchungstext/i,
-      /beschreibung/i,
-      /vorgang/i,
-      /subject/i,
-      /memo/i,
-      /details/i,
-      /text/i,
-      /umsatztext/i,
-      /info/i,
-      /zweck/i,
-    ]) || (headers.length > 1 ? headers[1] : headers[0] || ''),
-    valueColumn: findHeader([
-      /betrag/i,
-      /amount/i,
-      /umsatz/i,
-      /wert/i,
-      /saldo/i,
-      /soll/i,
-      /haben/i,
-      /preis/i,
-      /summe/i,
-    ]) || (headers.length > 2 ? headers[2] : headers[0] || ''),
-    ibanColumn: findHeader([
-      /iban/i,
-      /kontonummer/i,
-      /gegenkonto/i,
-      /konto/i,
-    ]),
-    typeColumn: findHeader([
-      /typ/i,
-      /art/i,
-      /type/i,
-      /buchungsart/i,
-    ]),
+    subjectColumn:
+      findHeader([
+        /verwendungszweck/i,
+        /buchungstext/i,
+        /beschreibung/i,
+        /vorgang/i,
+        /subject/i,
+        /memo/i,
+        /details/i,
+        /text/i,
+        /umsatztext/i,
+        /info/i,
+        /zweck/i,
+      ]) || (headers.length > 1 ? headers[1] : headers[0] || ''),
+    valueColumn:
+      findHeader([
+        /betrag/i,
+        /amount/i,
+        /umsatz/i,
+        /wert/i,
+        /saldo/i,
+        /soll/i,
+        /haben/i,
+        /preis/i,
+        /summe/i,
+      ]) || (headers.length > 2 ? headers[2] : headers[0] || ''),
+    ibanColumn: findHeader([/iban/i, /kontonummer/i, /gegenkonto/i, /konto/i]),
+    typeColumn: findHeader([/typ/i, /art/i, /type/i, /buchungsart/i]),
   };
 }
 
@@ -207,9 +197,7 @@ export function parseCurrencyValue(raw: string): number {
   if (!raw) return 0;
 
   // Bereinigen von Währungssymbolen, Leerzeichen, etc.
-  let cleaned = raw
-    .replace(/[€$£\s]/g, '')
-    .trim();
+  let cleaned = raw.replace(/[€$£\s]/g, '').trim();
 
   // Prüfen auf deutsches Format: 1.234,56 oder -1.234,56
   if (/\d+\.\d{3},\d{2}/.test(cleaned) || /,\d{2}$/.test(cleaned)) {

@@ -18,7 +18,9 @@ describe('Transactions Page', () => {
     );
 
     expect(await screen.findByPlaceholderText(/Volltextsuche/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: /Buchungen & Transaktionen/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: /Buchungen & Transaktionen/i })
+    ).toBeInTheDocument();
     expect(screen.getByText(/CSV Import/i)).toBeInTheDocument();
     expect(screen.getByText(/Filter & Suche/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Filter anwenden/i })).toBeInTheDocument();

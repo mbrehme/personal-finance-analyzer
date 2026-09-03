@@ -83,10 +83,16 @@ describe('balanceCalculator', () => {
       balanceEntries: [],
     };
 
-    const result = calculateAllBalances([account, secondAccount], transactions, 'monthly', 'acc-giro', {
-      startDate: '2026-09-01',
-      endDate: '2026-09-30',
-    });
+    const result = calculateAllBalances(
+      [account, secondAccount],
+      transactions,
+      'monthly',
+      'acc-giro',
+      {
+        startDate: '2026-09-01',
+        endDate: '2026-09-30',
+      }
+    );
 
     expect(result.periodKeys).toEqual(['2026-09']);
     expect(result.rows.length).toBe(1);

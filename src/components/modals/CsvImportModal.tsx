@@ -28,9 +28,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   accounts,
   onImport,
 }) => {
-  const [selectedAccountId, setSelectedAccountId] = useState<string>(
-    accounts[0]?.id || ''
-  );
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id || '');
   const [fileName, setFileName] = useState<string>('');
   const [parseResult, setParseResult] = useState<CsvParseResult | null>(null);
   const [mapping, setMapping] = useState<CsvColumnMapping | null>(null);
@@ -39,7 +37,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   const [importedCount, setImportedCount] = useState<number | null>(null);
 
   React.useEffect(() => {
-    if ((!selectedAccountId || !accounts.some((a) => a.id === selectedAccountId)) && accounts.length > 0) {
+    if (
+      (!selectedAccountId || !accounts.some((a) => a.id === selectedAccountId)) &&
+      accounts.length > 0
+    ) {
       setSelectedAccountId(accounts[0].id);
     }
   }, [accounts, selectedAccountId]);
@@ -60,8 +61,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
         const safeMapping: CsvColumnMapping = {
           ...parsed.suggestedMapping,
-          valueDateColumn:
-            parsed.suggestedMapping.valueDateColumn || parsed.headers[0] || '',
+          valueDateColumn: parsed.suggestedMapping.valueDateColumn || parsed.headers[0] || '',
           subjectColumn:
             parsed.suggestedMapping.subjectColumn ||
             (parsed.headers.length > 1 ? parsed.headers[1] : parsed.headers[0] || ''),
@@ -125,32 +125,32 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <UploadCloud className="w-6 h-6 text-blue-600" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+          <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
+            <UploadCloud className="h-6 w-6 text-blue-600" />
             Bank-Umsätze importieren (CSV)
           </h3>
           <button
             onClick={resetModal}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+        <div className="max-h-[80vh] space-y-5 overflow-y-auto p-6">
           {error && (
-            <div className="p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {importedCount !== null ? (
-            <div className="text-center py-8 space-y-3">
-              <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+            <div className="space-y-3 py-8 text-center">
+              <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
               <h4 className="text-base font-bold text-slate-800">
                 {importedCount} Buchung(en) erfolgreich importiert!
               </h4>
@@ -159,7 +159,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
               </p>
               <button
                 onClick={resetModal}
-                className="mt-4 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+                className="mt-4 rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
                 Fertigstellen
               </button>
@@ -168,13 +168,13 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
             <>
               {/* 1. Konto-Auswahl */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
                   Ziel-Konto für die Buchungen
                 </label>
                 <select
                   value={selectedAccountId || accounts[0]?.id || ''}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full h-10 px-3.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
@@ -186,15 +186,15 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
               {/* 2. Datei-Upload */}
               {!parseResult ? (
-                <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-blue-500 transition-colors bg-slate-50/50">
-                  <UploadCloud className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                  <p className="text-sm font-medium text-slate-700 mb-1">
+                <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-8 text-center transition-colors hover:border-blue-500">
+                  <UploadCloud className="mx-auto mb-2 h-10 w-10 text-slate-400" />
+                  <p className="mb-1 text-sm font-medium text-slate-700">
                     CSV-Datei auswählen oder hierher ziehen
                   </p>
-                  <p className="text-xs text-slate-400 mb-4">
+                  <p className="mb-4 text-xs text-slate-400">
                     Unterstützt Standard-Exporte aller deutschen und internationalen Banken
                   </p>
-                  <label className="inline-block px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-blue-700 shadow-sm transition-colors">
+                  <label className="inline-block cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700">
                     Datei wählen
                     <input
                       type="file"
@@ -206,18 +206,19 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs">
-                    <div className="flex items-center gap-2 text-blue-900 font-semibold">
-                      <FileText className="w-4 h-4 text-blue-600" />
+                  <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 text-xs">
+                    <div className="flex items-center gap-2 font-semibold text-blue-900">
+                      <FileText className="h-4 w-4 text-blue-600" />
                       <span>{fileName}</span>
                       <span className="text-blue-500">
-                        ({parseResult.rows.length} Zeilen erkannt, Trennzeichen: &apos;{parseResult.delimiter}&apos;)
+                        ({parseResult.rows.length} Zeilen erkannt, Trennzeichen: &apos;
+                        {parseResult.delimiter}&apos;)
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setParseResult(null)}
-                      className="text-blue-600 hover:underline font-medium"
+                      className="font-medium text-blue-600 hover:underline"
                     >
                       Andere Datei
                     </button>
@@ -226,18 +227,18 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                   {/* Spalten-Mapping */}
                   {mapping && (
                     <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                         Spalten-Zuordnung prüfen
                       </h4>
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div>
-                          <label className="block font-medium text-slate-600 mb-1">
+                          <label className="mb-1 block font-medium text-slate-600">
                             Wertstellungsdatum (Valuta) *
                           </label>
                           <select
                             value={mapping.valueDateColumn}
                             onChange={(e) => handleMappingChange('valueDateColumn', e.target.value)}
-                            className="w-full h-10 px-3.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                            className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             {parseResult.headers.map((h) => (
                               <option key={h} value={h}>
@@ -248,13 +249,11 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         </div>
 
                         <div>
-                          <label className="block font-medium text-slate-600 mb-1">
-                            Betrag *
-                          </label>
+                          <label className="mb-1 block font-medium text-slate-600">Betrag *</label>
                           <select
                             value={mapping.valueColumn}
                             onChange={(e) => handleMappingChange('valueColumn', e.target.value)}
-                            className="w-full h-10 px-3.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                            className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             {parseResult.headers.map((h) => (
                               <option key={h} value={h}>
@@ -265,13 +264,13 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         </div>
 
                         <div>
-                          <label className="block font-medium text-slate-600 mb-1">
+                          <label className="mb-1 block font-medium text-slate-600">
                             Verwendungszweck / Text *
                           </label>
                           <select
                             value={mapping.subjectColumn}
                             onChange={(e) => handleMappingChange('subjectColumn', e.target.value)}
-                            className="w-full h-10 px-3.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                            className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             {parseResult.headers.map((h) => (
                               <option key={h} value={h}>
@@ -282,13 +281,13 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         </div>
 
                         <div>
-                          <label className="block font-medium text-slate-600 mb-1">
+                          <label className="mb-1 block font-medium text-slate-600">
                             Empfänger (optional)
                           </label>
                           <select
                             value={mapping.receiverColumn || ''}
                             onChange={(e) => handleMappingChange('receiverColumn', e.target.value)}
-                            className="w-full h-10 px-3.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                            className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">(Nicht vorhanden)</option>
                             {parseResult.headers.map((h) => (
@@ -304,15 +303,15 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
 
                   {/* Vorschau der ersten 3 Zeilen mit ausschließlich zugeordneten Spalten */}
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                         Vorschau der zugeordneten Daten (erste 3 Zeilen)
                       </h4>
                       <span className="text-[11px] text-slate-400">
                         Zeigt nur aktiv zugeordnete CSV-Spalten
                       </span>
                     </div>
-                    <div className="border border-slate-200 rounded-xl overflow-x-auto text-xs bg-white shadow-sm">
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white text-xs shadow-sm">
                       <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50 text-slate-700">
                           <tr>
@@ -320,30 +319,36 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                               <div className="flex items-center gap-1">
                                 <span>Datum *</span>
                               </div>
-                              <div className="text-[10px] font-normal text-blue-600 font-mono truncate max-w-[140px]">
-                                {mapping?.valueDateColumn ? `↳ ${mapping.valueDateColumn}` : '(nicht gewählt)'}
+                              <div className="max-w-[140px] truncate font-mono text-[10px] font-normal text-blue-600">
+                                {mapping?.valueDateColumn
+                                  ? `↳ ${mapping.valueDateColumn}`
+                                  : '(nicht gewählt)'}
                               </div>
                             </th>
                             <th className="px-3.5 py-2.5 text-left font-semibold">
                               <div className="flex items-center gap-1">
                                 <span>Betrag *</span>
                               </div>
-                              <div className="text-[10px] font-normal text-blue-600 font-mono truncate max-w-[140px]">
-                                {mapping?.valueColumn ? `↳ ${mapping.valueColumn}` : '(nicht gewählt)'}
+                              <div className="max-w-[140px] truncate font-mono text-[10px] font-normal text-blue-600">
+                                {mapping?.valueColumn
+                                  ? `↳ ${mapping.valueColumn}`
+                                  : '(nicht gewählt)'}
                               </div>
                             </th>
                             <th className="px-3.5 py-2.5 text-left font-semibold">
                               <div className="flex items-center gap-1">
                                 <span>Verwendungszweck / Text *</span>
                               </div>
-                              <div className="text-[10px] font-normal text-blue-600 font-mono truncate max-w-[220px]">
-                                {mapping?.subjectColumn ? `↳ ${mapping.subjectColumn}` : '(nicht gewählt)'}
+                              <div className="max-w-[220px] truncate font-mono text-[10px] font-normal text-blue-600">
+                                {mapping?.subjectColumn
+                                  ? `↳ ${mapping.subjectColumn}`
+                                  : '(nicht gewählt)'}
                               </div>
                             </th>
                             {mapping?.receiverColumn && (
                               <th className="px-3.5 py-2.5 text-left font-semibold">
                                 <div>Empfänger</div>
-                                <div className="text-[10px] font-normal text-blue-600 font-mono truncate max-w-[140px]">
+                                <div className="max-w-[140px] truncate font-mono text-[10px] font-normal text-blue-600">
                                   ↳ {mapping.receiverColumn}
                                 </div>
                               </th>
@@ -352,24 +357,36 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {parseResult.rows.slice(0, 3).map((row, idx) => {
-                            const rawDate = mapping?.valueDateColumn ? row[mapping.valueDateColumn] : '';
+                            const rawDate = mapping?.valueDateColumn
+                              ? row[mapping.valueDateColumn]
+                              : '';
                             const rawValue = mapping?.valueColumn ? row[mapping.valueColumn] : '';
-                            const rawSubject = mapping?.subjectColumn ? row[mapping.subjectColumn] : '';
-                            const rawReceiver = mapping?.receiverColumn ? row[mapping.receiverColumn] : '';
+                            const rawSubject = mapping?.subjectColumn
+                              ? row[mapping.subjectColumn]
+                              : '';
+                            const rawReceiver = mapping?.receiverColumn
+                              ? row[mapping.receiverColumn]
+                              : '';
 
                             return (
                               <tr key={idx} className="hover:bg-slate-50/60">
-                                <td className="px-3.5 py-2 text-slate-800 whitespace-nowrap font-mono text-xs">
+                                <td className="whitespace-nowrap px-3.5 py-2 font-mono text-xs text-slate-800">
                                   {rawDate || <span className="text-slate-300">-</span>}
                                 </td>
-                                <td className="px-3.5 py-2 whitespace-nowrap font-semibold text-slate-900">
+                                <td className="whitespace-nowrap px-3.5 py-2 font-semibold text-slate-900">
                                   {rawValue || <span className="text-slate-300">-</span>}
                                 </td>
-                                <td className="px-3.5 py-2 text-slate-700 max-w-[260px] truncate" title={rawSubject}>
+                                <td
+                                  className="max-w-[260px] truncate px-3.5 py-2 text-slate-700"
+                                  title={rawSubject}
+                                >
                                   {rawSubject || <span className="text-slate-300">-</span>}
                                 </td>
                                 {mapping?.receiverColumn && (
-                                  <td className="px-3.5 py-2 text-slate-700 max-w-[160px] truncate" title={rawReceiver}>
+                                  <td
+                                    className="max-w-[160px] truncate px-3.5 py-2 text-slate-700"
+                                    title={rawReceiver}
+                                  >
                                     {rawReceiver || <span className="text-slate-300">-</span>}
                                   </td>
                                 )}
@@ -383,11 +400,11 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
                 <button
                   type="button"
                   onClick={resetModal}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
                 >
                   Abbrechen
                 </button>
@@ -403,13 +420,13 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                     !effectiveAccountId ||
                     importing
                   }
-                  className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-colors"
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {importing
                     ? 'Importiere...'
                     : parseResult
-                    ? `${parseResult.rows.length} Buchungen importieren`
-                    : 'Importieren'}
+                      ? `${parseResult.rows.length} Buchungen importieren`
+                      : 'Importieren'}
                 </button>
               </div>
             </>

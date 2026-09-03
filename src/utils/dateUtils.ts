@@ -17,11 +17,7 @@ export function isValidDateString(dateStr: string): dateStr is ISODateString {
   }
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
-  return (
-    date.getUTCFullYear() === y &&
-    date.getUTCMonth() === m - 1 &&
-    date.getUTCDate() === d
-  );
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
 /**
@@ -71,11 +67,7 @@ export function toISODateString(dateInput: Date | string | number): ISODateStrin
     if (dotMatch) {
       const [, day, month, rawYear] = dotMatch;
       const fullYear =
-        rawYear.length === 2
-          ? Number(rawYear) < 70
-            ? `20${rawYear}`
-            : `19${rawYear}`
-          : rawYear;
+        rawYear.length === 2 ? (Number(rawYear) < 70 ? `20${rawYear}` : `19${rawYear}`) : rawYear;
       const iso = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       if (isValidDateString(iso)) {
         return iso;
@@ -87,11 +79,7 @@ export function toISODateString(dateInput: Date | string | number): ISODateStrin
     if (slashMatch) {
       const [, day, month, rawYear] = slashMatch;
       const fullYear =
-        rawYear.length === 2
-          ? Number(rawYear) < 70
-            ? `20${rawYear}`
-            : `19${rawYear}`
-          : rawYear;
+        rawYear.length === 2 ? (Number(rawYear) < 70 ? `20${rawYear}` : `19${rawYear}`) : rawYear;
       const iso = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       if (isValidDateString(iso)) {
         return iso;
@@ -103,11 +91,7 @@ export function toISODateString(dateInput: Date | string | number): ISODateStrin
     if (dashMatch) {
       const [, day, month, rawYear] = dashMatch;
       const fullYear =
-        rawYear.length === 2
-          ? Number(rawYear) < 70
-            ? `20${rawYear}`
-            : `19${rawYear}`
-          : rawYear;
+        rawYear.length === 2 ? (Number(rawYear) < 70 ? `20${rawYear}` : `19${rawYear}`) : rawYear;
       const iso = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       if (isValidDateString(iso)) {
         return iso;
@@ -187,8 +171,18 @@ export function getCurrentPeriodKey(
  */
 export function formatPeriodLabel(periodKey: string, granularity: PeriodGranularity): string {
   const monthNames = [
-    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+    'Jan',
+    'Feb',
+    'Mär',
+    'Apr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Dez',
   ];
 
   if (granularity === 'monthly') {
@@ -240,8 +234,18 @@ export function getYearFromPeriodKey(periodKey: string): string {
  */
 export function formatSubPeriodLabel(periodKey: string, granularity: PeriodGranularity): string {
   const monthNames = [
-    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+    'Jan',
+    'Feb',
+    'Mär',
+    'Apr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Dez',
   ];
 
   if (granularity === 'monthly') {
@@ -329,9 +333,7 @@ export function fillPeriodKeyRange(
     keySet.add(upToPeriodKey);
     const targetYear = getYearFromPeriodKey(upToPeriodKey);
 
-    const keysInTargetYear = periodKeys.filter(
-      (k) => getYearFromPeriodKey(k) === targetYear
-    );
+    const keysInTargetYear = periodKeys.filter((k) => getYearFromPeriodKey(k) === targetYear);
 
     if (keysInTargetYear.length > 0) {
       if (granularity === 'monthly') {
@@ -526,8 +528,8 @@ export function getDateRangeForPreset(
     referenceDate instanceof Date
       ? referenceDate
       : typeof referenceDate === 'string' || typeof referenceDate === 'number'
-      ? new Date(referenceDate)
-      : new Date();
+        ? new Date(referenceDate)
+        : new Date();
 
   const year = ref.getFullYear();
   const month = ref.getMonth() + 1; // 1-12
@@ -686,8 +688,18 @@ export function formatDateRangeDisplay(
   }
 
   const monthNames = [
-    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+    'Jan',
+    'Feb',
+    'Mär',
+    'Apr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Dez',
   ];
 
   const preset = detectPresetForRange(startDate, endDate, referenceDate);
@@ -696,8 +708,8 @@ export function formatDateRangeDisplay(
     referenceDate instanceof Date
       ? referenceDate
       : typeof referenceDate === 'string' || typeof referenceDate === 'number'
-      ? new Date(referenceDate)
-      : new Date();
+        ? new Date(referenceDate)
+        : new Date();
   const year = ref.getFullYear();
   const month = ref.getMonth() + 1;
 

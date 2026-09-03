@@ -62,4 +62,3 @@ export function formatMoney(amount: number, options?: FormatMoneyOptions): strin
 export function roundToTwoDecimals(amount: number): number {
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 }
-

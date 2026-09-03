@@ -9,10 +9,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { FinanceProvider } from '@/services/storage/FinanceContext';
-import {
-  AnalyticsLayout,
-  ANALYTICS_GRANULARITY_KEY,
-} from './AnalyticsLayout';
+import { AnalyticsLayout, ANALYTICS_GRANULARITY_KEY } from './AnalyticsLayout';
 import { useAnalyticsFilter } from './AnalyticsContext';
 
 const DummyChild = () => {

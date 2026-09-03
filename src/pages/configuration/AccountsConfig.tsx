@@ -11,23 +11,11 @@ import { formatDate } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/components/IconRenderer';
 import { AccountModal } from '@/components/modals/AccountModal';
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  ShieldCheck,
-  GripVertical,
-} from 'lucide-react';
+import { Plus, Edit2, Trash2, ShieldCheck, GripVertical } from 'lucide-react';
 
 export const AccountsConfig: React.FC = () => {
-  const {
-    buckets,
-    accounts,
-    addAccount,
-    updateAccount,
-    deleteAccount,
-    reorderAccounts,
-  } = useFinance();
+  const { buckets, accounts, addAccount, updateAccount, deleteAccount, reorderAccounts } =
+    useFinance();
 
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -89,10 +77,10 @@ export const AccountsConfig: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">
             Verwaltete Konten ({accounts.length})
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="mt-0.5 text-xs text-slate-400">
             Ziehe Konten-Karten per Drag & Drop, um deren Reihenfolge anzupassen.
           </p>
         </div>
@@ -102,9 +90,9 @@ export const AccountsConfig: React.FC = () => {
             setEditingAccount(null);
             setIsAccountModalOpen(true);
           }}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-4 w-4" />
           Neues Konto
         </button>
       </div>
@@ -129,43 +117,47 @@ export const AccountsConfig: React.FC = () => {
                 setEditingAccount(acc);
                 setIsAccountModalOpen(true);
               }}
-              className={`bg-white p-4 sm:p-5 rounded-2xl shadow-sm border transition-all cursor-pointer group ${
-                isDraggingThis ? 'opacity-40 scale-[0.99] border-slate-200' : 'hover:border-blue-400 hover:shadow-md'
+              className={`group cursor-pointer rounded-2xl border bg-white p-4 shadow-sm transition-all sm:p-5 ${
+                isDraggingThis
+                  ? 'scale-[0.99] border-slate-200 opacity-40'
+                  : 'hover:border-blue-400 hover:shadow-md'
               } ${
-                isTarget ? 'border-t-4 border-t-blue-600 bg-blue-50/40 border-slate-200' : 'border-slate-200'
+                isTarget
+                  ? 'border-t-4 border-slate-200 border-t-blue-600 bg-blue-50/40'
+                  : 'border-slate-200'
               }`}
               title="Klicken zum Bearbeiten &bull; Ziehen zum Umsortieren"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 {/* Linker Bereich: Drag Handle + Icon + Name + IBAN */}
-                <div className="flex items-center gap-3 min-w-[240px]">
+                <div className="flex min-w-[240px] items-center gap-3">
                   <div
-                    className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 p-1 rounded transition-colors -ml-1"
+                    className="-ml-1 cursor-grab rounded p-1 text-slate-400 transition-colors hover:text-slate-700 active:cursor-grabbing"
                     onClick={(e) => e.stopPropagation()}
                     title="Ziehen zum Umsortieren"
                   >
-                    <GripVertical className="w-5 h-5" />
+                    <GripVertical className="h-5 w-5" />
                   </div>
 
                   <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform"
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-white shadow-sm transition-transform group-hover:scale-105"
                     style={{ backgroundColor: acc.color || '#3b82f6' }}
                   >
-                    <IconRenderer name={acc.icon} className="w-5 h-5" />
+                    <IconRenderer name={acc.icon} className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    <h3 className="font-bold text-slate-900 transition-colors group-hover:text-blue-600">
                       {acc.name}
                     </h3>
                   </div>
                 </div>
 
                 {/* Mittlerer Bereich: Verknüpfte Buckets */}
-                <div className="flex-1 min-w-[200px]">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                <div className="min-w-[200px] flex-1">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     Zugeordnete Buckets ({acc.bucketIds.length})
                   </div>
-                  <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                  <div className="flex max-h-16 flex-wrap gap-1 overflow-y-auto">
                     {acc.bucketIds.length > 0 ? (
                       acc.bucketIds.map((bId) => {
                         const b = buckets.find((item) => item.id === bId);
@@ -173,41 +165,46 @@ export const AccountsConfig: React.FC = () => {
                         return (
                           <span
                             key={b.id}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
                           >
-                            <IconRenderer name={b.icon} style={{ color: b.color }} className="w-3 h-3" />
+                            <IconRenderer
+                              name={b.icon}
+                              style={{ color: b.color }}
+                              className="h-3 w-3"
+                            />
                             {b.name}
                           </span>
                         );
                       })
                     ) : (
-                      <span className="text-xs text-slate-400 italic">Alle Buckets zugelassen</span>
+                      <span className="text-xs italic text-slate-400">Alle Buckets zugelassen</span>
                     )}
                   </div>
                 </div>
 
                 {/* Rechter Bereich: Saldo mit Stichtag & Aktionen */}
-                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 min-w-[230px]">
+                <div className="flex min-w-[230px] items-center justify-between gap-4 border-t border-slate-100 pt-3 sm:justify-end sm:border-t-0 sm:pt-0">
                   <div className="text-left sm:text-right">
                     {acc.balanceEntries.length > 0 ? (
                       <>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center sm:justify-end gap-1 mb-0.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Stichtag: {formatDate(acc.balanceEntries[acc.balanceEntries.length - 1].date)}</span>
+                        <div className="mb-0.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:justify-end">
+                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>
+                            Stichtag:{' '}
+                            {formatDate(acc.balanceEntries[acc.balanceEntries.length - 1].date)}
+                          </span>
                         </div>
-                        <div className="font-mono font-bold text-slate-900 text-sm">
+                        <div className="font-mono text-sm font-bold text-slate-900">
                           {formatMoney(acc.balanceEntries[acc.balanceEntries.length - 1].amount)}
                         </div>
                       </>
                     ) : (
                       <>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center sm:justify-end gap-1 mb-0.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-slate-300" />
+                        <div className="mb-0.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:justify-end">
+                          <ShieldCheck className="h-3.5 w-3.5 text-slate-300" />
                           <span>Kein Stichtag</span>
                         </div>
-                        <div className="font-mono font-bold text-slate-400 text-sm">
-                          0,00 €
-                        </div>
+                        <div className="font-mono text-sm font-bold text-slate-400">0,00 €</div>
                       </>
                     )}
                   </div>
@@ -220,10 +217,10 @@ export const AccountsConfig: React.FC = () => {
                         setEditingAccount(acc);
                         setIsAccountModalOpen(true);
                       }}
-                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
                       title="Bearbeiten"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
@@ -233,10 +230,10 @@ export const AccountsConfig: React.FC = () => {
                           deleteAccount(acc.id);
                         }
                       }}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                       title="Löschen"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -263,4 +260,3 @@ export const AccountsConfig: React.FC = () => {
     </div>
   );
 };
-

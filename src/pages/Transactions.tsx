@@ -56,7 +56,10 @@ export const CircularGauge: React.FC<{
   const strokeDashoffset = circumference - (clampedPercent / 100) * circumference;
 
   return (
-    <div className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+    <div
+      className="relative inline-flex shrink-0 items-center justify-center"
+      style={{ width: size, height: size }}
+    >
       <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2}
@@ -81,7 +84,7 @@ export const CircularGauge: React.FC<{
         />
       </svg>
       {showText && (
-        <span className="absolute text-[10px] font-bold text-slate-800 font-mono">
+        <span className="absolute font-mono text-[10px] font-bold text-slate-800">
           {Math.round(clampedPercent)}%
         </span>
       )}
@@ -323,15 +326,16 @@ export const Transactions: React.FC = () => {
   // Initiales Laden aus der IndexedDB
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[420px] p-8 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4 text-center">
+      <div className="flex min-h-[420px] flex-col items-center justify-center space-y-4 rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <div className="relative flex items-center justify-center">
           <CircularGauge percentage={80} size={72} strokeWidth={6} showText={false} />
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin absolute inset-0 m-auto" />
+          <Loader2 className="absolute inset-0 m-auto h-8 w-8 animate-spin text-blue-600" />
         </div>
         <div>
           <h3 className="text-base font-bold text-slate-800">Lade Buchungen & Transaktionen...</h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm">
-            Buchungsdaten und Bucket-Zuordnungen werden aus der lokalen IndexedDB-Datenbank synchronisiert.
+          <p className="mt-1 max-w-sm text-xs text-slate-400">
+            Buchungsdaten und Bucket-Zuordnungen werden aus der lokalen IndexedDB-Datenbank
+            synchronisiert.
           </p>
         </div>
       </div>
@@ -346,20 +350,21 @@ export const Transactions: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header & Hauptaktionen */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Receipt className="w-7 h-7 text-blue-600" />
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+              <Receipt className="h-7 w-7 text-blue-600" />
               Buchungen & Transaktionen
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {transactions.length} Buchungen gesamt • {filteredTransactions.length} nach Filter ({displayedTransactions.length} sichtbar)
+            <p className="mt-1 text-sm text-slate-500">
+              {transactions.length} Buchungen gesamt • {filteredTransactions.length} nach Filter (
+              {displayedTransactions.length} sichtbar)
             </p>
           </div>
 
           {filteredTransactions.length > 0 && (
-            <div className="hidden sm:flex items-center gap-2.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-inner">
+            <div className="hidden items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-inner sm:flex">
               <CircularGauge percentage={loadedPercentage} size={36} strokeWidth={4} />
               <div className="text-left leading-tight">
                 <div className="text-[11px] font-bold text-slate-700">Geladen</div>
@@ -375,9 +380,9 @@ export const Transactions: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
           >
-            <UploadCloud className="w-4 h-4" />
+            <UploadCloud className="h-4 w-4" />
             CSV Import
           </button>
 
@@ -389,10 +394,10 @@ export const Transactions: React.FC = () => {
                   clearTransactions();
                 }
               }}
-              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
               title="Alle Transaktionen leeren"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -400,12 +405,12 @@ export const Transactions: React.FC = () => {
 
       {/* Re-matching Indikator Banner */}
       {reMatching && (
-        <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs text-blue-900 shadow-sm animate-pulse">
+        <div className="flex animate-pulse items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-900 shadow-sm">
           <div className="flex items-center gap-2.5 font-medium">
-            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
             <span>Regex-Muster werden auf alle Buchungen angewendet...</span>
           </div>
-          <span className="font-mono text-blue-600 font-bold">Bitte warten</span>
+          <span className="font-mono font-bold text-blue-600">Bitte warten</span>
         </div>
       )}
 
@@ -415,20 +420,28 @@ export const Transactions: React.FC = () => {
           e.preventDefault();
           handleApplyFilters();
         }}
-        className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3"
+        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
           <div className="flex items-center gap-2.5">
             <span className="flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-blue-600" />
+              <Filter className="h-3.5 w-3.5 text-blue-600" />
               Filter & Suche
             </span>
 
             {filteredTransactions.length > 0 && (
-              <div className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 text-[11px] font-normal normal-case">
-                <CircularGauge percentage={loadedPercentage} size={16} strokeWidth={2.5} showText={false} />
+              <div className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-normal normal-case text-slate-700">
+                <CircularGauge
+                  percentage={loadedPercentage}
+                  size={16}
+                  strokeWidth={2.5}
+                  showText={false}
+                />
                 <span>
-                  <strong className="font-semibold text-slate-900">{displayedTransactions.length}</strong> / {filteredTransactions.length} sichtbar ({Math.round(loadedPercentage)}%)
+                  <strong className="font-semibold text-slate-900">
+                    {displayedTransactions.length}
+                  </strong>{' '}
+                  / {filteredTransactions.length} sichtbar ({Math.round(loadedPercentage)}%)
                 </span>
               </div>
             )}
@@ -439,37 +452,37 @@ export const Transactions: React.FC = () => {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="text-slate-500 hover:text-slate-700 flex items-center gap-1 text-xs font-medium normal-case px-2.5 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium normal-case text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="h-3 w-3" />
                 Zurücksetzen
               </button>
             )}
 
             <button
               type="submit"
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all normal-case ${
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold normal-case shadow-sm transition-all ${
                 hasPendingChanges
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-400/40'
+                  ? 'bg-blue-600 text-white ring-2 ring-blue-400/40 hover:bg-blue-700'
                   : 'bg-slate-800 text-white hover:bg-slate-900'
               }`}
             >
-              <Search className="w-3.5 h-3.5" />
+              <Search className="h-3.5 w-3.5" />
               Filter anwenden
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
           {/* 1. Compound Freitext-Suche */}
-          <div className="lg:col-span-3 relative flex items-center">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <div className="relative flex items-center lg:col-span-3">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={inputSearchTerm}
               onChange={(e) => setInputSearchTerm(e.target.value)}
               placeholder="Volltextsuche..."
-              className="w-full h-9 pl-9 pr-3 text-xs border border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400"
+              className="h-9 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-xs shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -478,7 +491,7 @@ export const Transactions: React.FC = () => {
             <select
               value={inputAccountId}
               onChange={(e) => setInputAccountId(e.target.value)}
-              className="w-full h-9 px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
+              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Konten</option>
               {accounts.map((a) => (
@@ -494,7 +507,7 @@ export const Transactions: React.FC = () => {
             <select
               value={inputBucketId}
               onChange={(e) => setInputBucketId(e.target.value)}
-              className="w-full h-9 px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
+              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Zuweisungen</option>
               <option value="assigned">Zugewiesen</option>
@@ -513,7 +526,7 @@ export const Transactions: React.FC = () => {
             <select
               value={inputType}
               onChange={(e) => setInputType(e.target.value as TransactionType | 'all')}
-              className="w-full h-9 px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 truncate"
+              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Typen</option>
               <option value="inbound">Nur Einnahmen (+)</option>
@@ -537,17 +550,17 @@ export const Transactions: React.FC = () => {
       </form>
 
       {/* Transaktionstabelle */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden space-y-0">
+      <div className="space-y-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                <th className="py-3 px-4">Datum</th>
-                <th className="py-3 px-4">Konto</th>
-                <th className="py-3 px-4">Empfänger / Sender & Text</th>
-                <th className="py-3 px-4 text-right">Betrag</th>
-                <th className="py-3 px-4">Bucket & Zuweisung</th>
-                <th className="py-3 px-4 text-right">Aktionen</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
+                <th className="px-4 py-3">Datum</th>
+                <th className="px-4 py-3">Konto</th>
+                <th className="px-4 py-3">Empfänger / Sender & Text</th>
+                <th className="px-4 py-3 text-right">Betrag</th>
+                <th className="px-4 py-3">Bucket & Zuweisung</th>
+                <th className="px-4 py-3 text-right">Aktionen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -557,20 +570,20 @@ export const Transactions: React.FC = () => {
                   const isOutbound = tx.value < 0;
 
                   return (
-                    <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={tx.id} className="transition-colors hover:bg-slate-50/80">
                       {/* Datum */}
-                      <td className="py-3 px-4 whitespace-nowrap font-medium text-slate-700">
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
                         {formatDate(tx.valueDate)}
                       </td>
 
                       {/* Konto */}
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-4 py-3">
                         {account ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-medium">
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
                             <IconRenderer
                               name={account.icon}
                               style={{ color: account.color }}
-                              className="w-3.5 h-3.5"
+                              className="h-3.5 w-3.5"
                             />
                             {account.name}
                           </span>
@@ -580,29 +593,29 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Partner & Subject */}
-                      <td className="py-3 px-4 max-w-xs">
-                        <div className="font-semibold text-slate-800 truncate">
+                      <td className="max-w-xs px-4 py-3">
+                        <div className="truncate font-semibold text-slate-800">
                           {tx.receiver || tx.issuer || 'Kein Empfänger'}
                         </div>
-                        <div className="text-slate-500 truncate text-[11px] mt-0.5">
+                        <div className="mt-0.5 truncate text-[11px] text-slate-500">
                           {tx.subject}
                         </div>
                       </td>
 
                       {/* Betrag */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold">
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-bold">
                         <span className={isOutbound ? 'text-slate-900' : 'text-emerald-600'}>
                           {formatMoney(tx.value, { signDisplay: 'always' })}
                         </span>
                       </td>
 
                       {/* Bucket Selector */}
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-2">
                           <select
                             value={tx.bucketId || ''}
                             onChange={(e) => assignTransactionBucket(tx.id, e.target.value || null)}
-                            className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px]"
+                            className="max-w-[200px] rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">(Kein Bucket)</option>
                             {bucketOptions.map((b) => (
@@ -615,32 +628,32 @@ export const Transactions: React.FC = () => {
                           {/* Assignment Source Badge */}
                           {tx.assignmentSource === 'manual' && (
                             <span
-                              className="inline-flex items-center gap-0.5 p-1 rounded bg-amber-100 text-amber-800 text-[10px] font-bold"
+                              className="inline-flex items-center gap-0.5 rounded bg-amber-100 p-1 text-[10px] font-bold text-amber-800"
                               title="Manuell zugewiesen (gesperrt gegen Überschreiben)"
                             >
-                              <Lock className="w-3 h-3" />
+                              <Lock className="h-3 w-3" />
                             </span>
                           )}
                           {tx.assignmentSource === 'auto_regex' && (
                             <span
-                              className="inline-flex items-center gap-0.5 p-1 rounded bg-blue-50 text-blue-700 text-[10px] font-medium"
+                              className="inline-flex items-center gap-0.5 rounded bg-blue-50 p-1 text-[10px] font-medium text-blue-700"
                               title="Automatisch via Regex zugewiesen"
                             >
-                              <Bot className="w-3 h-3" />
+                              <Bot className="h-3 w-3" />
                             </span>
                           )}
                         </div>
                       </td>
 
                       {/* Aktionen */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
                         <button
                           type="button"
                           onClick={() => deleteTransaction(tx.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
+                          className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                           title="Löschen"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </td>
                     </tr>
@@ -648,7 +661,7 @@ export const Transactions: React.FC = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 text-sm">
+                  <td colSpan={6} className="py-12 text-center text-sm text-slate-400">
                     Keine passenden Buchungen gefunden. Lade eine CSV-Datei hoch!
                   </td>
                 </tr>
@@ -659,9 +672,9 @@ export const Transactions: React.FC = () => {
 
         {/* Lazy Loading Sentinel & Footer */}
         {filteredTransactions.length > 0 && (
-          <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 p-4 text-xs text-slate-500">
             <div className="flex items-center gap-3">
-              <Layers className="w-4 h-4 text-slate-400" />
+              <Layers className="h-4 w-4 text-slate-400" />
               <span>
                 Zeige <strong className="text-slate-700">{displayedTransactions.length}</strong> von{' '}
                 <strong className="text-slate-700">{filteredTransactions.length}</strong> Buchungen
@@ -669,14 +682,14 @@ export const Transactions: React.FC = () => {
               </span>
 
               {/* Progress Gauge Bar */}
-              <div className="hidden md:flex items-center gap-2">
-                <div className="w-24 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div className="hidden items-center gap-2 md:flex">
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-200">
                   <div
-                    className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                    className="h-full rounded-full bg-blue-600 transition-all duration-300"
                     style={{ width: `${Math.round(loadedPercentage)}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-mono font-semibold text-slate-600">
+                <span className="font-mono text-[10px] font-semibold text-slate-600">
                   {Math.round(loadedPercentage)}%
                 </span>
               </div>
@@ -685,8 +698,8 @@ export const Transactions: React.FC = () => {
             {hasMore && (
               <div className="flex items-center gap-2">
                 {isLoadingMore && (
-                  <div className="flex items-center gap-1.5 text-blue-600 text-xs font-medium mr-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <div className="mr-2 flex items-center gap-1.5 text-xs font-medium text-blue-600">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     <span>Lade...</span>
                   </div>
                 )}
@@ -694,16 +707,16 @@ export const Transactions: React.FC = () => {
                   type="button"
                   onClick={loadMore}
                   disabled={isLoadingMore}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-300 rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                  className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:opacity-50"
                 >
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
                   Mehr laden (+{Math.min(PAGE_SIZE, filteredTransactions.length - visibleCount)})
                 </button>
                 <button
                   type="button"
                   onClick={showAll}
                   disabled={isLoadingMore}
-                  className="px-3 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:text-blue-700 hover:underline disabled:opacity-50"
                 >
                   Alle {filteredTransactions.length} anzeigen
                 </button>
@@ -713,10 +726,13 @@ export const Transactions: React.FC = () => {
         )}
 
         {/* Intersection Sentinel element with loading indicator */}
-        <div ref={sentinelRef} className="py-2 w-full flex items-center justify-center pointer-events-none">
+        <div
+          ref={sentinelRef}
+          className="pointer-events-none flex w-full items-center justify-center py-2"
+        >
           {isLoadingMore && hasMore && (
-            <div className="flex items-center gap-2 text-xs text-blue-600 font-medium animate-pulse">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            <div className="flex animate-pulse items-center gap-2 text-xs font-medium text-blue-600">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
               <span>Lade weitere Buchungen nach...</span>
             </div>
           )}

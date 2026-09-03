@@ -18,9 +18,7 @@ describe('financeDB Storage Layer', () => {
       id: 'acc-1',
       name: 'Girokonto Test',
       bucketIds: ['b-living'],
-      balanceEntries: [
-        { id: 'be-1', date: '2026-09-01', amount: 2500, note: 'Monatsanfang' },
-      ],
+      balanceEntries: [{ id: 'be-1', date: '2026-09-01', amount: 2500, note: 'Monatsanfang' }],
     };
 
     await financeDB.saveAccount(account);

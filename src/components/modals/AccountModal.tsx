@@ -61,9 +61,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   }, [account, isOpen]);
 
   const handleToggleBucket = (bId: string) => {
-    setBucketIds((prev) =>
-      prev.includes(bId) ? prev.filter((id) => id !== bId) : [...prev, bId]
-    );
+    setBucketIds((prev) => (prev.includes(bId) ? prev.filter((id) => id !== bId) : [...prev, bId]));
   };
 
   const handleAddBalanceEntry = (e: React.FormEvent) => {
@@ -112,27 +110,27 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+          <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-white shadow-sm"
               style={{ backgroundColor: color || '#3b82f6' }}
             >
-              <IconRenderer name={icon} className="w-4 h-4" />
+              <IconRenderer name={icon} className="h-4 w-4" />
             </div>
             {account ? 'Konto bearbeiten' : 'Neues Konto anlegen'}
           </h3>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+        <div className="max-h-[80vh] space-y-5 overflow-y-auto p-6">
           {/* Einheitliche EntityVisualMetadata Felder: Color, Icon, Title & Description */}
           <EntityVisualFields
             name={name}
@@ -149,26 +147,32 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
           {/* Zugeordnete Buckets */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
               Zugeordnete Buckets ({bucketIds.length} ausgewählt)
             </label>
-            <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200 max-h-36 overflow-y-auto text-xs">
+            <div className="grid max-h-36 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
               {existingBuckets.map((b) => {
                 const isSelected = bucketIds.includes(b.id);
                 return (
                   <label
                     key={b.id}
-                    className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition-colors ${
-                      isSelected ? 'bg-blue-50 text-blue-900 font-medium' : 'text-slate-700 hover:bg-slate-100'
+                    className={`flex cursor-pointer items-center gap-2 rounded p-1.5 transition-colors ${
+                      isSelected
+                        ? 'bg-blue-50 font-medium text-blue-900'
+                        : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => handleToggleBucket(b.id)}
-                      className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500"
+                      className="h-3.5 w-3.5 rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <IconRenderer name={b.icon} style={{ color: b.color }} className="w-3.5 h-3.5" />
+                    <IconRenderer
+                      name={b.icon}
+                      style={{ color: b.color }}
+                      className="h-3.5 w-3.5"
+                    />
                     <span className="truncate">{b.name}</span>
                   </label>
                 );
@@ -177,32 +181,30 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
 
           {/* Stichtags-Salden (Balance Entries) */}
-          <div className="pt-2 border-t border-slate-100">
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+          <div className="border-t border-slate-100 pt-2">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-700">
               Stichtags-Salden (Stand zu Datum X)
             </label>
 
             {balanceEntries.length > 0 && (
-              <div className="space-y-1.5 mb-3 max-h-32 overflow-y-auto">
+              <div className="mb-3 max-h-32 space-y-1.5 overflow-y-auto">
                 {balanceEntries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-xs"
+                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
                   >
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
                       <span className="font-semibold text-slate-800">{entry.date}:</span>
-                      <span className="text-slate-900 font-bold">
-                        {formatMoney(entry.amount)}
-                      </span>
-                      {entry.note && <span className="text-slate-500 italic">({entry.note})</span>}
+                      <span className="font-bold text-slate-900">{formatMoney(entry.amount)}</span>
+                      {entry.note && <span className="italic text-slate-500">({entry.note})</span>}
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveBalanceEntry(entry.id)}
-                      className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                      className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}
@@ -210,13 +212,13 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             )}
 
             {/* Saldo-Hinzufügen Zeile */}
-            <div className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="grid grid-cols-12 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="col-span-4">
                 <input
                   type="date"
                   value={newEntryDate}
                   onChange={(e) => setNewEntryDate(e.target.value as ISODateString)}
-                  className="w-full h-10 px-3 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm font-sans"
+                  className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 font-sans text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="col-span-4">
@@ -232,27 +234,27 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   value={newEntryNote}
                   onChange={(e) => setNewEntryNote(e.target.value)}
                   placeholder="Notiz (z. B. Start)"
-                  className="w-full h-10 px-3.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm placeholder:text-slate-400"
+                  className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="col-span-1 flex justify-end">
                 <button
                   type="button"
                   onClick={handleAddBalanceEntry}
-                  className="w-10 h-10 flex items-center justify-center text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shadow-sm"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 shadow-sm transition-colors hover:bg-blue-100 hover:text-blue-700"
                   title="Saldo-Eintrag hinzufügen"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="h-5 w-5" />
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
             >
               Abbrechen
             </button>
@@ -260,7 +262,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
+              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-50"
             >
               {saving ? 'Speichert...' : account ? 'Änderungen speichern' : 'Konto anlegen'}
             </button>

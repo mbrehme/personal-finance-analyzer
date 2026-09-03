@@ -177,28 +177,28 @@ export const BucketModal: React.FC<BucketModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+          <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-white shadow-sm"
               style={{ backgroundColor: color || '#3b82f6' }}
             >
-              <IconRenderer name={icon} className="w-4 h-4" />
+              <IconRenderer name={icon} className="h-4 w-4" />
             </div>
             {bucket ? 'Bucket bearbeiten' : 'Neuen Bucket anlegen'}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="max-h-[80vh] space-y-4 overflow-y-auto p-6">
           {/* Einheitliche EntityVisualMetadata Felder: Color, Icon, Title & Description */}
           <EntityVisualFields
             name={name}
@@ -214,13 +214,13 @@ export const BucketModal: React.FC<BucketModalProps> = ({
           />
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
               Übergeordneter Bucket (Parent)
             </label>
             <select
               value={parentId || ''}
               onChange={(e) => setParentId(e.target.value || null)}
-              className="w-full h-10 px-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white shadow-sm"
+              className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Keiner (Top-Level Bucket)</option>
               {availableParents.map((p) => (
@@ -234,7 +234,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
           {/* Regex-Regel (nur für Leaf-Buckets) */}
           {!isParentWithChildren ? (
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
                 Regex
               </label>
               <input
@@ -242,34 +242,35 @@ export const BucketModal: React.FC<BucketModalProps> = ({
                 value={regexPattern}
                 onChange={(e) => handleRegexChange(e.target.value)}
                 placeholder="z. B. Rewe|Edeka|Aldi|Lidl"
-                className={`w-full h-10 px-3.5 font-mono text-sm border rounded-xl focus:outline-none focus:ring-2 shadow-sm ${
+                className={`h-10 w-full rounded-xl border px-3.5 font-mono text-sm shadow-sm focus:outline-none focus:ring-2 ${
                   regexError
                     ? 'border-red-500 focus:ring-red-400'
                     : 'border-slate-300 focus:ring-blue-500'
                 }`}
               />
               {regexError ? (
-                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5" />
+                <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
+                  <AlertCircle className="h-3.5 w-3.5" />
                   {regexError}
                 </p>
               ) : (
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="mt-1 text-xs text-slate-500">
                   Wird gegen das Compound-Feld (Konto, Sender, Empfänger, Text, Betrag) geprüft.
                 </p>
               )}
             </div>
           ) : (
-            <div className="p-3 bg-amber-50 rounded-xl text-xs text-amber-800 border border-amber-200">
-              Dieser Bucket besitzt untergeordnete Kinder. Regex-Regeln werden ausschließlich auf Kinder-Buckets angewendet.
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              Dieser Bucket besitzt untergeordnete Kinder. Regex-Regeln werden ausschließlich auf
+              Kinder-Buckets angewendet.
             </div>
           )}
 
           {/* Soll-Budget */}
-          <div className="pt-2 border-t border-slate-100 space-y-2">
+          <div className="space-y-2 border-t border-slate-100 pt-2">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
                   Soll-Budget festlegen
                 </label>
                 {isParentWithChildren && (
@@ -284,19 +285,24 @@ export const BucketModal: React.FC<BucketModalProps> = ({
                 onChange={(e) => {
                   const checked = e.target.checked;
                   setHasBudget(checked);
-                  if (checked && isParentWithChildren && rollupForSelectedPeriod > 0 && budgetAmount === 100) {
+                  if (
+                    checked &&
+                    isParentWithChildren &&
+                    rollupForSelectedPeriod > 0 &&
+                    budgetAmount === 100
+                  ) {
                     setBudgetAmount(roundToTwoDecimals(rollupForSelectedPeriod));
                   }
                 }}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
               />
             </div>
 
             {hasBudget ? (
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+              <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
                       Zielbetrag
                     </label>
                     <MoneyInput
@@ -307,13 +313,13 @@ export const BucketModal: React.FC<BucketModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
                       Zyklus
                     </label>
                     <select
                       value={budgetPeriod}
                       onChange={(e) => setBudgetPeriod(e.target.value as PeriodGranularity)}
-                      className="w-full h-10 px-3.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="monthly">Monatlich</option>
                       <option value="quarterly">Quartal</option>
@@ -325,17 +331,23 @@ export const BucketModal: React.FC<BucketModalProps> = ({
 
                 {/* Hint für Rollup-Wert bei Elternbuckets */}
                 {isParentWithChildren && rollupForSelectedPeriod > 0 && (
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-[11px] text-slate-600">
+                  <div className="flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-600">
                     <span className="flex items-center gap-1">
                       <span className="font-semibold text-slate-700">Rollup der Kinder:</span>{' '}
-                      {formatMoney(rollupForSelectedPeriod)}{' '}
-                      / {budgetPeriod === 'monthly' ? 'Monat' : budgetPeriod === 'quarterly' ? 'Quartal' : budgetPeriod === 'halfYearly' ? 'Halbjahr' : 'Jahr'}
+                      {formatMoney(rollupForSelectedPeriod)} /{' '}
+                      {budgetPeriod === 'monthly'
+                        ? 'Monat'
+                        : budgetPeriod === 'quarterly'
+                          ? 'Quartal'
+                          : budgetPeriod === 'halfYearly'
+                            ? 'Halbjahr'
+                            : 'Jahr'}
                     </span>
                     {budgetAmount !== roundToTwoDecimals(rollupForSelectedPeriod) && (
                       <button
                         type="button"
                         onClick={() => setBudgetAmount(roundToTwoDecimals(rollupForSelectedPeriod))}
-                        className="text-blue-600 hover:text-blue-700 font-semibold underline hover:no-underline cursor-pointer transition-colors"
+                        className="cursor-pointer font-semibold text-blue-600 underline transition-colors hover:text-blue-700 hover:no-underline"
                       >
                         Als Wert übernehmen
                       </button>
@@ -344,11 +356,11 @@ export const BucketModal: React.FC<BucketModalProps> = ({
                 )}
               </div>
             ) : (
-              isParentWithChildren && rollupMonthlyBudget > 0 && (
-                <div className="p-2.5 bg-blue-50/60 rounded-xl border border-blue-100 text-[11px] text-blue-900 flex items-center justify-between">
+              isParentWithChildren &&
+              rollupMonthlyBudget > 0 && (
+                <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50/60 p-2.5 text-[11px] text-blue-900">
                   <span>
-                    <strong>Automatisches Rollup aktiv:</strong>{' '}
-                    {formatMoney(rollupMonthlyBudget)}{' '}
+                    <strong>Automatisches Rollup aktiv:</strong> {formatMoney(rollupMonthlyBudget)}{' '}
                     / Monat aus untergeordneten Buckets.
                   </span>
                   <button
@@ -357,7 +369,7 @@ export const BucketModal: React.FC<BucketModalProps> = ({
                       setHasBudget(true);
                       setBudgetAmount(roundToTwoDecimals(rollupMonthlyBudget));
                     }}
-                    className="text-blue-700 hover:text-blue-800 font-bold underline shrink-0 ml-2 cursor-pointer"
+                    className="ml-2 shrink-0 cursor-pointer font-bold text-blue-700 underline hover:text-blue-800"
                   >
                     Manuell überschreiben
                   </button>
@@ -367,20 +379,21 @@ export const BucketModal: React.FC<BucketModalProps> = ({
           </div>
 
           {bucket?.manualTransactionIds && bucket.manualTransactionIds.length > 0 && (
-            <div className="p-2.5 bg-blue-50/70 rounded-lg border border-blue-200 text-xs text-blue-800">
-              <strong>{bucket.manualTransactionIds.length}</strong> Buchung(en) wurden diesem Bucket manuell zugewiesen.
+            <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-2.5 text-xs text-blue-800">
+              <strong>{bucket.manualTransactionIds.length}</strong> Buchung(en) wurden diesem Bucket
+              manuell zugewiesen.
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between border-t border-slate-100 pt-4">
             {bucket && onDelete ? (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="h-4 w-4" />
                 {deleting ? 'Lösche...' : 'Bucket löschen'}
               </button>
             ) : (
@@ -391,14 +404,14 @@ export const BucketModal: React.FC<BucketModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
               >
                 Abbrechen
               </button>
               <button
                 type="submit"
                 disabled={saving || !!regexError}
-                className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-sm transition-colors"
+                className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? 'Speichert...' : bucket ? 'Änderungen speichern' : 'Bucket anlegen'}
               </button>

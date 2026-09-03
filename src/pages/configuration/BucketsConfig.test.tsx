@@ -25,4 +25,3 @@ describe('BucketsConfig Subpage', () => {
     expect(dragHandles.length).toBeGreaterThan(0);
   });
 });
-

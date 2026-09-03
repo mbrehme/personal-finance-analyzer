@@ -28,7 +28,7 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
 }) => {
   return (
     <div
-      className={`inline-flex p-1 bg-slate-100 rounded-lg border border-slate-200 text-sm font-medium ${className}`}
+      className={`inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-sm font-medium ${className}`}
       role="group"
       aria-label="Granularitätsauswahl"
     >
@@ -39,10 +39,10 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({
             key={opt.key}
             type="button"
             onClick={() => onChange(opt.key)}
-            className={`px-3 py-1.5 rounded-md transition-all ${
+            className={`rounded-md px-3 py-1.5 transition-all ${
               isActive
-                ? 'bg-white text-blue-700 shadow-sm font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-white font-semibold text-blue-700 shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
             }`}
           >
             {opt.label}

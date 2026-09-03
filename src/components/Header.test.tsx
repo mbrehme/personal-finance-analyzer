@@ -155,4 +155,3 @@ describe('Header', () => {
     expect(rematchBtn).toHaveTextContent(/Progressing.../i);
   });
 });
-

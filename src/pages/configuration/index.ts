@@ -7,4 +7,3 @@
 export { ConfigurationLayout } from './ConfigurationLayout';
 export { BucketsConfig } from './BucketsConfig';
 export { AccountsConfig } from './AccountsConfig';
-

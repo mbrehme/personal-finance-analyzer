@@ -310,9 +310,13 @@ describe('dateUtils', () => {
     });
 
     it('formats display labels cleanly', () => {
-      expect(formatDateRangeDisplay('2026-01-01', '2026-12-31', refDate)).toBe('Dieses Jahr (2026)');
+      expect(formatDateRangeDisplay('2026-01-01', '2026-12-31', refDate)).toBe(
+        'Dieses Jahr (2026)'
+      );
       expect(formatDateRangeDisplay('', '', refDate)).toBe('Gesamter Zeitraum');
-      expect(formatDateRangeDisplay('2025-03-01', '2026-05-31', refDate)).toBe('Mär 2025 – Mai 2026');
+      expect(formatDateRangeDisplay('2025-03-01', '2026-05-31', refDate)).toBe(
+        'Mär 2025 – Mai 2026'
+      );
       expect(formatDateRangeDisplay('2025-03-01', '2025-03-31', refDate)).toBe('Mär 2025');
     });
   });

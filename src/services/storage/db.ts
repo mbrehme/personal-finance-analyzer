@@ -269,7 +269,9 @@ export const financeDB = {
       memoryStore.transactions.delete(transactionId);
       return;
     }
-    await performStoreOperation(STORES.TRANSACTIONS, 'readwrite', (store) => store.delete(transactionId));
+    await performStoreOperation(STORES.TRANSACTIONS, 'readwrite', (store) =>
+      store.delete(transactionId)
+    );
   },
 
   async clearTransactions(): Promise<void> {
@@ -282,10 +284,7 @@ export const financeDB = {
 
   /* ================== EXPORT & IMPORT ================== */
   async exportConfiguration(): Promise<FinanceConfigExport> {
-    const [accounts, buckets] = await Promise.all([
-      this.getAccounts(),
-      this.getBuckets(),
-    ]);
+    const [accounts, buckets] = await Promise.all([this.getAccounts(), this.getBuckets()]);
 
     return {
       version: 1,
@@ -333,7 +332,10 @@ export const financeDB = {
     if (isIndexedDBAvailable()) {
       const db = await openDB();
       return new Promise((resolve, reject) => {
-        const tx = db.transaction([STORES.ACCOUNTS, STORES.BUCKETS, STORES.TRANSACTIONS], 'readwrite');
+        const tx = db.transaction(
+          [STORES.ACCOUNTS, STORES.BUCKETS, STORES.TRANSACTIONS],
+          'readwrite'
+        );
         tx.objectStore(STORES.ACCOUNTS).clear();
         tx.objectStore(STORES.BUCKETS).clear();
         tx.objectStore(STORES.TRANSACTIONS).clear();

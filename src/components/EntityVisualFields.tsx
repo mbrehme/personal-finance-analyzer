@@ -84,7 +84,7 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
       <div className="flex items-end gap-3">
         {/* Color Picker */}
         <div className="relative" ref={colorRef}>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
             Farbe
           </label>
           <button
@@ -93,19 +93,19 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
               setIsColorPickerOpen(!isColorPickerOpen);
               setIsIconPickerOpen(false);
             }}
-            className="flex items-center gap-1.5 h-10 px-2.5 bg-white border border-slate-300 rounded-xl hover:border-slate-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 shadow-sm transition-all hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             title="Farbe wählen"
           >
             <span
-              className="w-5 h-5 rounded-full shadow-inner border border-black/10 flex items-center justify-center text-white"
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-black/10 text-white shadow-inner"
               style={{ backgroundColor: color || '#3b82f6' }}
             />
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
           </button>
 
           {isColorPickerOpen && (
-            <div className="absolute left-0 top-full mt-2 z-50 p-3 bg-white rounded-2xl shadow-xl border border-slate-200 w-64 space-y-3 animate-in fade-in-50 zoom-in-95 duration-100">
-              <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <div className="animate-in fade-in-50 zoom-in-95 absolute left-0 top-full z-50 mt-2 w-64 space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl duration-100">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Farbpalette
               </div>
               <div className="grid grid-cols-4 gap-2">
@@ -118,24 +118,26 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
                       setIsColorPickerOpen(false);
                     }}
                     style={{ backgroundColor: c }}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm hover:scale-110 active:scale-95 transition-transform"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-sm transition-transform hover:scale-110 active:scale-95"
                     title={c}
                   >
-                    {color.toLowerCase() === c.toLowerCase() && <Check className="w-5 h-5 stroke-[3]" />}
+                    {color.toLowerCase() === c.toLowerCase() && (
+                      <Check className="h-5 w-5 stroke-[3]" />
+                    )}
                   </button>
                 ))}
               </div>
 
               {/* Custom Color Input */}
-              <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                <label className="flex items-center gap-1.5 text-xs text-slate-600 font-medium cursor-pointer">
-                  <Pipette className="w-4 h-4 text-slate-500" />
+              <div className="flex items-center gap-2 border-t border-slate-100 pt-2">
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-600">
+                  <Pipette className="h-4 w-4 text-slate-500" />
                   Eigene Farbe:
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
-                    className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                    className="h-6 w-6 cursor-pointer rounded border-0 bg-transparent"
                   />
                 </label>
                 <input
@@ -143,7 +145,7 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
                   placeholder="#000000"
-                  className="w-20 px-2 py-1 font-mono text-xs border border-slate-300 rounded-lg text-slate-700 uppercase"
+                  className="w-20 rounded-lg border border-slate-300 px-2 py-1 font-mono text-xs uppercase text-slate-700"
                 />
               </div>
             </div>
@@ -152,7 +154,7 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
 
         {/* Icon Picker */}
         <div className="relative" ref={iconRef}>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
             Icon
           </label>
           <button
@@ -161,33 +163,33 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
               setIsIconPickerOpen(!isIconPickerOpen);
               setIsColorPickerOpen(false);
             }}
-            className="flex items-center gap-1.5 h-10 px-2.5 bg-white border border-slate-300 rounded-xl hover:border-slate-400 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 shadow-sm transition-all hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             title="Icon wählen"
           >
             <div
-              className="w-6 h-6 rounded-lg flex items-center justify-center text-white shadow-sm"
+              className="flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm"
               style={{ backgroundColor: color || '#3b82f6' }}
             >
-              <IconRenderer name={icon || 'Folder'} className="w-4 h-4" />
+              <IconRenderer name={icon || 'Folder'} className="h-4 w-4" />
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
           </button>
 
           {isIconPickerOpen && (
-            <div className="absolute left-0 top-full mt-2 z-50 p-3 bg-white rounded-2xl shadow-xl border border-slate-200 w-72 space-y-2.5 animate-in fade-in-50 zoom-in-95 duration-100">
+            <div className="animate-in fade-in-50 zoom-in-95 absolute left-0 top-full z-50 mt-2 w-72 space-y-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl duration-100">
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
                   value={iconSearch}
                   onChange={(e) => setIconSearch(e.target.value)}
                   placeholder="Icon suchen..."
-                  className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-slate-300 py-1.5 pl-8 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
               </div>
 
-              <div className="grid grid-cols-5 gap-1.5 max-h-48 overflow-y-auto p-1">
+              <div className="grid max-h-48 grid-cols-5 gap-1.5 overflow-y-auto p-1">
                 {filteredIcons.map((ic) => (
                   <button
                     key={ic}
@@ -196,18 +198,18 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
                       setIcon(ic);
                       setIsIconPickerOpen(false);
                     }}
-                    className={`p-2 rounded-xl flex items-center justify-center transition-all ${
+                    className={`flex items-center justify-center rounded-xl p-2 transition-all ${
                       icon === ic
-                        ? 'bg-blue-600 text-white shadow-sm scale-105'
+                        ? 'scale-105 bg-blue-600 text-white shadow-sm'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                     title={ic}
                   >
-                    <IconRenderer name={ic} className="w-5 h-5" />
+                    <IconRenderer name={ic} className="h-5 w-5" />
                   </button>
                 ))}
                 {filteredIcons.length === 0 && (
-                  <div className="col-span-5 text-center py-4 text-xs text-slate-400">
+                  <div className="col-span-5 py-4 text-center text-xs text-slate-400">
                     Kein Icon gefunden
                   </div>
                 )}
@@ -218,7 +220,7 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
 
         {/* Title / Name Input */}
         <div className="flex-1">
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
             {nameLabel}
           </label>
           <input
@@ -227,7 +229,7 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={namePlaceholder}
-            className="w-full h-10 px-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium text-slate-900 shadow-sm"
+            className="h-10 w-full rounded-xl border border-slate-300 px-3.5 text-sm font-medium text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
@@ -235,7 +237,7 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
       {/* Darunter: Beschreibung (optional) */}
       {setDescription && (
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
             Beschreibung (optional)
           </label>
           <input
@@ -243,11 +245,10 @@ export const EntityVisualFields: React.FC<EntityVisualFieldsProps> = ({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Optionale Notiz, Zweck oder Details..."
-            className="w-full h-10 px-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 shadow-sm placeholder:text-slate-400"
+            className="h-10 w-full rounded-xl border border-slate-300 px-3.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       )}
     </div>
   );
 };
-

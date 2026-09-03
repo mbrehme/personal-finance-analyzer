@@ -1,14 +1,16 @@
 # Plan: Analytics Layout mit Subpages Cashflow und Salden
 
-* **Status:** Abgeschlossen
-* **Erstellt am:** 2026-09-03
-* **Bearbeiter:** Antigravity
+- **Status:** Abgeschlossen
+- **Erstellt am:** 2026-09-03
+- **Bearbeiter:** Antigravity
 
 ---
 
 ## 1. Ziel & Übersicht
+
 Cashflow und Salden wurden als untergeordnete Subpages unter einem gemeinsamen Hauptbereich **Analyse** (`/analytics`) zusammengefasst – analog zur bestehenden Struktur von **Konfiguration** (`/configuration/buckets`, `/configuration/accounts`).
 Der Headerbereich mit der Auswahl von:
+
 1. **Konto** (Alle Konten oder spezifisches Konto)
 2. **Granularität** (Monatlich, Quartal, Halbjahr, Jährlich)
 3. **Date Range Picker** (Zeitraum-Auswahl mit Presets und Von–Bis)
@@ -16,6 +18,7 @@ Der Headerbereich mit der Auswahl von:
 gilt global für beide Unterseiten. Beim Wechsel zwischen Cashflow und Salden bleiben alle Filtereinstellungen nahtlos erhalten.
 
 ## 2. Anforderungen & User Stories
+
 - [x] Neuer Layout-Container `AnalyticsLayout.tsx` unter `src/pages/analytics/` mit:
   - Globalem Header & Titel „Analyse“
   - Gemeinsamer Filter-Toolbar (Konto-Dropdown, Granularitäts-Umschalter `PeriodSelector`, `DateRangePicker`)
@@ -35,18 +38,20 @@ gilt global für beide Unterseiten. Beim Wechsel zwischen Cashflow und Salden bl
 - [x] Vollständige Testabdeckung (`vitest`) für Layout, Routing und Subpages.
 
 ## 3. Technische Konzeption & Betroffene Komponenten
-* **UI / Komponenten (`src/pages/analytics/`):**
+
+- **UI / Komponenten (`src/pages/analytics/`):**
   - `AnalyticsLayout.tsx`: Gemeinsamer Layout-Container mit Toolbar, Tabs und Outlet.
   - `AnalyticsContext.tsx`: Typisierter React Context / Hook zur Weitergabe der globalen Filterzustände an die Kindkomponenten.
   - `Cashflow.tsx`: Nutzt Filter aus Context; eigener Toolbar-Header entfällt.
   - `Balances.tsx`: Nutzt Filter aus Context; eigener Toolbar-Header entfällt.
-* **Services & Rechner (`src/services/analytics/`):**
+- **Services & Rechner (`src/services/analytics/`):**
   - `balanceCalculator.ts`: Optionaler Kontofilter und Datumsfilter für die Salden-Timeline.
-* **Routing & Navigation (`src/App.tsx`, `src/components/Header.tsx`):**
+- **Routing & Navigation (`src/App.tsx`, `src/components/Header.tsx`):**
   - `Header.tsx`: Ersetzt Cashflow/Salden durch „Analyse“.
   - `App.tsx`: Definiert `/analytics` als verschachtelte Route.
 
 ## 4. Schrittweiser Umsetzungsplan
+
 1. [x] **Schritt 1: AnalyticsContext & AnalyticsLayout erstellen**
    - `src/pages/analytics/AnalyticsContext.tsx`
    - `src/pages/analytics/AnalyticsLayout.tsx` & `AnalyticsLayout.test.tsx`
@@ -60,7 +65,7 @@ gilt global für beide Unterseiten. Beim Wechsel zwischen Cashflow und Salden bl
    - `Cashflow.test.tsx`, `Balances.test.tsx`, `Header.test.tsx`, `App.test.tsx`
 
 ## 5. Verifikationsplan
+
 - [x] Unit-Tests erfolgreich (`pnpm test` – 109 Tests bestanden)
 - [x] TypeScript Check & Build erfolgreich (`pnpm build`)
 - [x] Manuelle Prüfung von Tab-Wechsel und Filterpersistenz
-

@@ -42,8 +42,8 @@ export const MoneyInput: React.FC<MoneyInputProps> = ({
 
   return (
     <div className={`relative flex items-center ${className}`}>
-      <div className="absolute left-2.5 flex items-center pointer-events-none text-slate-400">
-        <Banknote className="w-4 h-4" />
+      <div className="pointer-events-none absolute left-2.5 flex items-center text-slate-400">
+        <Banknote className="h-4 w-4" />
       </div>
       <input
         id={id}
@@ -57,7 +57,7 @@ export const MoneyInput: React.FC<MoneyInputProps> = ({
         value={value === 0 ? '' : value}
         onChange={handleChange}
         placeholder={placeholder}
-        className="w-full h-10 pl-8 pr-3 font-mono text-sm font-semibold text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all placeholder:text-slate-300 placeholder:font-normal [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-8 pr-3 font-mono text-sm font-semibold text-slate-900 shadow-sm transition-all [appearance:textfield] placeholder:font-normal placeholder:text-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
     </div>
   );

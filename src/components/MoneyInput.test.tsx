@@ -27,4 +27,3 @@ describe('MoneyInput', () => {
     expect(handleChange).toHaveBeenCalledWith(250);
   });
 });
-

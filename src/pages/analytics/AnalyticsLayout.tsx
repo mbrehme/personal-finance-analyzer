@@ -12,12 +12,7 @@ import { ISODateString, PeriodGranularity } from '@/types/finance';
 import { PeriodSelector } from '@/components/PeriodSelector';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { AnalyticsContext, AnalyticsFilterState } from './AnalyticsContext';
-import {
-  BarChart3,
-  TrendingUp,
-  Wallet,
-  Landmark,
-} from 'lucide-react';
+import { BarChart3, TrendingUp, Wallet, Landmark } from 'lucide-react';
 
 export const ANALYTICS_ACCOUNT_KEY = 'analytics_account';
 export const ANALYTICS_GRANULARITY_KEY = 'analytics_granularity';
@@ -60,7 +55,12 @@ export const AnalyticsLayout: React.FC = () => {
     const saved =
       localStorage.getItem(ANALYTICS_GRANULARITY_KEY) ||
       localStorage.getItem(LEGACY_GRANULARITY_KEY);
-    if (saved === 'monthly' || saved === 'quarterly' || saved === 'halfYearly' || saved === 'yearly') {
+    if (
+      saved === 'monthly' ||
+      saved === 'quarterly' ||
+      saved === 'halfYearly' ||
+      saved === 'yearly'
+    ) {
       return saved as PeriodGranularity;
     }
     return 'monthly';
@@ -125,15 +125,16 @@ export const AnalyticsLayout: React.FC = () => {
     <AnalyticsContext.Provider value={contextValue}>
       <div className="space-y-6">
         {/* Globaler Header & Filter-Toolbar */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                <BarChart3 className="w-7 h-7 text-blue-600" />
+              <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+                <BarChart3 className="h-7 w-7 text-blue-600" />
                 Analyse
               </h1>
-              <p className="text-sm text-slate-500 mt-1">
-                Detaillierte Finanzanalysen deines Cashflows und deiner Salden über frei wählbare Zeiträume.
+              <p className="mt-1 text-sm text-slate-500">
+                Detaillierte Finanzanalysen deines Cashflows und deiner Salden über frei wählbare
+                Zeiträume.
               </p>
             </div>
 
@@ -141,13 +142,13 @@ export const AnalyticsLayout: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3">
               {/* Konto-Filter */}
               <div className="relative min-w-[160px]">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Landmark className="w-4 h-4" />
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                  <Landmark className="h-4 w-4" />
                 </div>
                 <select
                   value={selectedAccountId || ''}
                   onChange={(e) => setSelectedAccountId(e.target.value ? e.target.value : null)}
-                  className="w-full h-10 pl-9 pr-8 text-sm font-semibold border border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100/80 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors shadow-sm cursor-pointer"
+                  className="h-10 w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 pl-9 pr-8 text-sm font-semibold shadow-sm transition-colors hover:bg-slate-100/80 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   data-testid="analytics-account-select"
                 >
                   <option value="">Alle Konten ({accounts.length})</option>
@@ -182,25 +183,25 @@ export const AnalyticsLayout: React.FC = () => {
         <div className="flex items-center gap-2 border-b border-slate-200">
           <NavLink
             to="/analytics/cashflow"
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
               !isBalances
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <TrendingUp className="w-4 h-4" />
+            <TrendingUp className="h-4 w-4" />
             Cashflow
           </NavLink>
 
           <NavLink
             to="/analytics/balances"
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
               isBalances
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Wallet className="w-4 h-4" />
+            <Wallet className="h-4 w-4" />
             Salden
           </NavLink>
         </div>

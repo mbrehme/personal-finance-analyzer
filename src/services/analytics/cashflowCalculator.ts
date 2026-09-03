@@ -5,11 +5,7 @@
  * @module services/analytics/cashflowCalculator
  */
 
-import {
-  Bucket,
-  PeriodGranularity,
-  Transaction,
-} from '@/types/finance';
+import { Bucket, PeriodGranularity, Transaction } from '@/types/finance';
 import {
   fillPeriodKeyRange,
   getCurrentPeriodKey,
@@ -254,8 +250,7 @@ export function calculateCashflowMatrix(
       totalOutbound += outbound;
 
       const actualAmount = Math.abs(net);
-      const diffToBudget =
-        budgetAmount !== undefined ? actualAmount - budgetAmount : undefined;
+      const diffToBudget = budgetAmount !== undefined ? actualAmount - budgetAmount : undefined;
 
       periods[pKey] = {
         inbound,
@@ -267,8 +262,7 @@ export function calculateCashflowMatrix(
     });
 
     const totalNet = totalInbound + totalOutbound;
-    const totalBudget =
-      budgetAmount !== undefined ? budgetAmount * periodKeys.length : undefined;
+    const totalBudget = budgetAmount !== undefined ? budgetAmount * periodKeys.length : undefined;
 
     rows.push({
       bucket,

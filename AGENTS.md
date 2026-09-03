@@ -9,32 +9,37 @@ Willkommen im Projekt **Personal Finance Analyzer**. Diese Datei enthält verbin
 Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzuhalten:
 
 ### 1. Vorbereitungs- & Planungsphase
+
 1. **Architektur prüfen:** Vor Entwurfsentscheidungen bestehende ADRs in [`docs/architecture/`](docs/architecture/) sichten.
 2. **Plan anlegen:** Für größere Features oder Refactorings einen Plan unter `docs/plans/active/YYYY-MM-DD-<feature-name>.md` nach der Vorlage [`docs/plans/template.md`](docs/plans/template.md) erstellen.
 
 ### 2. Implementierungsphase
-* **Tech-Stack:** React 18, TypeScript (strikter Modus), Vite, Tailwind CSS.
-* **Terminologie:** Verwende **ausschließlich den Begriff "Bucket" bzw. "Buckets"** (niemals "Kategorie" oder "Kategorien").
-* **Path-Alias:** Verwende für alle relativen Modulimporte den konfigurierten Alias `@/*` (z. B. `import { Button } from '@/components/Button'`).
-* **Struktur:**
+
+- **Tech-Stack:** React 18, TypeScript (strikter Modus), Vite, Tailwind CSS.
+- **Terminologie:** Verwende **ausschließlich den Begriff "Bucket" bzw. "Buckets"** (niemals "Kategorie" oder "Kategorien").
+- **Path-Alias:** Verwende für alle relativen Modulimporte den konfigurierten Alias `@/*` (z. B. `import { Button } from '@/components/Button'`).
+- **Struktur:**
   - `src/components/`: Wiederverwendbare UI-Komponenten.
   - `src/pages/`: Routen- und Seitenansichten.
   - `src/services/`: Typisierter Daten- und API-Layer.
-* **Dokumentation:** Schreibe für alle exportierten Komponenten, Hilfsfunktionen, Interfaces und Service-Methoden vollständige **JSDoc/TSDoc-Kommentare** (inkl. `@param`, `@returns`, `@example`).
+- **Dokumentation:** Schreibe für alle exportierten Komponenten, Hilfsfunktionen, Interfaces und Service-Methoden vollständige **JSDoc/TSDoc-Kommentare** (inkl. `@param`, `@returns`, `@example`).
 
 ### 3. Testing-Phase (Co-Location)
-* Es sollen immer Tests geschrieben werden
-* Tests werden **immer als Co-Located Files** direkt neben der Quellcode-Datei abgelegt (`Button.test.tsx` neben `Button.tsx`, `api.test.ts` neben `api.ts`).
-* Test-Stack: **`vitest`** mit **`happy-dom`** und **`@testing-library/react`**.
-* Geteilte Matcher und Mocks liegen in `src/test/setup.ts`.
+
+- Es sollen immer Tests geschrieben werden
+- Tests werden **immer als Co-Located Files** direkt neben der Quellcode-Datei abgelegt (`Button.test.tsx` neben `Button.tsx`, `api.test.ts` neben `api.ts`).
+- Test-Stack: **`vitest`** mit **`happy-dom`** und **`@testing-library/react`**.
+- Geteilte Matcher und Mocks liegen in `src/test/setup.ts`.
 
 ### 4. Commits & Releasing
-* **Kein automatisches Staging & keine automatischen Commits (Wichtig):** Agenten dürfen **weder eigenständig stagen (`git add`) noch committen (`git commit`)**. Sämtliche Änderungen verbleiben vollständig ungestaged direkt im Arbeitsverzeichnis (Working Tree), damit der Entwickler alle Diffs und Änderungen im Detail nachvollziehen, selbst auswählen und committen kann.
-* **Conventional Commits Pflicht:** Falls ein Commit explizit vom Entwickler angefordert wird, müssen alle Commits strikt dem Conventional Commits Schema folgen (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc.).
-* Git-Hooks (`husky`) prüfen Commit-Nachrichten automatisch über `commitlint`.
-* Releases werden mit `pnpm release` (SemVer + Changelog-Generierung) verwaltet.
+
+- **Kein automatisches Staging & keine automatischen Commits (Wichtig):** Agenten dürfen **weder eigenständig stagen (`git add`) noch committen (`git commit`)**. Sämtliche Änderungen verbleiben vollständig ungestaged direkt im Arbeitsverzeichnis (Working Tree), damit der Entwickler alle Diffs und Änderungen im Detail nachvollziehen, selbst auswählen und committen kann.
+- **Conventional Commits Pflicht:** Falls ein Commit explizit vom Entwickler angefordert wird, müssen alle Commits strikt dem Conventional Commits Schema folgen (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, etc.).
+- Git-Hooks (`husky`) prüfen Commit-Nachrichten automatisch über `commitlint`.
+- Releases werden mit `pnpm release` (SemVer + Changelog-Generierung) verwaltet.
 
 ### 5. Abschluss & Archivierung
+
 1. **Verifikation:** Stelle sicher, dass `pnpm test` und `pnpm build` ohne Fehler oder Warnungen durchlaufen.
 2. **Plan archivieren:** Verschiebe die fertige Plandatei von `docs/plans/active/` nach `docs/plans/archive/`.
 3. **ADR festhalten:** Wurde eine grundlegende Architekturentscheidung getroffen, dokumentiere sie als neues ADR unter `docs/architecture/XXXX-<thema>.md` nach [`docs/architecture/template.md`](docs/architecture/template.md).
@@ -43,14 +48,15 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 
 ## 🛠 Wichtige Terminal-Befehle
 
-| Befehl | Zweck |
-| :--- | :--- |
-| `pnpm dev` | Startet den Vite Entwicklungsserver (`http://localhost:5173`) |
-| `pnpm test` | Führt alle Tests einmalig aus |
-| `pnpm test:watch` | Startet Vitest im interaktiven Watch-Modus |
-| `pnpm test:coverage` | Berechnet Codeabdeckung & generiert HTML/Terminal-Report |
-| `pnpm build` | Führt den TypeScript-Check (`tsc`) und den Vite-Build aus |
-| `pnpm commit` | Interaktiver Commit-Assistent (Conventional Commits) |
-| `pnpm release` | Erstellt einen automatischen SemVer-Release inkl. `CHANGELOG.md` |
+| Befehl                 | Zweck                                                               |
+| :--------------------- | :------------------------------------------------------------------ |
+| `pnpm dev`             | Startet den Vite Entwicklungsserver (`http://localhost:5173`)       |
+| `pnpm test`            | Führt alle Tests einmalig aus                                       |
+| `pnpm test:watch`      | Startet Vitest im interaktiven Watch-Modus                          |
+| `pnpm test:coverage`   | Berechnet Codeabdeckung & generiert HTML/Terminal-Report            |
+| `pnpm format`          | Formatiert alle Quellcode-Dateien mit Prettier                      |
+| `pnpm format:check`    | Prüft Formatierung ohne Dateien zu verändern                        |
+| `pnpm build`           | Führt den TypeScript-Check (`tsc`) und den Vite-Build aus           |
+| `pnpm commit`          | Interaktiver Commit-Assistent (Conventional Commits)                |
+| `pnpm release`         | Erstellt einen automatischen SemVer-Release inkl. `CHANGELOG.md`    |
 | `pnpm release:dry-run` | Vorschau der nächsten Version und Release Notes ohne Schreibzugriff |
-

@@ -18,13 +18,7 @@ describe('DateRangePicker', () => {
   });
 
   it('renders formatted label when dates are active', () => {
-    render(
-      <DateRangePicker
-        startDate="2026-01-01"
-        endDate="2026-12-31"
-        onChange={vi.fn()}
-      />
-    );
+    render(<DateRangePicker startDate="2026-01-01" endDate="2026-12-31" onChange={vi.fn()} />);
 
     expect(screen.getByText('Dieses Jahr (2026)')).toBeInTheDocument();
   });
@@ -69,7 +63,7 @@ describe('DateRangePicker', () => {
 
     const inputs = screen.getAllByDisplayValue('');
     const startInput = inputs[0]; // Von Monat
-    const endInput = inputs[1];   // Bis Monat
+    const endInput = inputs[1]; // Bis Monat
 
     fireEvent.change(startInput, { target: { value: '2025-03' } });
     fireEvent.change(endInput, { target: { value: '2025-06' } });
@@ -86,13 +80,7 @@ describe('DateRangePicker', () => {
     const user = userEvent.setup();
     const handleChange = vi.fn();
 
-    render(
-      <DateRangePicker
-        startDate="2026-01-01"
-        endDate="2026-12-31"
-        onChange={handleChange}
-      />
-    );
+    render(<DateRangePicker startDate="2026-01-01" endDate="2026-12-31" onChange={handleChange} />);
 
     const clearBtn = screen.getByTitle('Zeitraum zurücksetzen');
     await user.click(clearBtn);
@@ -115,4 +103,3 @@ describe('DateRangePicker', () => {
     expect(screen.queryByText('Zeitraum wählen')).not.toBeInTheDocument();
   });
 });
-

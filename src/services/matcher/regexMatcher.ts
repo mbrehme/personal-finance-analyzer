@@ -5,7 +5,12 @@
  * @module services/matcher/regexMatcher
  */
 
-import { Bucket, Transaction, buildCompoundSearchField, BucketAssignmentSource } from '@/types/finance';
+import {
+  Bucket,
+  Transaction,
+  buildCompoundSearchField,
+  BucketAssignmentSource,
+} from '@/types/finance';
 
 export interface MatchResult {
   bucketId: string | null;

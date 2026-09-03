@@ -1,20 +1,23 @@
 # Plan: Drag-and-Drop für Buckets (Reihenfolge & Hierarchie) und Accounts (Reihenfolge)
 
-* **Status:** Abgeschlossen
-* **Erstellt am:** 2026-09-02
-* **Abgeschlossen am:** 2026-09-02
-* **Bearbeiter:** Antigravity & Entwickler-Team
+- **Status:** Abgeschlossen
+- **Erstellt am:** 2026-09-02
+- **Abgeschlossen am:** 2026-09-02
+- **Bearbeiter:** Antigravity & Entwickler-Team
 
 ---
 
 ## 1. Ziel & Übersicht
+
 Ermöglichung von intuitivem Drag-and-Drop in der Konfiguration (`/configuration`):
+
 1. **Buckets:** Reihenfolge unter Geschwister- und Top-Level-Buckets ändern sowie Eltern-Kind-Hierarchien per Nesting flexibel anpassen.
 2. **Accounts:** Reihenfolge der Konten-Karten per Drag-and-Drop anpassen.
 
 ---
 
 ## 2. Anforderungen & User Stories
+
 - [x] **Sortierung (Order):** `EntityVisualMetadata` (und damit `Bucket` und `Account`) erhält ein `order?: number` Attribut zur deterministischen Sortierung.
 - [x] **Visuelles Drag-Handle:**
   - Bucket-Zeilen erhalten ein `GripVertical`-Handle.
@@ -32,18 +35,20 @@ Ermöglichung von intuitivem Drag-and-Drop in der Konfiguration (`/configuration
 ---
 
 ## 3. Technische Konzeption & Betroffene Komponenten
-* **Domain Model (`src/types/finance.ts`):**
+
+- **Domain Model (`src/types/finance.ts`):**
   - Ergänzung von `order?: number` in `EntityVisualMetadata`.
-* **Storage & Context (`src/services/storage/`):**
+- **Storage & Context (`src/services/storage/`):**
   - `reorderBuckets(updatedBuckets: Bucket[])` und `reorderAccounts(updatedAccounts: Account[])` in `FinanceContext.tsx` und `db.ts`.
-* **UI (`src/pages/Configuration.tsx`):**
+- **UI (`src/pages/Configuration.tsx`):**
   - Drag-and-Drop Handlers für Bucket-Zeilen und Account-Karten mit visueller Hervorhebung.
-* **Cashflow & Balances Matrix Views:**
+- **Cashflow & Balances Matrix Views:**
   - Automatische Sortierung von Buckets und Accounts nach `(a.order ?? 0) - (b.order ?? 0)`.
 
 ---
 
 ## 4. Schrittweiser Umsetzungsplan
+
 1. [x] **Schritt 1: Typdefinitionen (`order?: number`)**
    - Datei: `src/types/finance.ts`
 2. [x] **Schritt 2: Batch Storage & Context Methoden**
@@ -56,6 +61,6 @@ Ermöglichung von intuitivem Drag-and-Drop in der Konfiguration (`/configuration
 ---
 
 ## 5. Verifikationsplan
+
 - [x] Unit-Tests erfolgreich (`pnpm test`)
 - [x] TypeScript Check & Build erfolgreich (`pnpm build`)
-

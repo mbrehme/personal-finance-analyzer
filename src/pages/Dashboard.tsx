@@ -46,17 +46,13 @@ export const Dashboard: React.FC = () => {
     }).format(amount);
   };
 
-  const categories = [
-    'all',
-    ...Array.from(new Set(transactions.map((t) => t.category))),
-  ];
+  const categories = ['all', ...Array.from(new Set(transactions.map((t) => t.category)))];
 
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch =
       t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      categoryFilter === 'all' || t.category === categoryFilter;
+    const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -73,18 +69,10 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            icon={<Download className="h-4 w-4" />}
-          >
+          <Button variant="outline" size="sm" icon={<Download className="h-4 w-4" />}>
             Export
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Plus className="h-4 w-4" />}
-          >
+          <Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />}>
             Transaktion hinzufügen
           </Button>
         </div>
@@ -92,7 +80,7 @@ export const Dashboard: React.FC = () => {
 
       {/* KPI Summary Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 animate-pulse">
+        <div className="grid animate-pulse grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-32 rounded-2xl bg-slate-200" />
           ))}
@@ -101,9 +89,7 @@ export const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">
-                Gesamtvermögen
-              </span>
+              <span className="text-sm font-medium text-slate-500">Gesamtvermögen</span>
               <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
                 <Wallet className="h-5 w-5" />
               </div>
@@ -112,17 +98,13 @@ export const Dashboard: React.FC = () => {
               <span className="text-2xl font-bold text-slate-900">
                 {formatCurrency(summary.totalBalance)}
               </span>
-              <span className="ml-2 text-xs font-medium text-emerald-600">
-                +4.2% Vormonat
-              </span>
+              <span className="ml-2 text-xs font-medium text-emerald-600">+4.2% Vormonat</span>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">
-                Einnahmen (Monat)
-              </span>
+              <span className="text-sm font-medium text-slate-500">Einnahmen (Monat)</span>
               <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
                 <ArrowDownLeft className="h-5 w-5" />
               </div>
@@ -131,17 +113,13 @@ export const Dashboard: React.FC = () => {
               <span className="text-2xl font-bold text-slate-900">
                 {formatCurrency(summary.monthlyIncome)}
               </span>
-              <span className="ml-2 text-xs font-medium text-slate-500">
-                Reguläres Gehalt
-              </span>
+              <span className="ml-2 text-xs font-medium text-slate-500">Reguläres Gehalt</span>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">
-                Ausgaben (Monat)
-              </span>
+              <span className="text-sm font-medium text-slate-500">Ausgaben (Monat)</span>
               <div className="rounded-lg bg-rose-100 p-2 text-rose-700">
                 <ArrowUpRight className="h-5 w-5" />
               </div>
@@ -150,28 +128,20 @@ export const Dashboard: React.FC = () => {
               <span className="text-2xl font-bold text-slate-900">
                 {formatCurrency(summary.monthlyExpenses)}
               </span>
-              <span className="ml-2 text-xs font-medium text-slate-500">
-                63.1% der Einnahmen
-              </span>
+              <span className="ml-2 text-xs font-medium text-slate-500">63.1% der Einnahmen</span>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">
-                Sparquote
-              </span>
+              <span className="text-sm font-medium text-slate-500">Sparquote</span>
               <div className="rounded-lg bg-purple-100 p-2 text-purple-700">
                 <PiggyBank className="h-5 w-5" />
               </div>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-slate-900">
-                {summary.savingsRate}%
-              </span>
-              <span className="ml-2 text-xs font-medium text-purple-600">
-                Ziel: 30% erreicht
-              </span>
+              <span className="text-2xl font-bold text-slate-900">{summary.savingsRate}%</span>
+              <span className="ml-2 text-xs font-medium text-purple-600">Ziel: 30% erreicht</span>
             </div>
           </div>
         </div>
@@ -179,24 +149,22 @@ export const Dashboard: React.FC = () => {
 
       {/* Transactions Section */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <Receipt className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-lg font-bold text-slate-900">
-              Letzte Transaktionen
-            </h2>
+            <h2 className="text-lg font-bold text-slate-900">Letzte Transaktionen</h2>
           </div>
 
           {/* Filter & Search */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Transaktion suchen..."
-                className="pl-9 pr-4 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="rounded-lg border border-slate-300 py-1.5 pl-9 pr-4 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
@@ -205,7 +173,7 @@ export const Dashboard: React.FC = () => {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="py-1.5 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 capitalize bg-white"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm capitalize focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>
@@ -222,10 +190,10 @@ export const Dashboard: React.FC = () => {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
               <tr>
-                <th className="py-3 px-4">Beschreibung</th>
-                <th className="py-3 px-4">Kategorie</th>
-                <th className="py-3 px-4">Datum</th>
-                <th className="py-3 px-4 text-right">Betrag</th>
+                <th className="px-4 py-3">Beschreibung</th>
+                <th className="px-4 py-3">Kategorie</th>
+                <th className="px-4 py-3">Datum</th>
+                <th className="px-4 py-3 text-right">Betrag</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -237,26 +205,19 @@ export const Dashboard: React.FC = () => {
                 </tr>
               ) : (
                 filteredTransactions.map((tx) => (
-                  <tr
-                    key={tx.id}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    <td className="py-3.5 px-4 font-medium text-slate-900">
-                      {tx.description}
-                    </td>
-                    <td className="py-3.5 px-4">
+                  <tr key={tx.id} className="transition-colors hover:bg-slate-50/80">
+                    <td className="px-4 py-3.5 font-medium text-slate-900">{tx.description}</td>
+                    <td className="px-4 py-3.5">
                       <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
                         {tx.category}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500 text-xs sm:text-sm">
+                    <td className="px-4 py-3.5 text-xs text-slate-500 sm:text-sm">
                       {new Date(tx.date).toLocaleDateString('de-DE')}
                     </td>
                     <td
-                      className={`py-3.5 px-4 text-right font-semibold ${
-                        tx.type === 'income'
-                          ? 'text-emerald-600'
-                          : 'text-slate-900'
+                      className={`px-4 py-3.5 text-right font-semibold ${
+                        tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'
                       }`}
                     >
                       {tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}
@@ -271,4 +232,3 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 };
-

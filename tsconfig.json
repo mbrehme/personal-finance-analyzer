@@ -14,11 +14,7 @@
     "jsx": "react-jsx",
 
     /* Explicit ambient types for rich IDE hover documentation */
-    "types": [
-      "vite/client",
-      "vitest/globals",
-      "@testing-library/jest-dom/vitest"
-    ],
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom/vitest"],
 
     /* Linting / Strictness */
     "strict": true,

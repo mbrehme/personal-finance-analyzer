@@ -12,21 +12,11 @@ import { IconRenderer } from '@/components/IconRenderer';
 import { formatPeriodLabel } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { useAnalyticsFilter } from '@/pages/analytics';
-import {
-  Wallet,
-  Landmark,
-  ShieldCheck,
-  Calendar,
-} from 'lucide-react';
+import { Wallet, Landmark, ShieldCheck, Calendar } from 'lucide-react';
 
 export const Balances: React.FC = () => {
   const { accounts, transactions } = useFinance();
-  const {
-    granularity,
-    selectedAccountId,
-    startDate,
-    endDate,
-  } = useAnalyticsFilter();
+  const { granularity, selectedAccountId, startDate, endDate } = useAnalyticsFilter();
 
   const balanceMatrix = useMemo(() => {
     return calculateAllBalances(
@@ -43,53 +33,50 @@ export const Balances: React.FC = () => {
 
   return (
     <div className="space-y-6">
-
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
             <span>Aktueller Gesamtsaldo</span>
-            <Wallet className="w-4 h-4 text-blue-600" />
+            <Wallet className="h-4 w-4 text-blue-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
+          <div className="font-mono text-2xl font-bold text-slate-900">
             {formatMoney(balanceMatrix.totalRow.latestBalance)}
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
             <span>Aktive Konten</span>
-            <Landmark className="w-4 h-4 text-slate-600" />
+            <Landmark className="h-4 w-4 text-slate-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
-            {accounts.length}
-          </div>
+          <div className="font-mono text-2xl font-bold text-slate-900">{accounts.length}</div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
             <span>Stichtags-Salden</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
+          <div className="font-mono text-2xl font-bold text-slate-900">
             {accounts.reduce((sum, acc) => sum + acc.balanceEntries.length, 0)}
           </div>
         </div>
       </div>
 
       {/* Salden-Matrix Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-                <th className="py-3.5 px-4 min-w-[200px]">Konto</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
+                <th className="min-w-[200px] px-4 py-3.5">Konto</th>
                 {balanceMatrix.periodKeys.map((pKey) => (
-                  <th key={pKey} className="py-3.5 px-4 text-right min-w-[140px]">
+                  <th key={pKey} className="min-w-[140px] px-4 py-3.5 text-right">
                     {formatPeriodLabel(pKey, granularity)}
                   </th>
                 ))}
-                <th className="py-3.5 px-4 text-right min-w-[140px] bg-slate-100/70">
+                <th className="min-w-[140px] bg-slate-100/70 px-4 py-3.5 text-right">
                   Aktueller Stand
                 </th>
               </tr>
@@ -97,15 +84,15 @@ export const Balances: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {balanceMatrix.rows.length > 0 ? (
                 balanceMatrix.rows.map((row) => (
-                  <tr key={row.account.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr key={row.account.id} className="transition-colors hover:bg-slate-50/80">
                     {/* Konto Name */}
-                    <td className="py-3 px-4 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-white"
                           style={{ backgroundColor: row.account.color || '#3b82f6' }}
                         >
-                          <IconRenderer name={row.account.icon} className="w-4 h-4" />
+                          <IconRenderer name={row.account.icon} className="h-4 w-4" />
                         </div>
                         <div>
                           <div className="font-bold text-slate-900">{row.account.name}</div>
@@ -122,7 +109,7 @@ export const Balances: React.FC = () => {
                       };
 
                       return (
-                        <td key={pKey} className="py-3 px-4 text-right whitespace-nowrap font-mono">
+                        <td key={pKey} className="whitespace-nowrap px-4 py-3 text-right font-mono">
                           <div className="font-bold text-slate-900">
                             {formatMoney(pData.endBalance)}
                           </div>
@@ -140,7 +127,7 @@ export const Balances: React.FC = () => {
                     })}
 
                     {/* Aktueller Stand */}
-                    <td className="py-3 px-4 text-right whitespace-nowrap font-mono font-bold bg-slate-50/50 text-slate-900 text-sm">
+                    <td className="whitespace-nowrap bg-slate-50/50 px-4 py-3 text-right font-mono text-sm font-bold text-slate-900">
                       {formatMoney(row.latestBalance)}
                     </td>
                   </tr>
@@ -149,7 +136,7 @@ export const Balances: React.FC = () => {
                 <tr>
                   <td
                     colSpan={balanceMatrix.periodKeys.length + 2}
-                    className="py-12 text-center text-slate-400 text-sm"
+                    className="py-12 text-center text-sm text-slate-400"
                   >
                     Keine Konten konfiguriert.
                   </td>
@@ -159,20 +146,20 @@ export const Balances: React.FC = () => {
             {/* Gesamtsummenzeile */}
             {balanceMatrix.periodKeys.length > 0 && (
               <tfoot>
-                <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300 text-xs">
-                  <td className="py-3.5 px-4 text-slate-900 font-bold">Gesamtvermögen</td>
+                <tr className="border-t-2 border-slate-300 bg-slate-100/80 text-xs font-bold">
+                  <td className="px-4 py-3.5 font-bold text-slate-900">Gesamtvermögen</td>
                   {balanceMatrix.periodKeys.map((pKey) => {
                     const endBal = balanceMatrix.totalRow.periods[pKey]?.endBalance || 0;
                     return (
                       <td
                         key={pKey}
-                        className="py-3.5 px-4 text-right font-mono font-bold text-slate-900"
+                        className="px-4 py-3.5 text-right font-mono font-bold text-slate-900"
                       >
                         {formatMoney(endBal)}
                       </td>
                     );
                   })}
-                  <td className="py-3.5 px-4 text-right font-mono font-extrabold bg-slate-200/60 text-slate-900 text-sm">
+                  <td className="bg-slate-200/60 px-4 py-3.5 text-right font-mono text-sm font-extrabold text-slate-900">
                     {formatMoney(balanceMatrix.totalRow.latestBalance)}
                   </td>
                 </tr>
@@ -183,14 +170,14 @@ export const Balances: React.FC = () => {
       </div>
 
       {/* Checkpoints Info Banner */}
-      <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-start gap-3 text-xs text-blue-900">
-        <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-xs text-blue-900">
+        <Calendar className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
         <div>
-          <p className="font-semibold mb-0.5">Automatische Salden-Rekonstruktion:</p>
+          <p className="mb-0.5 font-semibold">Automatische Salden-Rekonstruktion:</p>
           <p className="text-blue-700">
             Die Salden werden ausgehend von deinen in den Konten hinterlegten Stichtagen durch die
-            tatsächlichen Einnahmen und Ausgaben exakt fortgeschrieben. Zusätzliche Stichtags-Salden kannst
-            du jederzeit in der Konfiguration hinzufügen.
+            tatsächlichen Einnahmen und Ausgaben exakt fortgeschrieben. Zusätzliche Stichtags-Salden
+            kannst du jederzeit in der Konfiguration hinzufügen.
           </p>
         </div>
       </div>

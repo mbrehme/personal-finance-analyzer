@@ -103,14 +103,13 @@ describe('CategoryModal', () => {
     expect(screen.getByText(/Automatisches Rollup aktiv/i)).toBeInTheDocument();
     expect(screen.getByText(/1\.200,00/i)).toBeInTheDocument();
 
-    // Klick auf "Manuell überschreiben"
-    const overrideBtn = screen.getByRole('button', { name: /Manuell überschreiben/i });
-    fireEvent.click(overrideBtn);
+    // Keine Option für manuelle Budgeteingabe bei Elternkategorien
+    expect(
+      screen.queryByRole('button', { name: /Manuell überschreiben/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Soll-Budget festlegen')).not.toBeInTheDocument();
 
-    // Rollup-Hinweis unter den Inputs sichtbar
-    expect(screen.getByText(/Rollup der Kinder:/i)).toBeInTheDocument();
-
-    // Speichern mit manuellem Betrag
+    // Speichern der Elternkategorie (targetBudget muss undefined sein)
     const submitBtn = screen.getByText('Änderungen speichern');
     fireEvent.submit(submitBtn.closest('form')!);
 
@@ -118,10 +117,7 @@ describe('CategoryModal', () => {
       expect.objectContaining({
         id: 'b-parent',
         name: 'Wohnen',
-        targetBudget: {
-          amount: 1200,
-          period: 'monthly',
-        },
+        targetBudget: undefined,
       })
     );
   });

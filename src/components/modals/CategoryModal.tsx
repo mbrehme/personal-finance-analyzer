@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Category, PeriodGranularity } from '@/types/finance';
 import { normalizeBudgetToGranularity } from '@/utils/dateUtils';
-import { formatMoney, roundToTwoDecimals } from '@/utils/moneyUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '../IconRenderer';
 import { EntityVisualFields } from '../EntityVisualFields';
 import { MoneyInput } from '../MoneyInput';
@@ -124,10 +124,6 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
     return directChildren.reduce((sum, child) => sum + getChildrenBudget(child.id), 0);
   }, [currentCategory, existingCategories]);
 
-  const rollupForSelectedPeriod = useMemo(() => {
-    return normalizeBudgetToGranularity(rollupMonthlyBudget, 'monthly', budgetPeriod);
-  }, [rollupMonthlyBudget, budgetPeriod]);
-
   const handleRegexChange = (pattern: string) => {
     setRegexPattern(pattern);
     if (!pattern.trim()) {
@@ -158,12 +154,13 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
         regexPattern: isParentWithChildren ? undefined : regexPattern.trim() || undefined,
         color,
         icon,
-        targetBudget: hasBudget
-          ? {
-              amount: Math.abs(budgetAmount),
-              period: budgetPeriod,
-            }
-          : undefined,
+        targetBudget:
+          !isParentWithChildren && hasBudget
+            ? {
+                amount: Math.abs(budgetAmount),
+                period: budgetPeriod,
+              }
+            : undefined,
       };
 
       await onSave(payload as any);
@@ -285,113 +282,72 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
 
           {/* Soll-Budget */}
           <div className="space-y-2 border-t border-slate-100 pt-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  Soll-Budget festlegen
-                </label>
-                {isParentWithChildren && (
-                  <span className="text-[11px] text-slate-500">
-                    Manuelles Budget für diese übergeordnete Kategorie
-                  </span>
-                )}
-              </div>
-              <input
-                type="checkbox"
-                checked={hasBudget}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setHasBudget(checked);
-                  if (
-                    checked &&
-                    isParentWithChildren &&
-                    rollupForSelectedPeriod > 0 &&
-                    budgetAmount === 100
-                  ) {
-                    setBudgetAmount(roundToTwoDecimals(rollupForSelectedPeriod));
-                  }
-                }}
-                className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-              />
-            </div>
-
-            {hasBudget ? (
-              <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
-                      Zielbetrag
-                    </label>
-                    <MoneyInput
-                      value={budgetAmount}
-                      onChange={setBudgetAmount}
-                      min={0}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
-                      Zyklus
-                    </label>
-                    <select
-                      value={budgetPeriod}
-                      onChange={(e) => setBudgetPeriod(e.target.value as PeriodGranularity)}
-                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="monthly">Monatlich</option>
-                      <option value="quarterly">Quartal</option>
-                      <option value="halfYearly">Halbjahr</option>
-                      <option value="yearly">Jährlich</option>
-                    </select>
-                  </div>
+            {isParentWithChildren ? (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-900">
+                <div className="flex items-center gap-2 font-semibold">
+                  <span className="flex h-2 w-2 rounded-full bg-blue-600" />
+                  Automatisches Rollup aktiv
                 </div>
-
-                {/* Hint für Rollup-Wert bei Elternkategorien */}
-                {isParentWithChildren && rollupForSelectedPeriod > 0 && (
-                  <div className="flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-600">
-                    <span className="flex items-center gap-1">
-                      <span className="font-semibold text-slate-700">Rollup der Kinder:</span>{' '}
-                      {formatMoney(rollupForSelectedPeriod)} /{' '}
-                      {budgetPeriod === 'monthly'
-                        ? 'Monat'
-                        : budgetPeriod === 'quarterly'
-                          ? 'Quartal'
-                          : budgetPeriod === 'halfYearly'
-                            ? 'Halbjahr'
-                            : 'Jahr'}
-                    </span>
-                    {budgetAmount !== roundToTwoDecimals(rollupForSelectedPeriod) && (
-                      <button
-                        type="button"
-                        onClick={() => setBudgetAmount(roundToTwoDecimals(rollupForSelectedPeriod))}
-                        className="cursor-pointer font-semibold text-blue-600 underline transition-colors hover:text-blue-700 hover:no-underline"
-                      >
-                        Als Wert übernehmen
-                      </button>
-                    )}
+                <p className="mt-1 text-[11px] text-blue-700">
+                  Diese Kategorie besitzt Unterkategorien. Das Budget und die Werte berechnen sich
+                  automatisch aus den ausgewählten Unterkategorien (Rollup). Es kann kein eigenes
+                  manuelles Budget vergeben werden.
+                </p>
+                {rollupMonthlyBudget > 0 && (
+                  <div className="mt-2 text-xs font-bold text-blue-900">
+                    Aktuelle Summe aller Unterkategorien: {formatMoney(rollupMonthlyBudget)} / Monat
                   </div>
                 )}
               </div>
             ) : (
-              isParentWithChildren &&
-              rollupMonthlyBudget > 0 && (
-                <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50/60 p-2.5 text-[11px] text-blue-900">
-                  <span>
-                    <strong>Automatisches Rollup aktiv:</strong> {formatMoney(rollupMonthlyBudget)}{' '}
-                    / Monat aus untergeordneten Kategorien.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHasBudget(true);
-                      setBudgetAmount(roundToTwoDecimals(rollupMonthlyBudget));
-                    }}
-                    className="ml-2 shrink-0 cursor-pointer font-bold text-blue-700 underline hover:text-blue-800"
-                  >
-                    Manuell überschreiben
-                  </button>
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                      Soll-Budget festlegen
+                    </label>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={hasBudget}
+                    onChange={(e) => setHasBudget(e.target.checked)}
+                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                  />
                 </div>
-              )
+
+                {hasBudget && (
+                  <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
+                          Zielbetrag
+                        </label>
+                        <MoneyInput
+                          value={budgetAmount}
+                          onChange={setBudgetAmount}
+                          min={0}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
+                          Zyklus
+                        </label>
+                        <select
+                          value={budgetPeriod}
+                          onChange={(e) => setBudgetPeriod(e.target.value as PeriodGranularity)}
+                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="monthly">Monatlich</option>
+                          <option value="quarterly">Quartal</option>
+                          <option value="halfYearly">Halbjahr</option>
+                          <option value="yearly">Jährlich</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

@@ -14,12 +14,12 @@ describe('cashflowCalculator', () => {
       id: 'b-living',
       name: 'Wohnen',
       parentId: null,
-      targetBudget: { period: 'monthly', amount: 1500 },
     },
     {
       id: 'b-rent',
       name: 'Miete',
       parentId: 'b-living',
+      targetBudget: { period: 'monthly', amount: 1500 },
     },
     {
       id: 'b-salary',
@@ -217,9 +217,85 @@ describe('cashflowCalculator', () => {
     expect(parentRow?.isBudgetRollup).toBe(true);
     expect(parentRow?.periods['2026-09'].budget).toBe(1250);
 
-    // b-manual-parent behält sein eigenes manuelles Budget (500), kein Rollup
-    expect(manualParentRow?.effectiveBudget).toBe(500);
-    expect(manualParentRow?.isBudgetRollup).toBe(false);
+    // b-manual-parent hat Kinder, darf keine eigenen Werte haben -> reines Rollup des Kindes (300)
+    expect(manualParentRow?.effectiveBudget).toBe(300);
+    expect(manualParentRow?.isBudgetRollup).toBe(true);
+  });
+
+  it('only includes selected categories in parent rollup (budget and transactions)', () => {
+    const hierarchyCategories: Category[] = [
+      {
+        id: 'p1',
+        name: 'Wohnen',
+        parentId: null,
+      },
+      {
+        id: 'c1',
+        name: 'Miete',
+        parentId: 'p1',
+        targetBudget: { period: 'monthly', amount: 800 },
+      },
+      {
+        id: 'c2',
+        name: 'Strom',
+        parentId: 'p1',
+        targetBudget: { period: 'monthly', amount: 100 },
+      },
+    ];
+
+    const txs: Transaction[] = [
+      {
+        id: 't1',
+        accountId: 'acc1',
+        bookingDate: '2026-09-05',
+        valueDate: '2026-09-05',
+        issuer: 'Me',
+        receiver: 'Landlord',
+        subject: 'Miete',
+        type: 'outbound',
+        iban: 'DE00',
+        value: -800,
+        categoryId: 'c1',
+        assignmentSource: 'manual',
+      },
+      {
+        id: 't2',
+        accountId: 'acc1',
+        bookingDate: '2026-09-10',
+        valueDate: '2026-09-10',
+        issuer: 'Me',
+        receiver: 'Utility',
+        subject: 'Strom',
+        type: 'outbound',
+        iban: 'DE00',
+        value: -90,
+        categoryId: 'c2',
+        assignmentSource: 'manual',
+      },
+    ];
+
+    // 1. Beide Kinder ausgewählt: Parent Rollup = 900 Budget, -890 Outbound
+    const fullMatrix = calculateCashflowMatrix(hierarchyCategories, txs, 'monthly', undefined, {
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+      selectedCategoryIds: ['p1', 'c1', 'c2'],
+    });
+
+    const fullParent = fullMatrix.rows.find((r) => r.category.id === 'p1');
+    expect(fullParent?.effectiveBudget).toBe(900);
+    expect(fullParent?.totalOutbound).toBe(-890);
+
+    // 2. Nur c1 (Miete) ausgewählt, c2 (Strom) abgewählt: Parent Rollup = 800 Budget, -800 Outbound
+    const filteredMatrix = calculateCashflowMatrix(hierarchyCategories, txs, 'monthly', undefined, {
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+      selectedCategoryIds: ['p1', 'c1'],
+    });
+
+    const filteredParent = filteredMatrix.rows.find((r) => r.category.id === 'p1');
+    expect(filteredParent?.effectiveBudget).toBe(800);
+    expect(filteredParent?.totalOutbound).toBe(-800);
+    expect(filteredMatrix.rows.find((r) => r.category.id === 'c2')).toBeUndefined();
   });
 
   it('correctly aggregates uncategorized transactions into uncategorizedRow', () => {

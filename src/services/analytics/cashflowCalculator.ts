@@ -202,10 +202,13 @@ export function calculateCashflowMatrix(
 
   const rows: CategoryCashflowRow[] = [];
 
+  const allowedCategories =
+    options?.selectedCategoryIds !== undefined ? new Set(options.selectedCategoryIds) : null;
+
   /**
    * Rekursive Berechnung des effektiven Budgets:
-   * 1. Hat die Kategorie ein eigenes manuelles targetBudget -> dieses verwenden.
-   * 2. Falls nicht, aber Kinderelemente mit Budgets existieren -> Summe der Kind-Budgets (Rollup).
+   * 1. Hat die Kategorie Kinder -> Reines Rollup der AUSGEWÄHLTEN Kinder (Elternkategorien dürfen keine eigenen Werte haben).
+   * 2. Ist es eine Blatt-Kategorie (keine Kinder) -> eigenes targetBudget verwenden, sofern ausgewählt.
    * 3. Ansonsten undefined.
    */
   const getEffectiveCategoryBudget = (
@@ -213,6 +216,44 @@ export function calculateCashflowMatrix(
   ): { amount: number; isRollup: boolean } | undefined => {
     const c = categories.find((item) => item.id === cId);
     if (!c) return undefined;
+
+    const children = childrenMap.get(cId) || [];
+    const hasChildren = children.length > 0;
+
+    // Wenn die Kategorie Kinder hat, darf sie keine eigenen Werte haben -> reines Rollup der Kinder
+    if (hasChildren) {
+      let sum = 0;
+      let hasAnyChildBudget = false;
+
+      children.forEach((child) => {
+        // Kind nur berücksichtigen, wenn es (oder eines seiner Sub-Kinder) im Filter ausgewählt ist
+        const childSubtree = getSubtreeCategoryIds(child.id);
+        const childIsActive =
+          !allowedCategories || childSubtree.some((id) => allowedCategories.has(id));
+
+        if (childIsActive) {
+          const childRes = getEffectiveCategoryBudget(child.id);
+          if (childRes !== undefined) {
+            sum += childRes.amount;
+            hasAnyChildBudget = true;
+          }
+        }
+      });
+
+      if (hasAnyChildBudget) {
+        return {
+          amount: sum,
+          isRollup: true,
+        };
+      }
+      return undefined;
+    }
+
+    // Blatt-Kategorie (ohne Kinder): nur dann ein Budget, wenn sie im Filter ausgewählt ist
+    const isAllowed = !allowedCategories || allowedCategories.has(c.id);
+    if (!isAllowed) {
+      return undefined;
+    }
 
     if (c.targetBudget) {
       return {
@@ -225,34 +266,8 @@ export function calculateCashflowMatrix(
       };
     }
 
-    const children = childrenMap.get(cId) || [];
-    if (children.length === 0) {
-      return undefined;
-    }
-
-    let sum = 0;
-    let hasAnyChildBudget = false;
-
-    children.forEach((child) => {
-      const childRes = getEffectiveCategoryBudget(child.id);
-      if (childRes !== undefined) {
-        sum += childRes.amount;
-        hasAnyChildBudget = true;
-      }
-    });
-
-    if (hasAnyChildBudget) {
-      return {
-        amount: sum,
-        isRollup: true,
-      };
-    }
-
     return undefined;
   };
-
-  const allowedCategories =
-    options?.selectedCategoryIds !== undefined ? new Set(options.selectedCategoryIds) : null;
 
   const processCategory = (category: Category, depth: number) => {
     const subtreeIds = getSubtreeCategoryIds(category.id);
@@ -273,11 +288,16 @@ export function calculateCashflowMatrix(
     const budgetAmount = effectiveBudgetInfo?.amount;
     const isBudgetRollup = effectiveBudgetInfo?.isRollup ?? false;
 
+    // Bei Rollups in der Matrix nur die aktuell ausgewählten Subtree-Kategorien summieren
+    const effectiveSubtreeIds = allowedCategories
+      ? subtreeIds.filter((id) => allowedCategories.has(id))
+      : subtreeIds;
+
     periodKeys.forEach((pKey) => {
       let inbound = 0;
       let outbound = 0;
 
-      subtreeIds.forEach((id) => {
+      effectiveSubtreeIds.forEach((id) => {
         const pData = directSums.get(id)?.[pKey];
         if (pData) {
           inbound += pData.inbound;

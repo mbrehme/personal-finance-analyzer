@@ -170,6 +170,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (loadedCategories.length === 0) {
         await financeDB.saveCategories(SEED_CATEGORIES);
         loadedCategories = SEED_CATEGORIES;
+      } else {
+        // Bereinigung: Eltern-Kategorien mit Kindern dürfen kein regexPattern besitzen
+        const parentIds = new Set(
+          loadedCategories.map((c) => c.parentId).filter(Boolean) as string[]
+        );
+        let needsDBSave = false;
+        const sanitizedCategories = loadedCategories.map((c) => {
+          if (parentIds.has(c.id) && c.regexPattern) {
+            needsDBSave = true;
+            return { ...c, regexPattern: undefined };
+          }
+          return c;
+        });
+        if (needsDBSave) {
+          await financeDB.saveCategories(sanitizedCategories);
+          loadedCategories = sanitizedCategories;
+        }
       }
 
       if (loadedAccounts.length === 0) {
@@ -274,8 +291,25 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: `b-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       manualTransactionIds: [],
     };
+
+    let updatedCategories = [...categories, newCategory];
+
+    // Wenn die neue Kategorie eine übergeordnete Kategorie hat, verliert diese ihr regexPattern
+    if (newCategory.parentId) {
+      const parent = categories.find((c) => c.id === newCategory.parentId);
+      if (parent && parent.regexPattern) {
+        const cleanedParent: Category = {
+          ...parent,
+          regexPattern: undefined,
+        };
+        await financeDB.saveCategory(cleanedParent);
+        updatedCategories = updatedCategories.map((c) =>
+          c.id === cleanedParent.id ? cleanedParent : c
+        );
+      }
+    }
+
     await financeDB.saveCategory(newCategory);
-    const updatedCategories = [...categories, newCategory];
     setCategories(updatedCategories);
     setReMatchStatus('needs_reprogress');
 
@@ -283,15 +317,46 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateCategory = async (updated: Category): Promise<void> => {
-    await financeDB.saveCategory(updated);
-    const updatedCategories = categories.map((c) => (c.id === updated.id ? updated : c));
+    // 1. Hat die aktualisierte Kategorie Kinder? Dann darf sie selbst kein Regex haben.
+    const hasChildren = categories.some((c) => c.parentId === updated.id);
+    const sanitizedUpdated: Category = hasChildren
+      ? { ...updated, regexPattern: undefined }
+      : updated;
+
+    let updatedCategories = categories.map((c) =>
+      c.id === sanitizedUpdated.id ? sanitizedUpdated : c
+    );
+
+    // 2. Hat die Kategorie einen Parent bekommen, der noch ein Regex hat? Dann Parent bereinigen.
+    if (sanitizedUpdated.parentId) {
+      const parent = categories.find((c) => c.id === sanitizedUpdated.parentId);
+      if (parent && parent.regexPattern) {
+        const cleanedParent: Category = { ...parent, regexPattern: undefined };
+        await financeDB.saveCategory(cleanedParent);
+        updatedCategories = updatedCategories.map((c) =>
+          c.id === cleanedParent.id ? cleanedParent : c
+        );
+      }
+    }
+
+    await financeDB.saveCategory(sanitizedUpdated);
     setCategories(updatedCategories);
     setReMatchStatus('needs_reprogress');
   };
 
   const reorderCategories = async (updatedCategories: Category[]): Promise<void> => {
-    await financeDB.saveCategories(updatedCategories);
-    setCategories(updatedCategories);
+    const parentIdsWithChildren = new Set(
+      updatedCategories.map((c) => c.parentId).filter(Boolean) as string[]
+    );
+    const sanitized = updatedCategories.map((c) => {
+      if (parentIdsWithChildren.has(c.id) && c.regexPattern) {
+        return { ...c, regexPattern: undefined };
+      }
+      return c;
+    });
+
+    await financeDB.saveCategories(sanitized);
+    setCategories(sanitized);
     setReMatchStatus('needs_reprogress');
   };
 

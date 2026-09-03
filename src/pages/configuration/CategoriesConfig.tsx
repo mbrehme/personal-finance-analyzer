@@ -44,6 +44,7 @@ export const CategoriesConfig: React.FC = () => {
   // Modal State
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [modalParentId, setModalParentId] = useState<string | null>(null);
 
   // Drag & Drop State
   const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
@@ -275,6 +276,7 @@ export const CategoriesConfig: React.FC = () => {
           onDragEnd={handleCategoryDragEnd}
           onClick={() => {
             setEditingCategory(category);
+            setModalParentId(null);
             setIsCategoryModalOpen(true);
           }}
           className={`group cursor-pointer border-b border-slate-100 transition-all hover:bg-blue-50/60 ${
@@ -326,13 +328,13 @@ export const CategoriesConfig: React.FC = () => {
 
           {/* Regex Spalte - Flexible Spalte mit Word-Break */}
           <td className="px-4 py-3 font-mono text-xs text-slate-600">
-            {category.regexPattern ? (
-              <span className="inline-block max-w-full whitespace-normal break-all rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 font-mono text-[11px] leading-relaxed text-slate-700 shadow-sm">
-                {category.regexPattern}
-              </span>
-            ) : hasChildren ? (
+            {hasChildren ? (
               <span className="text-[11px] italic text-slate-400">
                 Roll-Up aus Unter-Kategorien
+              </span>
+            ) : category.regexPattern ? (
+              <span className="inline-block max-w-full whitespace-normal break-all rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1 font-mono text-[11px] leading-relaxed text-slate-700 shadow-sm">
+                {category.regexPattern}
               </span>
             ) : (
               <span className="text-slate-300">-</span>
@@ -364,15 +366,23 @@ export const CategoriesConfig: React.FC = () => {
             )}
           </td>
 
-          {/* Manuelle Overrides */}
-          <td className="w-[160px] shrink-0 whitespace-nowrap px-4 py-3 text-xs text-slate-600">
-            {category.manualTransactionIds && category.manualTransactionIds.length > 0 ? (
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 font-medium text-amber-800">
-                {category.manualTransactionIds.length} Buchung(en)
-              </span>
-            ) : (
-              <span className="text-slate-400">0</span>
-            )}
+          {/* Aktionen: Neue Unterkategorie anlegen */}
+          <td className="w-[140px] shrink-0 whitespace-nowrap px-4 py-3 text-right text-xs">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingCategory(null);
+                setModalParentId(category.id);
+                setIsCategoryModalOpen(true);
+              }}
+              className="shadow-xs inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              title="Neue Unterkategorie anlegen"
+              aria-label="Neue Unterkategorie anlegen"
+            >
+              <FolderPlus className="h-3.5 w-3.5 text-blue-600" />
+              <span>Unterkategorie</span>
+            </button>
           </td>
         </tr>
 
@@ -399,6 +409,7 @@ export const CategoriesConfig: React.FC = () => {
           type="button"
           onClick={() => {
             setEditingCategory(null);
+            setModalParentId(null);
             setIsCategoryModalOpen(true);
           }}
           className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
@@ -415,7 +426,7 @@ export const CategoriesConfig: React.FC = () => {
               <th className="w-[280px] px-4 py-3">Kategorie Name</th>
               <th className="px-4 py-3">Regex-Muster (Leafs)</th>
               <th className="w-[180px] whitespace-nowrap px-4 py-3">Soll-Budget</th>
-              <th className="w-[160px] whitespace-nowrap px-4 py-3">Manuelle Overrides</th>
+              <th className="w-[140px] whitespace-nowrap px-4 py-3 text-right">Aktionen</th>
             </tr>
           </thead>
           <tbody>
@@ -457,6 +468,7 @@ export const CategoriesConfig: React.FC = () => {
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         category={editingCategory}
+        initialParentId={modalParentId}
         existingCategories={categories}
         onDelete={deleteCategory}
         onSave={async (categoryData) => {

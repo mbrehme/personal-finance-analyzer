@@ -329,4 +329,36 @@ describe('FinanceContext', () => {
     expect(result.current.transactions.some((t) => t.id === manualTx.id)).toBe(false);
     expect(result.current.deletedTransactions.some((t) => t.id === manualTx.id)).toBe(false);
   });
+
+  it('automatically clears regexPattern from parent category when subcategory is added', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let parentCategory: any;
+    await act(async () => {
+      parentCategory = await result.current.addCategory({
+        name: 'Parent mit Regex',
+        parentId: null,
+        regexPattern: 'TestRegex.*',
+      });
+    });
+
+    expect(parentCategory.regexPattern).toBe('TestRegex.*');
+    expect(result.current.categories.find((c) => c.id === parentCategory.id)?.regexPattern).toBe(
+      'TestRegex.*'
+    );
+
+    // Unterkategorie unter diesem Parent anlegen
+    await act(async () => {
+      await result.current.addCategory({
+        name: 'Neue Unterkategorie',
+        parentId: parentCategory.id,
+        regexPattern: 'ChildRegex.*',
+      });
+    });
+
+    // Parent muss nun sein regexPattern verloren haben
+    const updatedParent = result.current.categories.find((c) => c.id === parentCategory.id);
+    expect(updatedParent?.regexPattern).toBeUndefined();
+  });
 });

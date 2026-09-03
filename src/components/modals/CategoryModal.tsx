@@ -25,6 +25,8 @@ export interface CategoryModalProps {
   existingCategories?: Category[];
   /** @deprecated Verwende existingCategories */
   existingBuckets?: Category[];
+  /** Vorausgewählte übergeordnete Kategorie beim Neuanlegen */
+  initialParentId?: string | null;
 }
 
 /** @deprecated Verwende CategoryModalProps */
@@ -39,6 +41,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   bucket: propBucket,
   existingCategories: propExistingCategories,
   existingBuckets: propExistingBuckets,
+  initialParentId = null,
 }) => {
   const currentCategory = propCategory ?? propBucket;
   const existingCategories = propExistingCategories ?? propExistingBuckets ?? [];
@@ -74,7 +77,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
     } else {
       setName('');
       setDescription('');
-      setParentId(null);
+      setParentId(initialParentId ?? null);
       setRegexPattern('');
       setColor('#3b82f6');
       setIcon('Folder');
@@ -83,7 +86,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setBudgetPeriod('monthly');
     }
     setRegexError(null);
-  }, [currentCategory, isOpen]);
+  }, [currentCategory, isOpen, initialParentId]);
 
   // Prüfen, ob die aktuelle Kategorie Kinder hat (dann darf sie selbst kein Regex haben)
   const isParentWithChildren = currentCategory

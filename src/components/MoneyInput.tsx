@@ -36,7 +36,8 @@ export const MoneyInput: React.FC<MoneyInputProps> = ({
   id,
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = parseFloat(e.target.value);
+    const raw = e.target.value.replace(',', '.');
+    const parsed = parseFloat(raw);
     onChange(isNaN(parsed) ? 0 : parsed);
   };
 

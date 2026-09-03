@@ -12,10 +12,13 @@ import {
   ISODateString,
   buildCompoundSearchField,
   sortTransactionsDesc,
+  isManualTransaction,
+  Transaction,
 } from '@/types/finance';
 import { IconRenderer } from '@/components/IconRenderer';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { CsvImportModal } from '@/components/modals/CsvImportModal';
+import { TransactionModal } from '@/components/modals/TransactionModal';
 import { formatDate } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import {
@@ -24,12 +27,13 @@ import {
   Filter,
   UploadCloud,
   Trash2,
-  Lock,
-  Bot,
   RotateCcw,
   ChevronDown,
   Layers,
   Loader2,
+  Plus,
+  Pencil,
+  Scissors,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -98,6 +102,9 @@ export const Transactions: React.FC = () => {
     accounts,
     categories,
     loading,
+    addTransaction,
+    updateTransaction,
+    splitTransaction,
     importTransactions,
     assignTransactionCategory,
     deleteTransaction,
@@ -110,6 +117,7 @@ export const Transactions: React.FC = () => {
   const [inputAccountId, setInputAccountId] = useState<string>('all');
   const [inputCategoryId, setInputCategoryId] = useState<string>('all');
   const [inputType, setInputType] = useState<TransactionType | 'all'>('all');
+  const [inputOrigin, setInputOrigin] = useState<'all' | 'imported' | 'manual'>('all');
   const [inputStartDate, setInputStartDate] = useState<string>('');
   const [inputEndDate, setInputEndDate] = useState<string>('');
 
@@ -119,6 +127,7 @@ export const Transactions: React.FC = () => {
     accountId: string;
     categoryId: string;
     type: TransactionType | 'all';
+    origin: 'all' | 'imported' | 'manual';
     startDate: string;
     endDate: string;
   }>({
@@ -126,9 +135,49 @@ export const Transactions: React.FC = () => {
     accountId: 'all',
     categoryId: 'all',
     type: 'all',
+    origin: 'all',
     startDate: '',
     endDate: '',
   });
+
+  // Modal State für Manuelle Buchung / Edit / Split
+  const [isTxModalOpen, setIsTxModalOpen] = useState(false);
+  const [txModalMode, setTxModalMode] = useState<'create' | 'edit' | 'split'>('create');
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+
+  const handleOpenCreateModal = () => {
+    setSelectedTx(null);
+    setTxModalMode('create');
+    setIsTxModalOpen(true);
+  };
+
+  const handleOpenEditModal = (tx: Transaction) => {
+    setSelectedTx(tx);
+    setTxModalMode('edit');
+    setIsTxModalOpen(true);
+  };
+
+  const handleOpenSplitModal = (tx: Transaction) => {
+    setSelectedTx(tx);
+    setTxModalMode('split');
+    setIsTxModalOpen(true);
+  };
+
+  const handleSaveTransaction = async (txData: Omit<Transaction, 'id'> | Transaction) => {
+    if ('id' in txData && txData.id) {
+      await updateTransaction(txData as Transaction);
+    } else {
+      await addTransaction(txData);
+    }
+  };
+
+  const handleSplitTransaction = async (
+    originalId: string,
+    splitAmount: number,
+    splitData: { subject: string; receiver: string; categoryId: string | null }
+  ) => {
+    await splitTransaction(originalId, splitAmount, splitData);
+  };
 
   // Lazy Loading / Pagination State
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -179,7 +228,7 @@ export const Transactions: React.FC = () => {
 
   // Gefilterte Transaktionen basierend auf angewandten Filtern
   const filteredTransactions = useMemo(() => {
-    const { searchTerm, accountId, categoryId, type, startDate, endDate } = appliedFilters;
+    const { searchTerm, accountId, categoryId, type, origin, startDate, endDate } = appliedFilters;
 
     const matches = transactions.filter((tx) => {
       const txCatId = tx.categoryId ?? tx.bucketId ?? null;
@@ -214,7 +263,15 @@ export const Transactions: React.FC = () => {
         return false;
       }
 
-      // 4. Datum Filter
+      // 4. Quelle Filter (Alle Quellen | Bank-Import | Manuell)
+      if (origin === 'imported' && tx.origin === 'manual') {
+        return false;
+      }
+      if (origin === 'manual' && !isManualTransaction(tx)) {
+        return false;
+      }
+
+      // 5. Datum Filter
       if (startDate && tx.valueDate < (startDate as ISODateString)) {
         return false;
       }
@@ -222,7 +279,7 @@ export const Transactions: React.FC = () => {
         return false;
       }
 
-      // 5. Compound-Suche
+      // 6. Compound-Suche
       if (searchTerm.trim()) {
         const compound = buildCompoundSearchField(tx).toLowerCase();
         const term = searchTerm.trim().toLowerCase();
@@ -284,6 +341,7 @@ export const Transactions: React.FC = () => {
       accountId: inputAccountId,
       categoryId: inputCategoryId,
       type: inputType,
+      origin: inputOrigin,
       startDate: inputStartDate,
       endDate: inputEndDate,
     });
@@ -296,6 +354,7 @@ export const Transactions: React.FC = () => {
     setInputAccountId('all');
     setInputCategoryId('all');
     setInputType('all');
+    setInputOrigin('all');
     setInputStartDate('');
     setInputEndDate('');
     setAppliedFilters({
@@ -303,6 +362,7 @@ export const Transactions: React.FC = () => {
       accountId: 'all',
       categoryId: 'all',
       type: 'all',
+      origin: 'all',
       startDate: '',
       endDate: '',
     });
@@ -314,6 +374,7 @@ export const Transactions: React.FC = () => {
     inputAccountId !== appliedFilters.accountId ||
     inputCategoryId !== appliedFilters.categoryId ||
     inputType !== appliedFilters.type ||
+    inputOrigin !== appliedFilters.origin ||
     inputStartDate !== appliedFilters.startDate ||
     inputEndDate !== appliedFilters.endDate;
 
@@ -322,6 +383,7 @@ export const Transactions: React.FC = () => {
     appliedFilters.accountId !== 'all' ||
     appliedFilters.categoryId !== 'all' ||
     appliedFilters.type !== 'all' ||
+    appliedFilters.origin !== 'all' ||
     appliedFilters.startDate !== '' ||
     appliedFilters.endDate !== '';
 
@@ -379,6 +441,15 @@ export const Transactions: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+          >
+            <Plus className="h-4 w-4" />
+            Neue Buchung
+          </button>
+
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
@@ -524,19 +595,39 @@ export const Transactions: React.FC = () => {
           </div>
 
           {/* 4. Typ Filter */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <select
               value={inputType}
               onChange={(e) => setInputType(e.target.value as TransactionType | 'all')}
-              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="all">Alle Typen</option>
-              <option value="inbound">Nur Einnahmen (+)</option>
-              <option value="outbound">Nur Ausgaben (-)</option>
+              <option value="all">Typ: Alle</option>
+              <option value="inbound">Einnahmen (+)</option>
+              <option value="outbound">Ausgaben (-)</option>
             </select>
           </div>
 
-          {/* 5. Datums-Bereich */}
+          {/* 5. Quelle Filter */}
+          <div className="lg:col-span-1">
+            <select
+              value={inputOrigin}
+              onChange={(e) => {
+                const val = e.target.value as 'all' | 'imported' | 'manual';
+                setInputOrigin(val);
+                setAppliedFilters((prev) => ({ ...prev, origin: val }));
+                setVisibleCount(PAGE_SIZE);
+              }}
+              className="h-9 w-full truncate rounded-xl border border-slate-300 bg-white px-2 py-1.5 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Buchungsquelle filtern"
+              aria-label="Buchungsquelle filtern"
+            >
+              <option value="all">Alle Quellen</option>
+              <option value="imported">Bank-Import</option>
+              <option value="manual">Manuell</option>
+            </select>
+          </div>
+
+          {/* 6. Datums-Bereich */}
           <div className="lg:col-span-3">
             <DateRangePicker
               startDate={inputStartDate}
@@ -575,40 +666,113 @@ export const Transactions: React.FC = () => {
                     <tr key={tx.id} className="transition-colors hover:bg-slate-50/80">
                       {/* Datum */}
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                        {formatDate(tx.valueDate)}
+                        <div className="flex items-center gap-1.5">
+                          <span>{formatDate(tx.valueDate)}</span>
+                          {tx.originalValueDate !== undefined &&
+                            tx.valueDate !== tx.originalValueDate && (
+                              <span
+                                className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                                title={`Ursprüngliches Bankdatum: ${formatDate(tx.originalValueDate)}`}
+                              >
+                                Geändert
+                              </span>
+                            )}
+                        </div>
+                        {tx.origin === 'manual' && (
+                          <div className="mt-1">
+                            {tx.splitFromId ? (
+                              <span
+                                className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                                title="Abgespaltener Teil einer Buchung"
+                              >
+                                <Scissors className="h-2.5 w-2.5" /> Split
+                              </span>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-800"
+                                title="Manuell erfasste Buchung"
+                              >
+                                Manuell
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* Konto */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        {account ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
-                            <IconRenderer
-                              name={account.icon}
-                              style={{ color: account.color }}
-                              className="h-3.5 w-3.5"
-                            />
-                            {account.name}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {account ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
+                              <IconRenderer
+                                name={account.icon}
+                                style={{ color: account.color }}
+                                className="h-3.5 w-3.5"
+                              />
+                              {account.name}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                          {tx.originalAccountId !== undefined &&
+                            tx.accountId !== tx.originalAccountId && (
+                              <span
+                                className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                                title="Konto manuell angepasst"
+                              >
+                                Geändert
+                              </span>
+                            )}
+                        </div>
                       </td>
 
                       {/* Partner & Subject */}
                       <td className="max-w-xs px-4 py-3">
-                        <div className="truncate font-semibold text-slate-800">
-                          {tx.receiver || tx.issuer || 'Kein Empfänger'}
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate font-semibold text-slate-800">
+                            {tx.receiver || tx.issuer || 'Kein Empfänger'}
+                          </span>
+                          {((tx.originalReceiver !== undefined &&
+                            (tx.receiver || tx.issuer) !== tx.originalReceiver) ||
+                            (tx.originalIssuer !== undefined &&
+                              (tx.receiver || tx.issuer) !== tx.originalIssuer)) && (
+                            <span
+                              className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                              title={`Ursprünglich: ${tx.originalReceiver || tx.originalIssuer || 'Kein Empfänger'}`}
+                            >
+                              Geändert
+                            </span>
+                          )}
                         </div>
-                        <div className="mt-0.5 truncate text-[11px] text-slate-500">
-                          {tx.subject}
+                        <div className="mt-0.5 flex items-center gap-1.5">
+                          <span className="truncate text-[11px] text-slate-500">{tx.subject}</span>
+                          {tx.originalSubject !== undefined &&
+                            tx.subject !== tx.originalSubject && (
+                              <span
+                                className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                                title={`Ursprünglich: ${tx.originalSubject}`}
+                              >
+                                Geändert
+                              </span>
+                            )}
                         </div>
                       </td>
 
                       {/* Betrag */}
                       <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-bold">
-                        <span className={isOutbound ? 'text-slate-900' : 'text-emerald-600'}>
+                        <div className={isOutbound ? 'text-slate-900' : 'text-emerald-600'}>
                           {formatMoney(tx.value, { signDisplay: 'always' })}
-                        </span>
+                        </div>
+                        {tx.originalValue !== undefined && tx.value !== tx.originalValue && (
+                          <div className="mt-0.5">
+                            <span
+                              className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                              title={`Ursprünglicher Betrag: ${formatMoney(tx.originalValue, { signDisplay: 'always' })}`}
+                            >
+                              Geändert
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Kategorie Selector */}
@@ -629,21 +793,13 @@ export const Transactions: React.FC = () => {
                             ))}
                           </select>
 
-                          {/* Assignment Source Badge */}
+                          {/* Geändert Badge bei manueller Zuweisung */}
                           {tx.assignmentSource === 'manual' && (
                             <span
-                              className="inline-flex items-center gap-0.5 rounded bg-amber-100 p-1 text-[10px] font-bold text-amber-800"
-                              title="Manuell zugewiesen (gesperrt gegen Überschreiben)"
+                              className="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
+                              title="Kategorie manuell zugewiesen / angepasst"
                             >
-                              <Lock className="h-3 w-3" />
-                            </span>
-                          )}
-                          {tx.assignmentSource === 'auto_regex' && (
-                            <span
-                              className="inline-flex items-center gap-0.5 rounded bg-blue-50 p-1 text-[10px] font-medium text-blue-700"
-                              title="Automatisch via Regex zugewiesen"
-                            >
-                              <Bot className="h-3 w-3" />
+                              Geändert
                             </span>
                           )}
                         </div>
@@ -651,14 +807,35 @@ export const Transactions: React.FC = () => {
 
                       {/* Aktionen */}
                       <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => deleteTransaction(tx.id)}
-                          className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                          title="Löschen"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSplitModal(tx)}
+                            className="rounded p-1 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
+                            title="Buchung aufteilen (Split)"
+                            aria-label="Buchung aufteilen"
+                          >
+                            <Scissors className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(tx)}
+                            className="rounded p-1 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                            title="Bearbeiten"
+                            aria-label="Buchung bearbeiten"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteTransaction(tx.id)}
+                            className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            title="Löschen"
+                            aria-label="Buchung löschen"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -749,6 +926,18 @@ export const Transactions: React.FC = () => {
         onClose={() => setIsImportModalOpen(false)}
         accounts={accounts}
         onImport={importTransactions}
+      />
+
+      {/* MANUELLE BUCHUNG / EDIT / SPLIT MODAL */}
+      <TransactionModal
+        isOpen={isTxModalOpen}
+        onClose={() => setIsTxModalOpen(false)}
+        mode={txModalMode}
+        initialTransaction={selectedTx}
+        accounts={accounts}
+        categories={categories}
+        onSave={handleSaveTransaction}
+        onSplit={handleSplitTransaction}
       />
     </div>
   );

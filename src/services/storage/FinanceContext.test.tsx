@@ -143,4 +143,72 @@ describe('FinanceContext', () => {
     expect(result.current.accounts.length).toBeGreaterThan(0);
     expect(result.current.transactions.length).toBe(0);
   });
+
+  it('adds, updates and splits transactions with live remaining calculation and slim export', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // 1. Manuelle Transaktion hinzufügen
+    let newTx: any;
+    await act(async () => {
+      newTx = await result.current.addTransaction({
+        accountId: result.current.accounts[0].id,
+        valueDate: '2026-09-01',
+        bookingDate: '2026-09-01',
+        issuer: 'Bargeld',
+        receiver: 'Supermarkt',
+        subject: 'Wocheneinkauf',
+        type: 'outbound',
+        iban: '',
+        value: -100,
+        categoryId: null,
+      });
+    });
+
+    expect(newTx.id).toBeDefined();
+    expect(newTx.origin).toBe('manual');
+    expect(result.current.transactions).toHaveLength(1);
+    expect(result.current.transactions[0].value).toBe(-100);
+
+    // 2. Transaktion bearbeiten (Überschreiben)
+    await act(async () => {
+      await result.current.updateTransaction({
+        ...result.current.transactions[0],
+        subject: 'Wocheneinkauf REWE',
+      });
+    });
+    expect(result.current.transactions[0].subject).toBe('Wocheneinkauf REWE');
+
+    // 3. Transaktion aufteilen (Split 30 € abspalten)
+    await act(async () => {
+      await result.current.splitTransaction(result.current.transactions[0].id, 30, {
+        subject: 'Drogerieartikel',
+        receiver: 'Supermarkt',
+        categoryId: null,
+      });
+    });
+
+    expect(result.current.transactions).toHaveLength(2);
+    const origAfterSplit = result.current.transactions.find((t) => t.id === newTx.id);
+    const splitPart = result.current.transactions.find((t) => t.splitFromId === newTx.id);
+
+    expect(origAfterSplit?.value).toBe(-70);
+    expect(splitPart?.value).toBe(-30);
+    expect(splitPart?.subject).toBe('Drogerieartikel');
+    expect(splitPart?.origin).toBe('manual');
+
+    // 4. Split-Validierung: Split >= Originalbetrag muss Fehler werfen
+    await expect(
+      result.current.splitTransaction(origAfterSplit!.id, 75, {
+        subject: 'Ungültig',
+        receiver: 'Test',
+        categoryId: null,
+      })
+    ).rejects.toThrow(/Der Teilbetrag muss kleiner als der Originalbetrag sein/);
+
+    // 5. Schlanker Export: Exportiert nur manuelle Transaktionen und Overrides
+    const jsonStr = await result.current.exportConfiguration();
+    const parsed = JSON.parse(jsonStr);
+    expect(parsed.manualTransactions).toHaveLength(2);
+  });
 });

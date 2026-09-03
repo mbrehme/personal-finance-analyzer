@@ -232,6 +232,41 @@ export function generateTransactionId(
 }
 
 /**
+ * Berechnet einen deterministischen, tagesgenauen Fingerabdruck (FNV-1a 32-Bit Hash)
+ * für eine importierte Bank-Rohbuchung.
+ *
+ * @param {string} accountId - Konto-ID
+ * @param {string} valueDate - Valutadatum (YYYY-MM-DD)
+ * @param {number} value - Exakter Betrag
+ * @param {string} subject - Verwendungszweck der Bank
+ * @param {string} [partner=''] - Zahlungspartner (Empfänger oder Auftraggeber)
+ * @param {string} [iban=''] - IBAN
+ * @param {number} [occurrenceIndex=0] - Zähler für Mehrfachbuchungen am exakt selben Tag
+ * @returns {string} Einzigartiger Fingerprint-String mit Präfix 'fp-'
+ */
+export function computeRawFingerprint(
+  accountId: string,
+  valueDate: string,
+  value: number,
+  subject: string,
+  partner: string = '',
+  iban: string = '',
+  occurrenceIndex: number = 0
+): string {
+  const normSubject = (subject || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normPartner = (partner || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normIban = (iban || '').trim().toUpperCase().replace(/\s+/g, '');
+  const rawKey = `${accountId}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}|${occurrenceIndex}`;
+
+  let hash = 2166136261;
+  for (let i = 0; i < rawKey.length; i++) {
+    hash ^= rawKey.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fp-${(hash >>> 0).toString(36)}`;
+}
+
+/**
  * Konvertiert die geparsten CSV-Zeilen anhand des Mappings in typisierte `Transaction`-Objekte.
  *
  * @param {Record<string, string>[]} rows - Geparste CSV-Zeilen
@@ -249,6 +284,7 @@ export function convertRowsToTransactions(
   importedAt?: string
 ): Transaction[] {
   const timestamp = importedAt || new Date().toISOString();
+  const dayOccurrences = new Map<string, number>();
 
   return rows.map((row, index) => {
     const rawValDate = row[mapping.valueDateColumn] || '';
@@ -265,6 +301,26 @@ export function convertRowsToTransactions(
     const iban = mapping.ibanColumn ? (row[mapping.ibanColumn] || '').trim() : '';
 
     const type: TransactionType = value >= 0 ? 'inbound' : 'outbound';
+
+    // Tag-gebundener Occurrence-Zähler
+    const partner = receiver || issuer;
+    const normSubject = subject.trim().toLowerCase().replace(/\s+/g, ' ');
+    const normPartner = partner.trim().toLowerCase().replace(/\s+/g, ' ');
+    const normIban = iban.trim().toUpperCase().replace(/\s+/g, '');
+    const dayKey = `${accountId}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}`;
+
+    const occurrenceIndex = dayOccurrences.get(dayKey) || 0;
+    dayOccurrences.set(dayKey, occurrenceIndex + 1);
+
+    const rawFingerprint = computeRawFingerprint(
+      accountId,
+      valueDate,
+      value,
+      subject,
+      partner,
+      iban,
+      occurrenceIndex
+    );
 
     const baseId = generateTransactionId(
       accountId,
@@ -292,9 +348,21 @@ export function convertRowsToTransactions(
       categoryId: null,
       bucketId: null,
       assignmentSource: 'unassigned',
+      origin: 'imported',
+      rawFingerprint,
       importFilename: filename || undefined,
       importIndex: index,
       importedAt: timestamp,
+
+      // Flache Original-Rohdaten aus der Bank-CSV
+      originalAccountId: accountId,
+      originalValueDate: valueDate,
+      originalBookingDate: bookingDate,
+      originalValue: value,
+      originalSubject: subject,
+      originalReceiver: receiver,
+      originalIssuer: issuer,
+      originalIban: iban,
     };
   });
 }

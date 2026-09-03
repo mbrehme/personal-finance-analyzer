@@ -74,8 +74,65 @@ describe('csvParser', () => {
     expect(transactions[0].value).toBe(-45.5);
     expect(transactions[0].type).toBe('outbound');
 
+    expect(transactions[0].origin).toBe('imported');
+    expect(transactions[0].rawFingerprint).toBeDefined();
+    expect(transactions[0].originalValue).toBe(-45.5);
+    expect(transactions[0].originalSubject).toBe('Lebensmitteleinkauf');
+    expect(transactions[0].originalReceiver).toBe('Rewe Markt');
+    expect(transactions[0].originalAccountId).toBe('acc-ing-1');
+
     expect(transactions[1].valueDate).toBe('2026-09-02');
     expect(transactions[1].value).toBe(3200);
     expect(transactions[1].type).toBe('inbound');
+    expect(transactions[1].originalValue).toBe(3200);
+  });
+
+  it('computes deterministic, normalized rawFingerprint with day-isolated occurrenceIndex', async () => {
+    const { computeRawFingerprint } = await import('./csvParser');
+
+    // Case and whitespace normalization
+    const fp1 = computeRawFingerprint(
+      'acc-1',
+      '2026-09-01',
+      -25.5,
+      '  REWE   MARKT ',
+      ' Rewe Gmbh ',
+      'DE89 3704 0044',
+      0
+    );
+    const fp2 = computeRawFingerprint(
+      'acc-1',
+      '2026-09-01',
+      -25.5,
+      'rewe markt',
+      'rewe gmbh',
+      'DE8937040044',
+      0
+    );
+    expect(fp1).toBe(fp2);
+
+    // occurrenceIndex increments for same day
+    const fpSameDay2 = computeRawFingerprint(
+      'acc-1',
+      '2026-09-01',
+      -25.5,
+      'rewe markt',
+      'rewe gmbh',
+      'DE8937040044',
+      1
+    );
+    expect(fpSameDay2).not.toBe(fp1);
+
+    // Different day produces different fingerprint even with index 0
+    const fpDiffDay = computeRawFingerprint(
+      'acc-1',
+      '2026-09-02',
+      -25.5,
+      'rewe markt',
+      'rewe gmbh',
+      'DE8937040044',
+      0
+    );
+    expect(fpDiffDay).not.toBe(fp1);
   });
 });

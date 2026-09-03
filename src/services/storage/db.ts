@@ -11,6 +11,7 @@ import {
   Transaction,
   FinanceConfigExport,
   sortTransactionsDesc,
+  isTransactionOverridden,
 } from '@/types/finance';
 
 const DB_NAME = 'personal_finance_analyzer_db';
@@ -402,7 +403,15 @@ export const financeDB = {
 
   /* ================== EXPORT & IMPORT ================== */
   async exportConfiguration(): Promise<FinanceConfigExport> {
-    const [accounts, categories] = await Promise.all([this.getAccounts(), this.getCategories()]);
+    const [accounts, categories, transactions] = await Promise.all([
+      this.getAccounts(),
+      this.getCategories(),
+      this.getTransactions(),
+    ]);
+
+    const manualTransactions = transactions.filter(
+      (t) => t.origin === 'manual' || isTransactionOverridden(t)
+    );
 
     return {
       version: 2,
@@ -410,6 +419,7 @@ export const financeDB = {
       accounts,
       categories,
       buckets: categories,
+      manualTransactions,
     };
   },
 
@@ -424,12 +434,18 @@ export const financeDB = {
       memoryStore.categories.clear();
       config.accounts.forEach((acc) => memoryStore.accounts.set(acc.id, acc));
       categoriesToImport.forEach((c) => memoryStore.categories.set(c.id, c));
+      if (Array.isArray(config.manualTransactions)) {
+        config.manualTransactions.forEach((t) => memoryStore.transactions.set(t.id, t));
+      }
       return;
     }
 
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const candidates = [STORES.ACCOUNTS, STORES.CATEGORIES, STORES.BUCKETS];
+      const candidates: string[] = [STORES.ACCOUNTS, STORES.CATEGORIES, STORES.BUCKETS];
+      if (Array.isArray(config.manualTransactions) && config.manualTransactions.length > 0) {
+        candidates.push(STORES.TRANSACTIONS);
+      }
       const storeNames = candidates.filter((name) => db.objectStoreNames.contains(name));
       const tx = db.transaction(storeNames, 'readwrite');
       const accStore = tx.objectStore(STORES.ACCOUNTS);
@@ -446,6 +462,13 @@ export const financeDB = {
         const bucketStore = tx.objectStore(STORES.BUCKETS);
         bucketStore.clear();
         categoriesToImport.forEach((c) => bucketStore.put(c));
+      }
+      if (
+        Array.isArray(config.manualTransactions) &&
+        db.objectStoreNames.contains(STORES.TRANSACTIONS)
+      ) {
+        const txStore = tx.objectStore(STORES.TRANSACTIONS);
+        config.manualTransactions.forEach((t) => txStore.put(t));
       }
 
       tx.oncomplete = () => resolve();

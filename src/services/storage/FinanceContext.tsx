@@ -14,6 +14,8 @@ import {
   Transaction,
   sortTransactionsDesc,
   ReMatchStatus,
+  isTransactionOverridden,
+  CategoryAssignmentSource,
 } from '@/types/finance';
 import { financeDB } from './db';
 import { matchTransaction, reMatchAllTransactions } from '../matcher/regexMatcher';
@@ -57,6 +59,19 @@ export interface FinanceContextType {
   deleteBalanceEntry: (accountId: string, entryId: string) => Promise<void>;
 
   // Transaction Operations
+  addTransaction: (
+    transaction:
+      | (Omit<Transaction, 'id' | 'assignmentSource'> & {
+          assignmentSource?: CategoryAssignmentSource;
+        })
+      | Transaction
+  ) => Promise<Transaction>;
+  updateTransaction: (transaction: Transaction) => Promise<void>;
+  splitTransaction: (
+    originalId: string,
+    splitAmount: number,
+    splitData: { subject: string; receiver: string; categoryId: string | null }
+  ) => Promise<void>;
   importTransactions: (newTransactions: Transaction[]) => Promise<number>;
   assignTransactionCategory: (transactionId: string, categoryId: string | null) => Promise<void>;
   /** @deprecated Verwende assignTransactionCategory */
@@ -278,21 +293,210 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   /* ================== TRANSACTIONS ================== */
+  const addTransaction = async (
+    txData:
+      | (Omit<Transaction, 'id' | 'assignmentSource'> & {
+          assignmentSource?: CategoryAssignmentSource;
+        })
+      | Transaction
+  ): Promise<Transaction> => {
+    const id =
+      'id' in txData && txData.id
+        ? txData.id
+        : `tx-man-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const newTx: Transaction = {
+      ...txData,
+      id,
+      origin: 'manual',
+      assignmentSource: txData.categoryId ? 'manual' : 'unassigned',
+      categoryId: txData.categoryId || null,
+      bucketId: txData.categoryId || null,
+    };
+
+    if (newTx.categoryId) {
+      const updatedCats = categories.map((c) => {
+        if (c.id === newTx.categoryId) {
+          const list = c.manualTransactionIds || [];
+          return {
+            ...c,
+            manualTransactionIds: list.includes(id) ? list : [...list, id],
+          };
+        }
+        return c;
+      });
+      await financeDB.saveCategories(updatedCats);
+      setCategories(updatedCats);
+    }
+
+    await financeDB.saveTransaction(newTx);
+    setTransactions((prev) => sortTransactionsDesc([...prev, newTx]));
+    return newTx;
+  };
+
+  const updateTransaction = async (updatedTx: Transaction): Promise<void> => {
+    const oldTx = transactions.find((t) => t.id === updatedTx.id);
+    const oldCatId = oldTx?.categoryId ?? oldTx?.bucketId ?? null;
+    const newCatId = updatedTx.categoryId ?? updatedTx.bucketId ?? null;
+
+    if (oldCatId !== newCatId) {
+      let updatedCats = categories.map((c) => {
+        if (c.id === oldCatId && c.manualTransactionIds) {
+          return {
+            ...c,
+            manualTransactionIds: c.manualTransactionIds.filter((id) => id !== updatedTx.id),
+          };
+        }
+        return c;
+      });
+
+      if (newCatId) {
+        updatedCats = updatedCats.map((c) => {
+          if (c.id === newCatId) {
+            const list = c.manualTransactionIds || [];
+            return {
+              ...c,
+              manualTransactionIds: list.includes(updatedTx.id) ? list : [...list, updatedTx.id],
+            };
+          }
+          return c;
+        });
+      }
+
+      await financeDB.saveCategories(updatedCats);
+      setCategories(updatedCats);
+    }
+
+    const preparedTx: Transaction = {
+      ...updatedTx,
+      categoryId: newCatId,
+      bucketId: newCatId,
+      assignmentSource: newCatId ? 'manual' : 'unassigned',
+      // Flache Original-Felder absichern, falls von der Bank importiert
+      originalValue: oldTx?.originalValue ?? oldTx?.value,
+      originalSubject: oldTx?.originalSubject ?? oldTx?.subject,
+      originalReceiver: oldTx?.originalReceiver ?? oldTx?.receiver,
+      originalAccountId: oldTx?.originalAccountId ?? oldTx?.accountId,
+      originalValueDate: oldTx?.originalValueDate ?? oldTx?.valueDate,
+      originalIban: oldTx?.originalIban ?? oldTx?.iban,
+    };
+
+    await financeDB.saveTransaction(preparedTx);
+    setTransactions((prev) =>
+      sortTransactionsDesc(prev.map((t) => (t.id === preparedTx.id ? preparedTx : t)))
+    );
+  };
+
+  const splitTransaction = async (
+    originalId: string,
+    splitAmount: number,
+    splitData: { subject: string; receiver: string; categoryId: string | null }
+  ): Promise<void> => {
+    const originalTx = transactions.find((t) => t.id === originalId);
+    if (!originalTx) throw new Error('Originalbuchung nicht gefunden.');
+
+    const origAbs = Math.abs(originalTx.value);
+    if (splitAmount <= 0) {
+      throw new Error('Der Teilbetrag muss größer als 0 sein.');
+    }
+    if (splitAmount >= origAbs) {
+      throw new Error(
+        'Der Teilbetrag muss kleiner als der Originalbetrag sein. Der Restbetrag darf nicht unter 0,00 € fallen.'
+      );
+    }
+
+    const sign = originalTx.value < 0 ? -1 : 1;
+    const remainingAbs = origAbs - splitAmount;
+    const updatedOriginalValue = (sign * Math.round(remainingAbs * 100)) / 100;
+
+    const updatedOriginalTx: Transaction = {
+      ...originalTx,
+      value: updatedOriginalValue,
+      originalValue: originalTx.originalValue ?? originalTx.value,
+      originalSubject: originalTx.originalSubject ?? originalTx.subject,
+      originalReceiver: originalTx.originalReceiver ?? originalTx.receiver,
+      originalAccountId: originalTx.originalAccountId ?? originalTx.accountId,
+      originalValueDate: originalTx.originalValueDate ?? originalTx.valueDate,
+      originalIban: originalTx.originalIban ?? originalTx.iban,
+    };
+
+    const splitId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const splitValue = (sign * Math.round(splitAmount * 100)) / 100;
+    const newSplitTx: Transaction = {
+      id: splitId,
+      accountId: originalTx.accountId,
+      valueDate: originalTx.valueDate,
+      bookingDate: originalTx.bookingDate,
+      issuer: originalTx.issuer,
+      receiver: splitData.receiver.trim() || originalTx.receiver,
+      subject: splitData.subject.trim() || `${originalTx.subject} (Split)`,
+      type: originalTx.type,
+      iban: originalTx.iban,
+      value: splitValue,
+      categoryId: splitData.categoryId || null,
+      bucketId: splitData.categoryId || null,
+      assignmentSource: splitData.categoryId ? 'manual' : 'unassigned',
+      origin: 'manual',
+      splitFromId: originalId,
+    };
+
+    if (newSplitTx.categoryId) {
+      const updatedCats = categories.map((c) => {
+        if (c.id === newSplitTx.categoryId) {
+          const list = c.manualTransactionIds || [];
+          return {
+            ...c,
+            manualTransactionIds: list.includes(splitId) ? list : [...list, splitId],
+          };
+        }
+        return c;
+      });
+      await financeDB.saveCategories(updatedCats);
+      setCategories(updatedCats);
+    }
+
+    await financeDB.saveTransaction(updatedOriginalTx);
+    await financeDB.saveTransaction(newSplitTx);
+
+    setTransactions((prev) =>
+      sortTransactionsDesc(
+        prev.map((t) => (t.id === originalId ? updatedOriginalTx : t)).concat(newSplitTx)
+      )
+    );
+  };
+
   const importTransactions = async (newTransactions: Transaction[]): Promise<number> => {
-    // 1. Regex & Manual Overrides anwenden
-    const matched = newTransactions.map((tx) => {
-      const match = matchTransaction(tx, categories);
-      return {
-        ...tx,
+    // 1. Vorhandene Fingerprints erfassen, um bestehende Overrides und Splits vor Überschreiben zu schützen
+    const existingIds = new Set(transactions.map((t) => t.id));
+    const existingFingerprints = new Map<string, Transaction>();
+    transactions.forEach((t) => {
+      if (t.rawFingerprint) {
+        existingFingerprints.set(t.rawFingerprint, t);
+      }
+    });
+
+    const toInsert: Transaction[] = [];
+
+    for (const rawTx of newTransactions) {
+      // Duplikatprüfung: Bereits per ID oder per unveränderlichem Roh-Fingerabdruck vorhanden
+      if (existingIds.has(rawTx.id)) {
+        continue;
+      }
+      if (rawTx.rawFingerprint && existingFingerprints.has(rawTx.rawFingerprint)) {
+        continue;
+      }
+
+      // 2. Automatisches Matching gegen Kategorien anwenden
+      const match = matchTransaction(rawTx, categories);
+      const preparedTx: Transaction = {
+        ...rawTx,
         categoryId: match.categoryId,
         bucketId: match.categoryId,
         assignmentSource: match.assignmentSource,
       };
-    });
 
-    // 2. Bestehende IDs prüfen und Duplikate überspringen
-    const existingIds = new Set(transactions.map((t) => t.id));
-    const toInsert = matched.filter((t) => !existingIds.has(t.id));
+      toInsert.push(preparedTx);
+    }
 
     if (toInsert.length > 0) {
       await financeDB.saveTransactions(toInsert);
@@ -384,12 +588,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   /* ================== EXPORT & IMPORT ================== */
   const exportConfiguration = async (): Promise<string> => {
+    // Nur manuell erstellte Buchungen oder überschriebene Overrides exportieren!
+    const manualTransactions = transactions.filter(
+      (t) => t.origin === 'manual' || isTransactionOverridden(t)
+    );
+
     const exportData: FinanceConfigExport = {
       version: 2,
       exportedAt: new Date().toISOString(),
       accounts,
       categories,
       buckets: categories,
+      manualTransactions,
     };
     return JSON.stringify(exportData, null, 2);
   };
@@ -400,6 +610,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const loadedCats = parsed.categories || parsed.buckets || [];
     setAccounts(parsed.accounts);
     setCategories(loadedCats);
+
+    if (Array.isArray(parsed.manualTransactions) && parsed.manualTransactions.length > 0) {
+      const manualTxs = parsed.manualTransactions;
+      setTransactions((prev) => {
+        const existingIds = new Set(manualTxs.map((m) => m.id));
+        const merged = prev.filter((p) => !existingIds.has(p.id)).concat(manualTxs);
+        return sortTransactionsDesc(merged);
+      });
+    }
+
     setReMatchStatus('needs_reprogress');
   };
 
@@ -458,6 +678,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateBucket: updateCategory,
         deleteBucket: deleteCategory,
         reorderBuckets: reorderCategories,
+        addTransaction,
+        updateTransaction,
+        splitTransaction,
         importTransactions,
         assignTransactionCategory,
         assignTransactionBucket: assignTransactionCategory,

@@ -51,4 +51,161 @@ describe('Transactions Page', () => {
     const applyBtn = screen.getByRole('button', { name: /Filter anwenden/i });
     await user.click(applyBtn);
   });
+
+  it('renders Neue Buchung button, origin filter, and opens creation modal', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Verify Neue Buchung button and Quelle select are present
+    const newTxBtn = await screen.findByRole('button', { name: /Neue Buchung/i });
+    expect(newTxBtn).toBeInTheDocument();
+    expect(screen.getByText('Alle Quellen')).toBeInTheDocument();
+
+    // Click Neue Buchung
+    await user.click(newTxBtn);
+
+    // Modal should be opened
+    expect(screen.getByText('Neue Buchung erfassen')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Beschreibung der Buchung...')).toBeInTheDocument();
+
+    // Close modal
+    const cancelBtn = screen.getByRole('button', { name: 'Abbrechen' });
+    await user.click(cancelBtn);
+
+    expect(screen.queryByText('Neue Buchung erfassen')).not.toBeInTheDocument();
+  });
+
+  it('filters transactions by origin (Manuell vs. Importiert)', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [{ id: 'acc-1', name: 'Girokonto', color: '#000', icon: 'Wallet' }] as any,
+      categories: [] as any,
+      buckets: [] as any,
+      transactions: [
+        {
+          id: 'tx-imp',
+          accountId: 'acc-1',
+          valueDate: '2026-03-01',
+          bookingDate: '2026-03-01',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Importierter Einkauf',
+          type: 'outbound',
+          iban: 'DE11',
+          value: -45,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-man',
+          accountId: 'acc-1',
+          valueDate: '2026-03-02',
+          bookingDate: '2026-03-02',
+          issuer: 'Ich',
+          receiver: 'Bäcker',
+          subject: 'Manuelle Buchung',
+          type: 'outbound',
+          iban: '',
+          value: -12,
+          assignmentSource: 'manual',
+          origin: 'manual',
+        },
+        {
+          id: 'tx-overridden',
+          accountId: 'acc-1',
+          valueDate: '2026-03-03',
+          bookingDate: '2026-03-03',
+          issuer: 'Tankstelle',
+          receiver: 'Ich',
+          subject: 'Tanken angepasst',
+          originalSubject: 'ARAL FILIALE 1234',
+          type: 'outbound',
+          iban: 'DE22',
+          value: -80,
+          originalValue: -80,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ] as any,
+      loading: false,
+      error: null,
+      reMatchStatus: 'has_progressed',
+      setReMatchStatus: vi.fn(),
+      needsReMatch: false,
+      reMatching: false,
+      setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+      addBucket: vi.fn(),
+      updateBucket: vi.fn(),
+      deleteBucket: vi.fn(),
+      reorderBuckets: vi.fn(),
+      addAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+      reorderAccounts: vi.fn(),
+      addBalanceEntry: vi.fn(),
+      deleteBalanceEntry: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      splitTransaction: vi.fn(),
+      importTransactions: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      assignTransactionBucket: vi.fn(),
+      deleteTransaction: vi.fn(),
+      clearTransactions: vi.fn(),
+      triggerReMatch: vi.fn(),
+      exportConfiguration: vi.fn(),
+      importConfiguration: vi.fn(),
+      resetWorkspace: vi.fn(),
+    });
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Initially both transactions are rendered
+    expect(await screen.findByText('Importierter Einkauf')).toBeInTheDocument();
+    expect(screen.getByText('Manuelle Buchung')).toBeInTheDocument();
+
+    // Select "Manuell"
+    const selects = screen.getAllByRole('combobox');
+    // Origin select has options: Herkunft: Alle, Importiert, Manuell
+    const originSelect = selects.find((s) =>
+      Array.from((s as HTMLSelectElement).options).some((o) => o.value === 'imported')
+    ) as HTMLSelectElement;
+    expect(originSelect).toBeDefined();
+
+    await user.selectOptions(originSelect, 'manual');
+    const applyBtn = screen.getByRole('button', { name: /Filter anwenden/i });
+    await user.click(applyBtn);
+
+    // Under "Manuell": both manual booking and overridden bank booking are visible
+    expect(screen.getByText('Manuelle Buchung')).toBeInTheDocument();
+    expect(screen.getByText('Tanken angepasst')).toBeInTheDocument();
+    expect(screen.getAllByText('Geändert').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Importierter Einkauf')).not.toBeInTheDocument();
+
+    // Now select "Bank-Import"
+    await user.selectOptions(originSelect, 'imported');
+    await user.click(applyBtn);
+
+    // Both original bank imports (including the overridden one) are visible, purely manual is hidden
+    expect(screen.getByText('Importierter Einkauf')).toBeInTheDocument();
+    expect(screen.getByText('Tanken angepasst')).toBeInTheDocument();
+    expect(screen.queryByText('Manuelle Buchung')).not.toBeInTheDocument();
+  });
 });

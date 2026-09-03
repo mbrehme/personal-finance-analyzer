@@ -161,6 +161,56 @@ export interface Transaction {
   importIndex?: number;
   /** Import-Zeitpunkt als ISO-String */
   importedAt?: string;
+  /** Herkunft der Transaktion: 'imported' (Default) oder 'manual' */
+  origin?: TransactionOrigin;
+  /** Unveränderlicher Fingerabdruck der ursprünglichen Bank-Rohdaten (nur bei importierten Buchungen) */
+  rawFingerprint?: string;
+  /** ID der Ursprungsbuchung, falls diese Buchung aus einem Split hervorging */
+  splitFromId?: string;
+
+  /* Flache Original-Felder der Bank-Rohdaten (nur bei importierten Buchungen vorhanden) */
+  originalAccountId?: string;
+  originalValueDate?: ISODateString;
+  originalBookingDate?: ISODateString;
+  originalValue?: number;
+  originalSubject?: string;
+  originalReceiver?: string;
+  originalIssuer?: string;
+  originalIban?: string;
+}
+
+/**
+ * Herkunft einer Transaktion.
+ */
+export type TransactionOrigin = 'imported' | 'manual';
+
+/**
+ * Ermittelt, ob eine importierte Transaktion manuell überschrieben oder angepasst wurde.
+ * Prüft auf Feldebene, ob aktuelle Werte von den ursprünglichen Bankwerten abweichen.
+ *
+ * @param {Transaction} tx - Die zu prüfende Transaktion
+ * @returns {boolean} true, wenn Felder vom ursprünglichen Bank-Rohstand abweichen
+ */
+export function isTransactionOverridden(tx: Transaction): boolean {
+  return (
+    (tx.originalValue !== undefined && tx.value !== tx.originalValue) ||
+    (tx.originalSubject !== undefined && tx.subject !== tx.originalSubject) ||
+    (tx.originalReceiver !== undefined && tx.receiver !== tx.originalReceiver) ||
+    (tx.originalValueDate !== undefined && tx.valueDate !== tx.originalValueDate) ||
+    (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId) ||
+    (tx.originalIban !== undefined && tx.iban !== tx.originalIban) ||
+    Boolean(tx.splitFromId)
+  );
+}
+
+/**
+ * Prüft, ob eine Transaktion manuell ist (manuell erfasst, gesplittet oder überschrieben).
+ *
+ * @param {Transaction} tx - Die zu prüfende Transaktion
+ * @returns {boolean} true, wenn die Buchung manuell angelegt, gesplittet oder überschrieben wurde
+ */
+export function isManualTransaction(tx: Transaction): boolean {
+  return tx.origin === 'manual' || Boolean(tx.splitFromId) || isTransactionOverridden(tx);
 }
 
 /**
@@ -190,8 +240,10 @@ export function buildCompoundSearchField(tx: Transaction): string {
  */
 export interface TransactionFilterOptions {
   accountId?: string;
+  categoryId?: string | 'uncategorized' | 'assigned' | 'manual';
   bucketId?: string | 'uncategorized';
   type?: TransactionType | 'all';
+  origin?: 'all' | 'imported' | 'manual';
   startDate?: ISODateString;
   endDate?: ISODateString;
   searchTerm?: string;
@@ -244,4 +296,6 @@ export interface FinanceConfigExport {
   categories: Category[];
   /** @deprecated Abwärtskompatibilität für alte Exporte */
   buckets?: Category[];
+  /** Manuell erstellte Buchungen, Splits und modifizierte Overrides */
+  manualTransactions?: Transaction[];
 }

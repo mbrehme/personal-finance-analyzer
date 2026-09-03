@@ -110,16 +110,36 @@ describe('financeDB Storage Layer', () => {
     await financeDB.saveAccount(account);
     await financeDB.saveCategory(category);
 
+    const manualTx: Transaction = {
+      id: 'tx-man-1',
+      accountId: 'acc-export',
+      valueDate: '2026-09-01',
+      bookingDate: '2026-09-01',
+      issuer: '',
+      receiver: 'Bäcker',
+      subject: 'Kaffee',
+      type: 'outbound',
+      iban: '',
+      value: -3.5,
+      assignmentSource: 'manual',
+      origin: 'manual',
+    };
+    await financeDB.saveTransaction(manualTx);
+
     const exported = await financeDB.exportConfiguration();
     expect(exported.accounts).toHaveLength(1);
     expect(exported.categories).toHaveLength(1);
     expect(exported.categories[0].manualTransactionIds).toContain('tx-manual-1');
+    expect(exported.manualTransactions).toHaveLength(1);
+    expect(exported.manualTransactions![0].id).toBe('tx-man-1');
 
     await financeDB.clearAll();
     expect(await financeDB.getAccounts()).toHaveLength(0);
+    expect(await financeDB.getTransactions()).toHaveLength(0);
 
     await financeDB.importConfiguration(exported);
     expect(await financeDB.getAccounts()).toHaveLength(1);
     expect(await financeDB.getCategories()).toHaveLength(1);
+    expect(await financeDB.getTransactions()).toHaveLength(1);
   });
 });

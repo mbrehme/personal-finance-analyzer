@@ -41,7 +41,7 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 ### 5. Abschluss & Archivierung
 
 1. **Verifikation:** Stelle sicher, dass `pnpm test` und `pnpm build` ohne Fehler oder Warnungen durchlaufen.
-2. **Plan archivieren:** Verschiebe die fertige Plandatei von `docs/plans/active/` nach `docs/plans/archive/`.
+2. **Plan archivieren:** Überprüfe und hake alle Checkboxen im Plan vollständig ab (`[x]`), aktualisiere den Status auf `Abgeschlossen` und verschiebe die Plandatei von `docs/plans/active/` nach `docs/plans/archive/`.
 3. **ADR festhalten:** Wurde eine grundlegende Architekturentscheidung getroffen, dokumentiere sie als neues ADR unter `docs/architecture/XXXX-<thema>.md` nach [`docs/architecture/template.md`](docs/architecture/template.md).
 
 ---

@@ -308,7 +308,7 @@ export const CategoryFilterDropdown: React.FC<CategoryFilterDropdownProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`shadow-xs flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors ${
+        className={`shadow-xs flex h-9 w-full items-center justify-between gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors ${
           !allSelected
             ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100/70'
             : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
@@ -316,14 +316,16 @@ export const CategoryFilterDropdown: React.FC<CategoryFilterDropdownProps> = ({
         title="Kategorien filtern"
         data-testid="category-filter-dropdown-btn"
       >
-        <Filter className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-        <span className="truncate">
-          {allSelected
-            ? `Alle Kategorien (${allCategoryIds.length})`
-            : noneSelected
-              ? `Keine Kategorien (0/${allCategoryIds.length})`
-              : `Kategorien (${activeSelectedSet.size}/${allCategoryIds.length})`}
-        </span>
+        <div className="flex items-center gap-1.5 truncate">
+          <Filter className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+          <span className="truncate">
+            {allSelected
+              ? `Alle Kategorien (${allCategoryIds.length})`
+              : noneSelected
+                ? `Keine Kategorien (0/${allCategoryIds.length})`
+                : `Kategorien (${activeSelectedSet.size}/${allCategoryIds.length})`}
+          </span>
+        </div>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
       </button>
 

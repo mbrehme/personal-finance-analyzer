@@ -211,4 +211,127 @@ describe('Transactions Page', () => {
     expect(screen.getByText('Tanken angepasst')).toBeInTheDocument();
     expect(screen.queryByText('Manuelle Buchung')).not.toBeInTheDocument();
   });
+
+  it('filters transactions using the hierarchical CategoryFilterDropdown', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [{ id: 'acc-1', name: 'Girokonto', color: '#000', icon: 'Wallet' }] as any,
+      categories: [
+        { id: 'cat-food', name: 'Lebensmittel', parentId: null, color: '#f59e0b' },
+        { id: 'cat-rent', name: 'Miete', parentId: null, color: '#3b82f6' },
+      ] as any,
+      buckets: [] as any,
+      transactions: [
+        {
+          id: 'tx-1',
+          accountId: 'acc-1',
+          valueDate: '2026-03-01',
+          bookingDate: '2026-03-01',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Wocheneinkauf',
+          type: 'outbound',
+          iban: 'DE11',
+          value: -75,
+          categoryId: 'cat-food',
+          assignmentSource: 'manual',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-2',
+          accountId: 'acc-1',
+          valueDate: '2026-03-02',
+          bookingDate: '2026-03-02',
+          issuer: 'Vermieter',
+          receiver: 'Ich',
+          subject: 'Warmmiete',
+          type: 'outbound',
+          iban: 'DE22',
+          value: -950,
+          categoryId: 'cat-rent',
+          assignmentSource: 'manual',
+          origin: 'imported',
+        },
+      ] as any,
+      loading: false,
+      error: null,
+      reMatchStatus: 'has_progressed',
+      setReMatchStatus: vi.fn(),
+      needsReMatch: false,
+      reMatching: false,
+      setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+      addBucket: vi.fn(),
+      updateBucket: vi.fn(),
+      deleteBucket: vi.fn(),
+      reorderBuckets: vi.fn(),
+      addAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+      reorderAccounts: vi.fn(),
+      addBalanceEntry: vi.fn(),
+      deleteBalanceEntry: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      splitTransaction: vi.fn(),
+      importTransactions: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      assignTransactionBucket: vi.fn(),
+      deleteTransaction: vi.fn(),
+      clearTransactions: vi.fn(),
+      triggerReMatch: vi.fn(),
+      resetTransaction: vi.fn(),
+      deletedTransactions: [],
+      restoreTransaction: vi.fn(),
+      exportConfiguration: vi.fn(),
+      importConfiguration: vi.fn(),
+      resetWorkspace: vi.fn(),
+    });
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Anfangs sind beide Buchungen sichtbar
+    expect(await screen.findByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.getByText('Warmmiete')).toBeInTheDocument();
+
+    // Kategorie-Filter öffnen
+    const catDropdownBtn = screen.getByTestId('category-filter-dropdown-btn');
+    await user.click(catDropdownBtn);
+
+    // "Keine" auswählen (alle abwählen)
+    const noneBtn = screen.getByRole('button', { name: 'Keine' });
+    await user.click(noneBtn);
+
+    // Keine Buchungen mehr sichtbar
+    expect(screen.queryByText('Wocheneinkauf')).not.toBeInTheDocument();
+    expect(screen.queryByText('Warmmiete')).not.toBeInTheDocument();
+
+    // Nur "Lebensmittel" anwählen
+    const panel = screen.getByTestId('category-filter-dropdown-panel');
+    const foodOption = panel.querySelector('button[type="button"] span.truncate');
+    expect(foodOption).toBeDefined();
+    await user.click(screen.getByRole('button', { name: /Lebensmittel/i }));
+
+    // Wocheneinkauf sichtbar, Warmmiete nicht sichtbar
+    expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.queryByText('Warmmiete')).not.toBeInTheDocument();
+
+    // "Alle" auswählen
+    const allBtn = screen.getByRole('button', { name: 'Alle' });
+    await user.click(allBtn);
+
+    // Beide Buchungen wieder sichtbar
+    expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.getByText('Warmmiete')).toBeInTheDocument();
+  });
 });

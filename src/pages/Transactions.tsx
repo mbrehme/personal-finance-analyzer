@@ -21,6 +21,7 @@ import { IconRenderer } from '@/components/IconRenderer';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { CsvImportModal } from '@/components/modals/CsvImportModal';
 import { TransactionModal } from '@/components/modals/TransactionModal';
+import { CategoryFilterDropdown } from '@/components/analytics/CategoryFilterDropdown';
 import { formatDate } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import {
@@ -120,7 +121,7 @@ export const Transactions: React.FC = () => {
   // Entwurfs-Filter State (Eingaben)
   const [inputSearchTerm, setInputSearchTerm] = useState('');
   const [inputAccountId, setInputAccountId] = useState<string>('all');
-  const [inputCategoryId, setInputCategoryId] = useState<string>('all');
+  const [inputCategoryIds, setInputCategoryIds] = useState<string[] | null>(null);
   const [inputType, setInputType] = useState<TransactionType | 'all'>('all');
   const [inputOrigin, setInputOrigin] = useState<'all' | 'imported' | 'manual' | 'deleted'>('all');
   const [inputStartDate, setInputStartDate] = useState<string>('');
@@ -130,7 +131,7 @@ export const Transactions: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<{
     searchTerm: string;
     accountId: string;
-    categoryId: string;
+    categoryIds: string[] | null;
     type: TransactionType | 'all';
     origin: 'all' | 'imported' | 'manual' | 'deleted';
     startDate: string;
@@ -138,7 +139,7 @@ export const Transactions: React.FC = () => {
   }>({
     searchTerm: '',
     accountId: 'all',
-    categoryId: 'all',
+    categoryIds: null,
     type: 'all',
     origin: 'all',
     startDate: '',
@@ -254,7 +255,7 @@ export const Transactions: React.FC = () => {
 
   // Gefilterte Transaktionen basierend auf angewandten Filtern
   const filteredTransactions = useMemo(() => {
-    const { searchTerm, accountId, categoryId, type, origin, startDate, endDate } = appliedFilters;
+    const { searchTerm, accountId, categoryIds, type, origin, startDate, endDate } = appliedFilters;
 
     // Papierkorb-Ansicht: gelöschte Transaktionen anzeigen
     if (origin === 'deleted') {
@@ -276,24 +277,22 @@ export const Transactions: React.FC = () => {
         return false;
       }
 
-      // 2. Kategorie Filter
-      if (categoryId === 'uncategorized' && txCatId !== null) {
-        return false;
-      }
-      if (categoryId === 'assigned' && txCatId === null) {
-        return false;
-      }
-      if (categoryId === 'manual' && tx.assignmentSource !== 'manual') {
-        return false;
-      }
-      if (
-        categoryId !== 'all' &&
-        categoryId !== 'uncategorized' &&
-        categoryId !== 'assigned' &&
-        categoryId !== 'manual' &&
-        txCatId !== categoryId
-      ) {
-        return false;
+      // 2. Kategorie Filter (Multi-Select mit Hierarchie- und Unkategorisiert-Support)
+      if (categoryIds !== null) {
+        if (categoryIds.length === 0) {
+          return false;
+        }
+
+        const allowedSet = new Set(categoryIds);
+        if (!txCatId) {
+          if (!allowedSet.has('__uncategorized__')) {
+            return false;
+          }
+        } else {
+          if (!allowedSet.has(txCatId)) {
+            return false;
+          }
+        }
       }
 
       // 3. Typ Filter (virtuell basierend auf Betragsvorzeichen)
@@ -372,12 +371,19 @@ export const Transactions: React.FC = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
+  // Kategorie-Auswahl ändern (wendet direkt an für flüssige Bedienung)
+  const handleCategoryChange = (ids: string[] | null) => {
+    setInputCategoryIds(ids);
+    setAppliedFilters((prev) => ({ ...prev, categoryIds: ids }));
+    setVisibleCount(PAGE_SIZE);
+  };
+
   // Manuelles Anwenden der Filter
   const handleApplyFilters = () => {
     setAppliedFilters({
       searchTerm: inputSearchTerm,
       accountId: inputAccountId,
-      categoryId: inputCategoryId,
+      categoryIds: inputCategoryIds,
       type: inputType,
       origin: inputOrigin,
       startDate: inputStartDate,
@@ -390,7 +396,7 @@ export const Transactions: React.FC = () => {
   const handleResetFilters = () => {
     setInputSearchTerm('');
     setInputAccountId('all');
-    setInputCategoryId('all');
+    setInputCategoryIds(null);
     setInputType('all');
     setInputOrigin('all');
     setInputStartDate('');
@@ -398,7 +404,7 @@ export const Transactions: React.FC = () => {
     setAppliedFilters({
       searchTerm: '',
       accountId: 'all',
-      categoryId: 'all',
+      categoryIds: null,
       type: 'all',
       origin: 'all',
       startDate: '',
@@ -407,10 +413,18 @@ export const Transactions: React.FC = () => {
     setVisibleCount(PAGE_SIZE);
   };
 
+  const isCategoryChanged =
+    inputCategoryIds === null
+      ? appliedFilters.categoryIds !== null
+      : appliedFilters.categoryIds === null
+        ? true
+        : inputCategoryIds.length !== appliedFilters.categoryIds.length ||
+          inputCategoryIds.some((id) => !appliedFilters.categoryIds!.includes(id));
+
   const hasPendingChanges =
     inputSearchTerm !== appliedFilters.searchTerm ||
     inputAccountId !== appliedFilters.accountId ||
-    inputCategoryId !== appliedFilters.categoryId ||
+    isCategoryChanged ||
     inputType !== appliedFilters.type ||
     inputOrigin !== appliedFilters.origin ||
     inputStartDate !== appliedFilters.startDate ||
@@ -419,7 +433,7 @@ export const Transactions: React.FC = () => {
   const hasActiveFilters =
     appliedFilters.searchTerm !== '' ||
     appliedFilters.accountId !== 'all' ||
-    appliedFilters.categoryId !== 'all' ||
+    appliedFilters.categoryIds !== null ||
     appliedFilters.type !== 'all' ||
     appliedFilters.origin !== 'all' ||
     appliedFilters.startDate !== '' ||
@@ -616,22 +630,13 @@ export const Transactions: React.FC = () => {
 
           {/* 3. Kategorie Filter */}
           <div className="relative min-w-0">
-            <select
-              value={inputCategoryId}
-              onChange={(e) => setInputCategoryId(e.target.value)}
-              className="h-9 w-full appearance-none truncate rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Alle Zuweisungen</option>
-              <option value="assigned">Zugewiesen</option>
-              <option value="uncategorized">Ohne Kategorie (Unzugewiesen)</option>
-              <option value="manual">Manuell überschrieben</option>
-              {categoryOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <CategoryFilterDropdown
+              categories={categories}
+              hasUncategorized={true}
+              selectedCategoryIds={inputCategoryIds}
+              onChange={handleCategoryChange}
+              className="w-full"
+            />
           </div>
 
           {/* 4. Typ Filter */}

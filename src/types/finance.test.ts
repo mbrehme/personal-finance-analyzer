@@ -108,4 +108,76 @@ describe('finance domain helpers', () => {
     expect(sorted[1].id).toBe('tx-1');
     expect(sorted[2].id).toBe('tx-2');
   });
+
+  it('places split child transactions directly adjacent to their parent transaction', () => {
+    const parentTx: Transaction = {
+      id: 'tx-parent',
+      accountId: 'acc-1',
+      valueDate: '2026-07-20',
+      bookingDate: '2026-07-20',
+      issuer: 'Supermarkt',
+      receiver: 'Me',
+      subject: 'Einkauf Rest',
+      type: 'outbound',
+      iban: '',
+      value: -36.29,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+      importIndex: 0,
+    };
+
+    const unrelatedTx1: Transaction = {
+      id: 'tx-unrelated-1',
+      accountId: 'acc-1',
+      valueDate: '2026-07-20',
+      bookingDate: '2026-07-20',
+      issuer: 'Café',
+      receiver: 'Me',
+      subject: 'Kaffee',
+      type: 'outbound',
+      iban: '',
+      value: -28.33,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+      importIndex: 1,
+    };
+
+    const unrelatedTx2: Transaction = {
+      id: 'tx-unrelated-2',
+      accountId: 'acc-1',
+      valueDate: '2026-07-20',
+      bookingDate: '2026-07-20',
+      issuer: 'Strandcafé',
+      receiver: 'Me',
+      subject: 'Snack',
+      type: 'outbound',
+      iban: '',
+      value: -14.0,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+      importIndex: 2,
+    };
+
+    const splitChildTx: Transaction = {
+      id: 'tx-split-child',
+      splitFromId: 'tx-parent',
+      accountId: 'acc-1',
+      valueDate: '2026-07-20',
+      bookingDate: '2026-07-20',
+      issuer: 'Supermarkt',
+      receiver: 'Me',
+      subject: 'Einkauf Teilbetrag',
+      type: 'outbound',
+      iban: '',
+      value: -80.0,
+      bucketId: null,
+      assignmentSource: 'unassigned',
+    };
+
+    const sorted = sortTransactionsDesc([unrelatedTx2, unrelatedTx1, parentTx, splitChildTx]);
+    const ids = sorted.map((t) => t.id);
+
+    // Parent and child must be directly consecutive: tx-parent immediately followed by tx-split-child
+    expect(ids).toEqual(['tx-parent', 'tx-split-child', 'tx-unrelated-1', 'tx-unrelated-2']);
+  });
 });

@@ -226,6 +226,12 @@ export const Transactions: React.FC = () => {
       .sort((a, b) => a.name.localeCompare(b.name, 'de'));
   }, [categories]);
 
+  // IDs aller Transaktionen, die als Original aufgeteilt (gesplittet) wurden
+  const splitParentIds = useMemo(
+    () => new Set(transactions.map((t) => t.splitFromId).filter(Boolean) as string[]),
+    [transactions]
+  );
+
   // Gefilterte Transaktionen basierend auf angewandten Filtern
   const filteredTransactions = useMemo(() => {
     const { searchTerm, accountId, categoryId, type, origin, startDate, endDate } = appliedFilters;
@@ -661,9 +667,19 @@ export const Transactions: React.FC = () => {
                 displayedTransactions.map((tx) => {
                   const account = accountsMap.get(tx.accountId);
                   const isOutbound = tx.value < 0;
+                  const isSplitParent = splitParentIds.has(tx.id);
+                  const isSplitChild = Boolean(tx.splitFromId);
+                  const isSplitPart = isSplitParent || isSplitChild;
 
                   return (
-                    <tr key={tx.id} className="transition-colors hover:bg-slate-50/80">
+                    <tr
+                      key={tx.id}
+                      className={`transition-colors ${
+                        isSplitPart
+                          ? 'border-l-4 border-l-amber-400 bg-amber-50/25 hover:bg-amber-50/50'
+                          : 'hover:bg-slate-50/80'
+                      }`}
+                    >
                       {/* Datum */}
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
                         <div className="flex items-center gap-1.5">
@@ -678,23 +694,34 @@ export const Transactions: React.FC = () => {
                               </span>
                             )}
                         </div>
-                        {tx.origin === 'manual' && (
+                        {isSplitParent && (
                           <div className="mt-1">
-                            {tx.splitFromId ? (
-                              <span
-                                className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
-                                title="Abgespaltener Teil einer Buchung"
-                              >
-                                <Scissors className="h-2.5 w-2.5" /> Split
-                              </span>
-                            ) : (
-                              <span
-                                className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-800"
-                                title="Manuell erfasste Buchung"
-                              >
-                                Manuell
-                              </span>
-                            )}
+                            <span
+                              className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900"
+                              title="Diese Buchung wurde aufgeteilt (Original)"
+                            >
+                              <Scissors className="h-2.5 w-2.5 text-amber-700" /> Split (Original)
+                            </span>
+                          </div>
+                        )}
+                        {isSplitChild && (
+                          <div className="mt-1">
+                            <span
+                              className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900"
+                              title="Abgespaltener Teil dieser Buchung"
+                            >
+                              <Scissors className="h-2.5 w-2.5 text-amber-700" /> Split (Teil)
+                            </span>
+                          </div>
+                        )}
+                        {tx.origin === 'manual' && !isSplitChild && (
+                          <div className="mt-1">
+                            <span
+                              className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-800"
+                              title="Manuell erfasste Buchung"
+                            >
+                              Manuell
+                            </span>
                           </div>
                         )}
                       </td>

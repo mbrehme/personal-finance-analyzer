@@ -299,80 +299,78 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           {/* FALL 1: SPLIT MODUS (SIDE-BY-SIDE)                            */}
           {/* ============================================================= */}
           {mode === 'split' && initialTransaction && (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {/* LINKE SPALTE: ORIGINALBUCHUNG & VERBLEIBENDER RESTBETRAG */}
-              <div className="p-4.5 space-y-4 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700/60 dark:bg-slate-800/60">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2 dark:border-slate-700">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Originalbuchung
-                  </span>
-                  <span className="text-xs text-slate-400">
-                    {initialTransaction.origin === 'manual' ? 'Manuelle Buchung' : 'Bank-Buchung'}
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 text-sm">
-                  <div>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
-                      Ursprünglicher Betrag:
+            <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+              {/* LINKE SPALTE: ORIGINALBUCHUNG */}
+              <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/80 p-5 dark:border-slate-700/60 dark:bg-slate-800/50">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-700">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Originalbuchung
                     </span>
-                    <span className="text-base font-semibold text-slate-900 dark:text-white">
-                      {formatMoney(initialTransaction.value)}
+                    <span className="rounded-md bg-slate-200/60 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                      {initialTransaction.origin === 'manual' ? 'Manuell' : 'Bank-Import'}
                     </span>
                   </div>
 
-                  <div>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
-                      Zahlungspartner:
-                    </span>
-                    <span className="font-medium text-slate-800 dark:text-slate-200">
-                      {initialTransaction.receiver || initialTransaction.issuer || '-'}
-                    </span>
-                  </div>
+                  <div className="space-y-3.5 text-xs">
+                    <div>
+                      <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-400">
+                        Ursprünglicher Betrag:
+                      </span>
+                      <span className="font-mono text-base font-bold text-slate-900 dark:text-white">
+                        {formatMoney(initialTransaction.value)}
+                      </span>
+                    </div>
 
-                  <div>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
-                      Verwendungszweck:
-                    </span>
-                    <span className="break-words text-xs text-slate-700 dark:text-slate-300">
-                      {initialTransaction.subject || '-'}
-                    </span>
+                    <div>
+                      <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-400">
+                        Zahlungspartner:
+                      </span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {initialTransaction.receiver || initialTransaction.issuer || '-'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="block text-[11px] font-medium text-slate-400 dark:text-slate-400">
+                        Verwendungszweck:
+                      </span>
+                      <span className="break-words text-slate-600 dark:text-slate-300">
+                        {initialTransaction.subject || '-'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* HIGHLIGHT-BOX: VERBLEIBENDER RESTBETRAG */}
                 <div
-                  className={`mt-4 rounded-xl border p-3.5 transition-all ${
+                  className={`mt-6 rounded-xl border p-4 transition-all ${
                     remainingSplitAmount > 0
-                      ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-950/30'
-                      : 'border-rose-200 bg-rose-50 dark:border-rose-800/50 dark:bg-rose-950/30'
+                      ? 'border-emerald-200 bg-emerald-50/90 dark:border-emerald-800/50 dark:bg-emerald-950/40'
+                      : 'border-rose-200 bg-rose-50/90 dark:border-rose-800/50 dark:bg-rose-950/40'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Verbleibender Betrag des Originals:
-                      </span>
-                      <span
-                        className={`text-lg font-bold ${
-                          remainingSplitAmount > 0
-                            ? 'text-emerald-700 dark:text-emerald-400'
-                            : 'text-rose-600 dark:text-rose-400'
-                        }`}
-                      >
-                        {formatMoney(
-                          (initialTransaction.value < 0 ? -1 : 1) * remainingSplitAmount
-                        )}
-                      </span>
-                    </div>
+                  <span className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    Verbleibender Betrag des Originals:
+                  </span>
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span
+                      className={`font-mono text-xl font-bold ${
+                        remainingSplitAmount > 0
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-rose-600 dark:text-rose-400'
+                      }`}
+                    >
+                      {formatMoney((initialTransaction.value < 0 ? -1 : 1) * remainingSplitAmount)}
+                    </span>
                   </div>
                   {remainingSplitAmount <= 0 ? (
-                    <p className="mt-1 flex items-center gap-1 text-xs text-rose-600 dark:text-rose-400">
+                    <p className="mt-1.5 flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400">
                       <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                       Der Restbetrag kann nicht unter 0,00 € fallen!
                     </p>
                   ) : (
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                       Dieser Betrag verbleibt auf der ursprünglichen Buchung.
                     </p>
                   )}
@@ -380,81 +378,85 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </div>
 
               {/* RECHTE SPALTE: NEUE SPLIT-TEILBUCHUNG */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2 dark:border-slate-700">
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                    Neue Teilbuchung (Split)
-                  </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Wird neu angelegt
-                  </span>
-                </div>
-
-                {/* SPLIT BETRAG */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Abzuspaltender Betrag (€) *
-                  </label>
-                  <MoneyInput
-                    value={splitAmount}
-                    onChange={(val) => setSplitAmount(Math.max(0, val))}
-                    className={`w-full ${splitValidationError ? 'border-rose-500 ring-rose-500' : ''}`}
-                    placeholder="0,00"
-                    autoFocus
-                  />
-                  {splitValidationError && (
-                    <span className="mt-1 block text-xs text-rose-600 dark:text-rose-400">
-                      {splitValidationError}
+              <div className="flex flex-col justify-between rounded-2xl border border-indigo-100 bg-indigo-50/30 p-5 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-indigo-100 pb-3 dark:border-indigo-900/50">
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                      Neue Teilbuchung (Split)
                     </span>
-                  )}
-                </div>
+                    <span className="rounded-md bg-indigo-100/70 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
+                      Wird neu angelegt
+                    </span>
+                  </div>
 
-                {/* SPLIT VERWENDUNGSZWECK */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Verwendungszweck für Split *
-                  </label>
-                  <input
-                    type="text"
-                    value={splitSubject}
-                    onChange={(e) => setSplitSubject(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    placeholder="Zweck des abgespaltenen Teils..."
-                    required
-                  />
-                </div>
+                  <div className="space-y-3.5">
+                    {/* SPLIT BETRAG */}
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Abzuspaltender Betrag (€) *
+                      </label>
+                      <MoneyInput
+                        value={splitAmount}
+                        onChange={(val) => setSplitAmount(Math.max(0, val))}
+                        className="w-full"
+                        placeholder="0,00"
+                        autoFocus
+                      />
+                      {splitValidationError && (
+                        <span className="mt-1 block text-xs text-rose-600 dark:text-rose-400">
+                          {splitValidationError}
+                        </span>
+                      )}
+                    </div>
 
-                {/* SPLIT EMPFÄNGER */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Zahlungspartner / Empfänger
-                  </label>
-                  <input
-                    type="text"
-                    value={splitReceiver}
-                    onChange={(e) => setSplitReceiver(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    placeholder="Empfänger..."
-                  />
-                </div>
+                    {/* SPLIT VERWENDUNGSZWECK */}
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Verwendungszweck für Split *
+                      </label>
+                      <input
+                        type="text"
+                        value={splitSubject}
+                        onChange={(e) => setSplitSubject(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        placeholder="Zweck des abgespaltenen Teils..."
+                        required
+                      />
+                    </div>
 
-                {/* SPLIT KATEGORIE */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Kategorie für Teilbuchung
-                  </label>
-                  <select
-                    value={splitCategoryId || ''}
-                    onChange={(e) => setSplitCategoryId(e.target.value || null)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  >
-                    <option value="">Keine Kategorie (Nicht zugewiesen)</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    {/* SPLIT EMPFÄNGER */}
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Zahlungspartner / Empfänger
+                      </label>
+                      <input
+                        type="text"
+                        value={splitReceiver}
+                        onChange={(e) => setSplitReceiver(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        placeholder="Empfänger..."
+                      />
+                    </div>
+
+                    {/* SPLIT KATEGORIE */}
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Kategorie für Teilbuchung
+                      </label>
+                      <select
+                        value={splitCategoryId || ''}
+                        onChange={(e) => setSplitCategoryId(e.target.value || null)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      >
+                        <option value="">Keine Kategorie (Nicht zugewiesen)</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

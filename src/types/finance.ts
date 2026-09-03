@@ -259,7 +259,21 @@ export interface TransactionFilterOptions {
  * @returns {Transaction[]} Eine neue sortierte Liste von Transaktionen
  */
 export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
-  return [...txList].sort((a, b) => {
+  // Split-Kinder sammeln
+  const childrenByParent = new Map<string, Transaction[]>();
+  const rootTransactions: Transaction[] = [];
+
+  for (const tx of txList) {
+    if (tx.splitFromId) {
+      const list = childrenByParent.get(tx.splitFromId) || [];
+      list.push(tx);
+      childrenByParent.set(tx.splitFromId, list);
+    } else {
+      rootTransactions.push(tx);
+    }
+  }
+
+  const compareBase = (a: Transaction, b: Transaction) => {
     // 1. Primär: Valuta- / Wertstellungsdatum absteigend (neueste Tage zuerst)
     const dateComp = b.valueDate.localeCompare(a.valueDate);
     if (dateComp !== 0) return dateComp;
@@ -283,7 +297,42 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
 
     // 6. Deterministischer Tie-Breaker: Transaktions-ID
     return b.id.localeCompare(a.id);
-  });
+  };
+
+  rootTransactions.sort(compareBase);
+
+  // Kinder untereinander sortieren
+  for (const list of childrenByParent.values()) {
+    list.sort(compareBase);
+  }
+
+  const result: Transaction[] = [];
+  const handledChildren = new Set<string>();
+
+  for (const root of rootTransactions) {
+    result.push(root);
+    const children = childrenByParent.get(root.id);
+    if (children) {
+      for (const child of children) {
+        result.push(child);
+        handledChildren.add(child.id);
+      }
+    }
+  }
+
+  // Verwaiste Split-Kinder (falls Parent durch Filterung nicht in txList ist)
+  const remainingChildren: Transaction[] = [];
+  for (const tx of txList) {
+    if (tx.splitFromId && !handledChildren.has(tx.id)) {
+      remainingChildren.push(tx);
+    }
+  }
+  if (remainingChildren.length > 0) {
+    remainingChildren.sort(compareBase);
+    result.push(...remainingChildren);
+  }
+
+  return result;
 }
 
 /**

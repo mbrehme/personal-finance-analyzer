@@ -228,16 +228,50 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         });
       } else if (initialTransaction) {
         const { type: _discardedType, ...rest } = initialTransaction;
+
+        // Partner (Empfänger/Auftraggeber) sauber behandeln:
+        // Wurde das Partner-Eingabefeld überhaupt verändert?
+        const initialPartner = (
+          initialTransaction.receiver ||
+          initialTransaction.issuer ||
+          ''
+        ).trim();
+        const trimmedPartner = receiver.trim();
+        const isPartnerFieldChanged = trimmedPartner !== initialPartner;
+
+        let finalReceiver = initialTransaction.receiver;
+        let finalIssuer = initialTransaction.issuer;
+
+        if (isPartnerFieldChanged) {
+          if (initialTransaction.receiver) {
+            finalReceiver = trimmedPartner;
+          } else if (initialTransaction.issuer) {
+            finalIssuer = trimmedPartner;
+          } else {
+            finalReceiver = type === 'outbound' ? trimmedPartner : '';
+            finalIssuer = type === 'inbound' ? trimmedPartner : '';
+          }
+        }
+
+        // Wurde die Kategorie verändert?
+        const initialCategoryId =
+          initialTransaction.categoryId ?? initialTransaction.bucketId ?? null;
+        const isCategoryFieldChanged = categoryId !== initialCategoryId;
+
         await onSave({
           ...rest,
           accountId,
           valueDate: valueDate as ISODateString,
           value: signedValue,
-          receiver: type === 'outbound' ? receiver : initialTransaction.receiver,
-          issuer: type === 'inbound' ? receiver : initialTransaction.issuer,
+          receiver: finalReceiver,
+          issuer: finalIssuer,
           subject: subject.trim(),
           categoryId,
-          assignmentSource: categoryId ? 'manual' : 'unassigned',
+          assignmentSource: isCategoryFieldChanged
+            ? categoryId
+              ? 'manual'
+              : 'unassigned'
+            : initialTransaction.assignmentSource,
         });
       }
       onClose();

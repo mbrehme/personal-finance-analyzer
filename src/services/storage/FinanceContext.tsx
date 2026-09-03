@@ -460,15 +460,22 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setCategories(updatedCats);
     }
 
+    const isCategoryChanged = oldCatId !== newCatId;
+
     const preparedTx: Transaction = {
       ...updatedTx,
       categoryId: newCatId,
       bucketId: newCatId,
-      assignmentSource: newCatId ? 'manual' : 'unassigned',
+      assignmentSource: isCategoryChanged
+        ? newCatId
+          ? 'manual'
+          : 'unassigned'
+        : (updatedTx.assignmentSource ?? oldTx?.assignmentSource ?? 'unassigned'),
       // Flache Original-Felder absichern, falls von der Bank importiert
       originalValue: oldTx?.originalValue ?? oldTx?.value,
       originalSubject: oldTx?.originalSubject ?? oldTx?.subject,
       originalReceiver: oldTx?.originalReceiver ?? oldTx?.receiver,
+      originalIssuer: oldTx?.originalIssuer ?? oldTx?.issuer,
       originalAccountId: oldTx?.originalAccountId ?? oldTx?.accountId,
       originalValueDate: oldTx?.originalValueDate ?? oldTx?.valueDate,
       originalIban: oldTx?.originalIban ?? oldTx?.iban,

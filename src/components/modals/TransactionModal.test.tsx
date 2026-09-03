@@ -167,4 +167,46 @@ describe('TransactionModal', () => {
       })
     );
   });
+
+  it('preserves partner and assignmentSource when only valueDate is changed in edit mode', async () => {
+    const txWithRegex: Transaction = {
+      ...mockTransaction,
+      categoryId: 'cat-food',
+      assignmentSource: 'auto_regex',
+      receiver: 'REWE Markt GmbH',
+      issuer: '',
+    };
+
+    render(
+      <TransactionModal
+        isOpen={true}
+        mode="edit"
+        initialTransaction={txWithRegex}
+        accounts={mockAccounts}
+        categories={mockCategories}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    );
+
+    // Date ändern
+    const dateInput = screen.getByDisplayValue('2026-09-01');
+    fireEvent.change(dateInput, { target: { value: '2026-09-15' } });
+
+    // Absenden
+    const form = screen.getByRole('dialog').querySelector('form')!;
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        valueDate: '2026-09-15',
+        receiver: 'REWE Markt GmbH',
+        issuer: '',
+        categoryId: 'cat-food',
+        assignmentSource: 'auto_regex',
+      })
+    );
+  });
 });

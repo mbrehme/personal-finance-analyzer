@@ -801,17 +801,28 @@ export const Transactions: React.FC = () => {
                           <span className="truncate font-semibold text-slate-800">
                             {tx.receiver || tx.issuer || 'Kein Empfänger'}
                           </span>
-                          {((tx.originalReceiver !== undefined &&
-                            (tx.receiver || tx.issuer) !== tx.originalReceiver) ||
-                            (tx.originalIssuer !== undefined &&
-                              (tx.receiver || tx.issuer) !== tx.originalIssuer)) && (
-                            <span
-                              className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
-                              title={`Ursprünglich: ${tx.originalReceiver || tx.originalIssuer || 'Kein Empfänger'}`}
-                            >
-                              Geändert
-                            </span>
-                          )}
+                          {(() => {
+                            const origPartner = (
+                              tx.originalReceiver ||
+                              tx.originalIssuer ||
+                              ''
+                            ).trim();
+                            const currentPartner = (tx.receiver || tx.issuer || '').trim();
+                            const hasOrig =
+                              tx.originalReceiver !== undefined || tx.originalIssuer !== undefined;
+                            return (
+                              hasOrig &&
+                              origPartner !== '' &&
+                              currentPartner !== origPartner && (
+                                <span
+                                  className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                                  title={`Ursprünglich: ${origPartner}`}
+                                >
+                                  Geändert
+                                </span>
+                              )
+                            );
+                          })()}
                         </div>
                         <div className="mt-0.5 flex items-center gap-1.5">
                           <span className="truncate text-[11px] text-slate-500">{tx.subject}</span>
@@ -863,7 +874,7 @@ export const Transactions: React.FC = () => {
                           </select>
 
                           {/* Geändert Badge bei manueller Zuweisung */}
-                          {tx.assignmentSource === 'manual' && (
+                          {tx.origin !== 'manual' && tx.assignmentSource === 'manual' && (
                             <span
                               className="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
                               title="Kategorie manuell zugewiesen / angepasst"

@@ -334,4 +334,61 @@ describe('Transactions Page', () => {
     expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
     expect(screen.getByText('Warmmiete')).toBeInTheDocument();
   });
+
+  it('renders "Geändert" badge only for modified columns when only date is changed', async () => {
+    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [{ id: 'acc-1', name: 'Haupt-Girokonto', color: '#000', icon: 'Wallet' }] as any,
+      categories: [
+        { id: 'cat-salary', name: 'Einnahmen > Martin', parentId: null, color: '#10b981' },
+      ] as any,
+      buckets: [] as any,
+      transactions: [
+        {
+          id: 'tx-salary-1',
+          accountId: 'acc-1',
+          valueDate: '2026-05-30', // Geändert von 2026-05-01
+          bookingDate: '2026-05-01',
+          originalValueDate: '2026-05-01',
+          originalAccountId: 'acc-1',
+          originalValue: 6650.62,
+          originalSubject: 'Lohn - Gehalt Abrechnung 05/2026',
+          originalReceiver: 'Brehme Martin',
+          originalIssuer: '',
+          receiver: 'Brehme Martin',
+          issuer: '',
+          subject: 'Lohn - Gehalt Abrechnung 05/2026',
+          type: 'inbound',
+          iban: '',
+          value: 6650.62,
+          categoryId: 'cat-salary',
+          assignmentSource: 'auto_regex',
+          origin: 'imported',
+          rawFingerprint: 'fp-1',
+        },
+      ] as any,
+      deletedTransactions: [],
+      deleteTransaction: vi.fn(),
+      restoreTransaction: vi.fn(),
+      permanentlyDeleteTransaction: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      splitTransaction: vi.fn(),
+      resetTransactionToOriginal: vi.fn(),
+      loading: false,
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Es darf genau 1 "Geändert"-Badge geben (nur beim Datum 30.05.2026)
+    const badges = await screen.findAllByText('Geändert');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].closest('td')).toHaveTextContent('30.05.2026');
+  });
 });

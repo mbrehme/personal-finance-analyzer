@@ -213,10 +213,16 @@ export type TransactionOrigin = 'imported' | 'manual';
  * @returns {boolean} true, wenn Felder vom ursprünglichen Bank-Rohstand abweichen
  */
 export function isTransactionOverridden(tx: Transaction): boolean {
+  const currentPartner = (tx.receiver || tx.issuer || '').trim();
+  const origPartner = (tx.originalReceiver || tx.originalIssuer || '').trim();
+  const hasOrigPartner = tx.originalReceiver !== undefined || tx.originalIssuer !== undefined;
+  const isPartnerOverridden =
+    hasOrigPartner && origPartner !== '' && currentPartner !== origPartner;
+
   return (
     (tx.originalValue !== undefined && tx.value !== tx.originalValue) ||
     (tx.originalSubject !== undefined && tx.subject !== tx.originalSubject) ||
-    (tx.originalReceiver !== undefined && tx.receiver !== tx.originalReceiver) ||
+    isPartnerOverridden ||
     (tx.originalValueDate !== undefined && tx.valueDate !== tx.originalValueDate) ||
     (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId) ||
     (tx.originalIban !== undefined && tx.iban !== tx.originalIban) ||

@@ -11,10 +11,13 @@ import {
   BalanceEntry,
   Category,
   FinanceConfigExport,
+  ExportOptions,
+  DEFAULT_EXPORT_OPTIONS,
+  ResetOptions,
+  DEFAULT_RESET_OPTIONS,
   Transaction,
   sortTransactionsDesc,
   ReMatchStatus,
-  isTransactionOverridden,
   resetTransactionToOriginal,
   CategoryAssignmentSource,
 } from '@/types/finance';
@@ -87,18 +90,23 @@ export interface FinanceContextType {
   /** Stellt eine gelöschte Buchung wieder her */
   restoreTransaction: (transactionId: string) => Promise<void>;
 
-  // Export & Import
-  exportConfiguration: () => Promise<string>;
-  importConfiguration: (jsonContent: string) => Promise<void>;
-  resetWorkspace: () => Promise<void>;
+  // Export & Import & Reset
+  exportConfiguration: (options?: ExportOptions) => Promise<string>;
+  importConfiguration: (jsonContent: string) => Promise<{
+    accountsCount: number;
+    categoriesCount: number;
+    transactionsCount: number;
+  }>;
+  resetWorkspace: (options?: ResetOptions) => Promise<void>;
 }
 
 import seedConfigurationJson from '@/data/seedConfiguration.json';
+import { SEED_TRANSACTIONS } from '@/data/seedTransactions';
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 const SEED_CONFIG = seedConfigurationJson as unknown as FinanceConfigExport;
-const SEED_ACCOUNTS: Account[] = SEED_CONFIG.accounts;
+const SEED_ACCOUNTS: Account[] = SEED_CONFIG.accounts || [];
 const SEED_CATEGORIES: Category[] = SEED_CONFIG.categories || SEED_CONFIG.buckets || [];
 
 const REMATCH_STATUS_STORAGE_KEY = 'finance_rematch_status';
@@ -768,38 +776,48 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   /* ================== EXPORT & IMPORT ================== */
-  const exportConfiguration = async (): Promise<string> => {
-    // Nur manuell erstellte Buchungen oder überschriebene Overrides exportieren!
-    const manualTransactions = transactions.filter(
-      (t) => t.origin === 'manual' || isTransactionOverridden(t)
-    );
-
-    const exportData: FinanceConfigExport = {
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      accounts,
-      categories,
-      buckets: categories,
-      manualTransactions,
-      deletedTransactions,
-    };
+  const exportConfiguration = async (
+    options: ExportOptions = DEFAULT_EXPORT_OPTIONS
+  ): Promise<string> => {
+    const exportData = await financeDB.exportConfiguration(options);
     return JSON.stringify(exportData, null, 2);
   };
 
-  const importConfiguration = async (jsonContent: string): Promise<void> => {
+  const importConfiguration = async (
+    jsonContent: string
+  ): Promise<{
+    accountsCount: number;
+    categoriesCount: number;
+    transactionsCount: number;
+  }> => {
     const parsed: FinanceConfigExport = JSON.parse(jsonContent);
     await financeDB.importConfiguration(parsed);
-    const loadedCats = parsed.categories || parsed.buckets || [];
-    setAccounts(parsed.accounts);
-    setCategories(loadedCats);
 
-    if (Array.isArray(parsed.manualTransactions) && parsed.manualTransactions.length > 0) {
+    const loadedCats = parsed.categories || parsed.buckets;
+    let accountsCount = 0;
+    let categoriesCount = 0;
+    let transactionsCount = 0;
+
+    if (Array.isArray(parsed.accounts)) {
+      setAccounts(parsed.accounts);
+      accountsCount = parsed.accounts.length;
+    }
+    if (Array.isArray(loadedCats)) {
+      setCategories(loadedCats);
+      categoriesCount = loadedCats.length;
+    }
+
+    if (Array.isArray(parsed.transactions)) {
+      setTransactions(sortTransactionsDesc(parsed.transactions));
+      transactionsCount = parsed.transactions.length;
+    } else if (Array.isArray(parsed.manualTransactions) && parsed.manualTransactions.length > 0) {
       const manualTxs = parsed.manualTransactions;
       setTransactions((prev) => {
         const existingIds = new Set(manualTxs.map((m) => m.id));
         const merged = prev.filter((p) => !existingIds.has(p.id)).concat(manualTxs);
         return sortTransactionsDesc(merged);
       });
+      transactionsCount = manualTxs.length;
     }
 
     if (Array.isArray(parsed.deletedTransactions)) {
@@ -807,28 +825,65 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setReMatchStatus('needs_reprogress');
+    return { accountsCount, categoriesCount, transactionsCount };
   };
 
-  const resetWorkspace = async (): Promise<void> => {
+  const resetWorkspace = async (options: ResetOptions = DEFAULT_RESET_OPTIONS): Promise<void> => {
     try {
       setLoading(true);
-      await financeDB.clearAll();
+      await financeDB.resetDatabase(options);
 
-      const seededAccounts: Account[] = [
-        {
-          ...SEED_ACCOUNTS[0],
-          categoryIds: SEED_CATEGORIES.map((c) => c.id),
-          bucketIds: SEED_CATEGORIES.map((c) => c.id),
-        },
-      ];
+      const isSeed = options.target !== 'empty';
 
-      await financeDB.saveAccounts(seededAccounts);
-      await financeDB.saveCategories(SEED_CATEGORIES);
+      if (options.resetAccounts) {
+        if (isSeed) {
+          const seededAccounts: Account[] = [
+            {
+              ...SEED_ACCOUNTS[0],
+              categoryIds: SEED_CATEGORIES.map((c) => c.id),
+              bucketIds: SEED_CATEGORIES.map((c) => c.id),
+            },
+          ];
+          await financeDB.saveAccounts(seededAccounts);
+          setAccounts(seededAccounts);
+        } else {
+          setAccounts([]);
+        }
+      }
 
-      setAccounts(seededAccounts);
-      setCategories(SEED_CATEGORIES);
-      setTransactions([]);
-      setDeletedTransactions([]);
+      if (options.resetCategories) {
+        if (isSeed) {
+          await financeDB.saveCategories(SEED_CATEGORIES);
+          setCategories(SEED_CATEGORIES);
+
+          // Falls Konten nicht zurückgesetzt wurden, ihre categoryIds mit Seed synchronisieren
+          if (!options.resetAccounts) {
+            setAccounts((prev) =>
+              prev.map((acc) => ({
+                ...acc,
+                categoryIds: SEED_CATEGORIES.map((c) => c.id),
+                bucketIds: SEED_CATEGORIES.map((c) => c.id),
+              }))
+            );
+          }
+        } else {
+          setCategories([]);
+        }
+      }
+
+      if (options.resetTransactions) {
+        if (isSeed && options.includeSampleTransactions) {
+          await financeDB.saveTransactions(SEED_TRANSACTIONS);
+          setTransactions(SEED_TRANSACTIONS);
+        } else {
+          setTransactions([]);
+        }
+      }
+
+      if (options.resetDeletedTransactions) {
+        setDeletedTransactions([]);
+      }
+
       setReMatchStatus('has_progressed');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Zurücksetzen der Finanzdaten.');

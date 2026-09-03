@@ -373,17 +373,85 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
 }
 
 /**
- * Konfigurations-Export (leichtgewichtig & portabel – enthält Accounts und Categories inkl. manualTransactionIds).
+ * Optionen für den granularen Daten-Export.
+ */
+export interface ExportOptions {
+  /** Konten inklusive Saldenverläufen exportieren */
+  includeAccounts: boolean;
+  /** Kategorien inklusive Regeln, Soll-Budgets und Hierarchien exportieren */
+  includeCategories: boolean;
+  /** Manuelle Overrides und manuell angelegte Buchungen exportieren */
+  includeManualTransactions: boolean;
+  /** Sämtliche Transaktionen / Buchungen exportieren */
+  includeTransactions: boolean;
+  /** Gelöschte Buchungen (Papierkorb) exportieren */
+  includeDeletedTransactions: boolean;
+}
+
+/**
+ * Standard-Optionen für den Export (standardmäßig alles ausgewählt).
+ */
+export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
+  includeAccounts: true,
+  includeCategories: true,
+  includeManualTransactions: true,
+  includeTransactions: true,
+  includeDeletedTransactions: true,
+};
+
+/**
+ * Optionen für das selektive Zurücksetzen des Workspace.
+ */
+/**
+ * Modus für das Zurücksetzen des Workspace:
+ * - 'seed': Auf Beispieldaten / Standardkonfiguration zurücksetzen
+ * - 'empty': Vollständig leeren / löschen (leerer Zustand)
+ */
+export type ResetTarget = 'seed' | 'empty';
+
+/**
+ * Optionen für das selektive Zurücksetzen des Workspace.
+ */
+export interface ResetOptions {
+  /** Ziel: 'seed' (auf Beispieldaten zurücksetzen) oder 'empty' (vollständig leeren / löschen) */
+  target?: ResetTarget;
+  /** Konten auf Standard-Konto zurücksetzen oder leeren */
+  resetAccounts?: boolean;
+  /** Kategorien auf Standard-Kategorien zurücksetzen oder leeren */
+  resetCategories?: boolean;
+  /** Alle Transaktionen / Buchungen zurücksetzen oder leeren */
+  resetTransactions?: boolean;
+  /** Gelöschte Transaktionen (Papierkorb) leeren */
+  resetDeletedTransactions?: boolean;
+  /** Bei target === 'seed': Ob zusätzlich realistische Beispieldaten für Buchungen geladen werden sollen */
+  includeSampleTransactions?: boolean;
+}
+
+/**
+ * Standard-Optionen für den Reset (standardmäßig Beispieldaten & alles vorausgewählt).
+ */
+export const DEFAULT_RESET_OPTIONS: ResetOptions = {
+  target: 'seed',
+  resetAccounts: true,
+  resetCategories: true,
+  resetTransactions: true,
+  resetDeletedTransactions: true,
+};
+
+/**
+ * Konfigurations- und Daten-Export (leichtgewichtig oder vollständiges Backup).
  */
 export interface FinanceConfigExport {
   version: number;
   exportedAt: string;
-  accounts: Account[];
-  categories: Category[];
+  accounts?: Account[];
+  categories?: Category[];
   /** @deprecated Abwärtskompatibilität für alte Exporte */
   buckets?: Category[];
   /** Manuell erstellte Buchungen, Splits und modifizierte Overrides */
   manualTransactions?: Transaction[];
+  /** Vollständiger Buchungsbestand aller Transaktionen */
+  transactions?: Transaction[];
   /** Gelöschte Buchungen (damit sie beim Re-Import oder Gerätewechsel gelöscht bleiben) */
   deletedTransactions?: Transaction[];
 }

@@ -29,9 +29,6 @@ describe('ConfigurationLayout', () => {
     );
 
     expect(await screen.findByText('Konfiguration')).toBeInTheDocument();
-    expect(screen.getByText('JSON Export')).toBeInTheDocument();
-    expect(screen.getByText('JSON Import')).toBeInTheDocument();
-    expect(screen.getByText('Zurücksetzen')).toBeInTheDocument();
     expect(screen.getByText(/Kategorien \(\d+\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Konten \(\d+\)/i)).toBeInTheDocument();
     expect(screen.getByText('Categories Content')).toBeInTheDocument();

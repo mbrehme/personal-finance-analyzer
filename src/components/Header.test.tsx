@@ -120,4 +120,40 @@ describe('Header', () => {
     expect(rematchBtn).toBeDisabled();
     expect(rematchBtn).toHaveTextContent(/Progressing.../i);
   });
+
+  it('opens data management dropdown and triggers export and reset modals', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      ...baseMockFinance,
+    });
+
+    render(
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const dataMenuBtn = screen.getByTestId('header-data-menu-btn');
+    expect(dataMenuBtn).toBeInTheDocument();
+
+    // Open dropdown
+    await user.click(dataMenuBtn);
+    expect(screen.getByTestId('header-data-menu-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Daten exportieren.../i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Daten importieren.../i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Workspace zurücksetzen.../i })).toBeInTheDocument();
+
+    // Click Export -> should open Export modal
+    await user.click(screen.getByRole('button', { name: /Daten exportieren.../i }));
+    expect(screen.getByRole('heading', { name: 'Daten exportieren' })).toBeInTheDocument();
+
+    // Close Export modal
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(screen.queryByRole('heading', { name: 'Daten exportieren' })).not.toBeInTheDocument();
+
+    // Open dropdown again and click Reset
+    await user.click(dataMenuBtn);
+    await user.click(screen.getByRole('button', { name: /Workspace zurücksetzen.../i }));
+    expect(screen.getByRole('heading', { name: 'Workspace zurücksetzen' })).toBeInTheDocument();
+  });
 });

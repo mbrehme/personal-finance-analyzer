@@ -129,7 +129,7 @@ describe('financeDB Storage Layer', () => {
     const exported = await financeDB.exportConfiguration();
     expect(exported.accounts).toHaveLength(1);
     expect(exported.categories).toHaveLength(1);
-    expect(exported.categories[0].manualTransactionIds).toContain('tx-manual-1');
+    expect(exported.categories![0].manualTransactionIds).toContain('tx-manual-1');
     expect(exported.manualTransactions).toHaveLength(1);
     expect(exported.manualTransactions![0].id).toBe('tx-man-1');
     // Sicherstellen, dass der Typ nicht im Export-Objekt serialisiert wird
@@ -224,5 +224,76 @@ describe('financeDB Storage Layer', () => {
     // Endgültiges Löschen
     await financeDB.permanentlyDeleteTransaction('tx-del-1');
     expect(await financeDB.getDeletedTransactions()).toHaveLength(0);
+  });
+
+  it('supports selective export options and transactions export/import', async () => {
+    await financeDB.clearAll();
+
+    await financeDB.saveAccounts([
+      {
+        id: 'acc-1',
+        name: 'Giro',
+        color: '#fff',
+        icon: 'Wallet',
+        categoryIds: [],
+        balanceEntries: [],
+      },
+    ]);
+    await financeDB.saveCategories([
+      { id: 'cat-1', name: 'Freizeit', color: '#111', icon: 'Smile', parentId: null },
+    ]);
+    await financeDB.saveTransaction({
+      id: 'tx-bank-1',
+      accountId: 'acc-1',
+      valueDate: '2026-09-01',
+      bookingDate: '2026-09-01',
+      issuer: 'Cinema',
+      receiver: 'Me',
+      subject: 'Kino',
+      iban: '',
+      value: -15,
+      assignmentSource: 'unassigned',
+      origin: 'imported',
+    });
+
+    // 1. Export mit nur Konfiguration (ohne alle Transaktionen)
+    const configExport = await financeDB.exportConfiguration({
+      includeAccounts: true,
+      includeCategories: true,
+      includeManualTransactions: false,
+      includeTransactions: false,
+      includeDeletedTransactions: false,
+    });
+    expect(configExport.accounts).toHaveLength(1);
+    expect(configExport.categories).toHaveLength(1);
+    expect(configExport.transactions).toBeUndefined();
+    expect(configExport.manualTransactions).toBeUndefined();
+
+    // 2. Export mit vollen Transaktionen
+    const fullExport = await financeDB.exportConfiguration({
+      includeAccounts: true,
+      includeCategories: true,
+      includeManualTransactions: true,
+      includeTransactions: true,
+      includeDeletedTransactions: true,
+    });
+    expect(fullExport.transactions).toHaveLength(1);
+    expect(fullExport.transactions![0].id).toBe('tx-bank-1');
+
+    // 3. Selective Reset (nur Transaktionen löschen)
+    await financeDB.resetDatabase({
+      resetAccounts: false,
+      resetCategories: false,
+      resetTransactions: true,
+      resetDeletedTransactions: false,
+    });
+    expect(await financeDB.getAccounts()).toHaveLength(1);
+    expect(await financeDB.getCategories()).toHaveLength(1);
+    expect(await financeDB.getTransactions()).toHaveLength(0);
+
+    // 4. Re-Import von vollem Export inkl. Transaktionen
+    await financeDB.importConfiguration(fullExport);
+    expect(await financeDB.getTransactions()).toHaveLength(1);
+    expect((await financeDB.getTransactions())[0].subject).toBe('Kino');
   });
 });

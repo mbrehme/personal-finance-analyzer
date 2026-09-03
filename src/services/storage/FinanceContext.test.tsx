@@ -361,4 +361,62 @@ describe('FinanceContext', () => {
     const updatedParent = result.current.categories.find((c) => c.id === parentCategory.id);
     expect(updatedParent?.regexPattern).toBeUndefined();
   });
+
+  it('supports selective reset of workspace categories without deleting accounts or transactions', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Custom Category anlegen
+    await act(async () => {
+      await result.current.addCategory({
+        name: 'Spezialkategorie',
+        parentId: null,
+      });
+    });
+    expect(result.current.categories.some((c) => c.name === 'Spezialkategorie')).toBe(true);
+
+    // Selektiv nur Kategorien zurücksetzen
+    await act(async () => {
+      await result.current.resetWorkspace({
+        resetAccounts: false,
+        resetCategories: true,
+        resetTransactions: false,
+        resetDeletedTransactions: false,
+      });
+    });
+
+    // Spezialkategorie ist weg, da Kategorien auf Seed zurückgesetzt wurden
+    expect(result.current.categories.some((c) => c.name === 'Spezialkategorie')).toBe(false);
+  });
+
+  it('supports empty reset mode to completely wipe categories and transactions', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.resetWorkspace({
+        target: 'empty',
+        resetCategories: true,
+        resetTransactions: true,
+      });
+    });
+
+    expect(result.current.categories).toHaveLength(0);
+    expect(result.current.transactions).toHaveLength(0);
+  });
+
+  it('loads sample transactions when resetWorkspace is called with includeSampleTransactions true', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.resetWorkspace({
+        target: 'seed',
+        resetTransactions: true,
+        includeSampleTransactions: true,
+      });
+    });
+
+    expect(result.current.transactions.length).toBeGreaterThan(0);
+  });
 });

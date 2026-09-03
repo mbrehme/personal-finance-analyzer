@@ -10,6 +10,10 @@ import {
   Category,
   Transaction,
   FinanceConfigExport,
+  ExportOptions,
+  DEFAULT_EXPORT_OPTIONS,
+  ResetOptions,
+  DEFAULT_RESET_OPTIONS,
   sortTransactionsDesc,
   isTransactionOverridden,
   getTransactionType,
@@ -551,7 +555,9 @@ export const financeDB = {
   },
 
   /* ================== EXPORT & IMPORT ================== */
-  async exportConfiguration(): Promise<FinanceConfigExport> {
+  async exportConfiguration(
+    options: ExportOptions = DEFAULT_EXPORT_OPTIONS
+  ): Promise<FinanceConfigExport> {
     const [accounts, categories, transactions, deletedTransactions] = await Promise.all([
       this.getAccounts(),
       this.getCategories(),
@@ -559,44 +565,73 @@ export const financeDB = {
       this.getDeletedTransactions(),
     ]);
 
-    const manualTransactions = transactions
-      .filter((t) => t.origin === 'manual' || isTransactionOverridden(t))
-      .map((t) => this.sanitizeForPersistence(t) as Transaction);
-
-    const sanitizedDeleted = deletedTransactions.map(
-      (t) => this.sanitizeForPersistence(t) as Transaction
-    );
-
-    return {
+    const result: FinanceConfigExport = {
       version: 2,
       exportedAt: new Date().toISOString(),
-      accounts,
-      categories,
-      buckets: categories,
-      manualTransactions,
-      deletedTransactions: sanitizedDeleted,
     };
+
+    if (options.includeAccounts) {
+      result.accounts = accounts;
+    }
+
+    if (options.includeCategories) {
+      result.categories = categories;
+      result.buckets = categories;
+    }
+
+    if (options.includeTransactions) {
+      result.transactions = transactions.map((t) => this.sanitizeForPersistence(t) as Transaction);
+    }
+
+    if (options.includeManualTransactions) {
+      result.manualTransactions = transactions
+        .filter((t) => t.origin === 'manual' || isTransactionOverridden(t))
+        .map((t) => this.sanitizeForPersistence(t) as Transaction);
+    }
+
+    if (options.includeDeletedTransactions) {
+      result.deletedTransactions = deletedTransactions.map(
+        (t) => this.sanitizeForPersistence(t) as Transaction
+      );
+    }
+
+    return result;
   },
 
   async importConfiguration(config: FinanceConfigExport): Promise<void> {
     const categoriesToImport = config.categories || config.buckets;
-    if (!config || !Array.isArray(config.accounts) || !Array.isArray(categoriesToImport)) {
+    const hasAccounts = Array.isArray(config.accounts);
+    const hasCategories = Array.isArray(categoriesToImport);
+    const hasTransactions = Array.isArray(config.transactions);
+    const hasManualTransactions = Array.isArray(config.manualTransactions);
+    const hasDeletedTransactions = Array.isArray(config.deletedTransactions);
+
+    if (!config || (!hasAccounts && !hasCategories && !hasTransactions && !hasManualTransactions)) {
       throw new Error('Ungültiges Konfigurationsformat.');
     }
 
     if (!isIndexedDBAvailable()) {
-      memoryStore.accounts.clear();
-      memoryStore.categories.clear();
-      memoryStore.deletedTransactions.clear();
-      config.accounts.forEach((acc) => memoryStore.accounts.set(acc.id, acc));
-      categoriesToImport.forEach((c) => memoryStore.categories.set(c.id, c));
-      if (Array.isArray(config.manualTransactions)) {
-        config.manualTransactions.forEach((t) =>
+      if (hasAccounts) {
+        memoryStore.accounts.clear();
+        config.accounts!.forEach((acc) => memoryStore.accounts.set(acc.id, acc));
+      }
+      if (hasCategories) {
+        memoryStore.categories.clear();
+        categoriesToImport!.forEach((c) => memoryStore.categories.set(c.id, c));
+      }
+      if (hasTransactions) {
+        memoryStore.transactions.clear();
+        config.transactions!.forEach((t) =>
+          memoryStore.transactions.set(t.id, this.sanitizeForPersistence(t) as Transaction)
+        );
+      } else if (hasManualTransactions) {
+        config.manualTransactions!.forEach((t) =>
           memoryStore.transactions.set(t.id, this.sanitizeForPersistence(t) as Transaction)
         );
       }
-      if (Array.isArray(config.deletedTransactions)) {
-        config.deletedTransactions.forEach((t) =>
+      if (hasDeletedTransactions) {
+        memoryStore.deletedTransactions.clear();
+        config.deletedTransactions!.forEach((t) =>
           memoryStore.deletedTransactions.set(t.id, this.sanitizeForPersistence(t) as Transaction)
         );
       }
@@ -605,46 +640,92 @@ export const financeDB = {
 
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const candidates: string[] = [STORES.ACCOUNTS, STORES.CATEGORIES, STORES.BUCKETS];
-      if (Array.isArray(config.manualTransactions) && config.manualTransactions.length > 0) {
+      const candidates: string[] = [];
+      if (hasAccounts) candidates.push(STORES.ACCOUNTS);
+      if (hasCategories) {
+        candidates.push(STORES.CATEGORIES);
+        candidates.push(STORES.BUCKETS);
+      }
+      if (hasTransactions || hasManualTransactions) {
         candidates.push(STORES.TRANSACTIONS);
       }
-      if (Array.isArray(config.deletedTransactions) && config.deletedTransactions.length > 0) {
+      if (hasDeletedTransactions) {
         candidates.push(STORES.DELETED_TRANSACTIONS);
       }
       const storeNames = candidates.filter((name) => db.objectStoreNames.contains(name));
       const idbTx = db.transaction(storeNames, 'readwrite');
-      const accStore = idbTx.objectStore(STORES.ACCOUNTS);
 
-      accStore.clear();
-      config.accounts.forEach((acc) => accStore.put(acc));
+      if (hasAccounts && db.objectStoreNames.contains(STORES.ACCOUNTS)) {
+        const accStore = idbTx.objectStore(STORES.ACCOUNTS);
+        accStore.clear();
+        config.accounts!.forEach((acc) => accStore.put(acc));
+      }
 
-      if (db.objectStoreNames.contains(STORES.CATEGORIES)) {
-        const catStore = idbTx.objectStore(STORES.CATEGORIES);
-        catStore.clear();
-        categoriesToImport.forEach((c) => catStore.put(c));
+      if (hasCategories) {
+        if (db.objectStoreNames.contains(STORES.CATEGORIES)) {
+          const catStore = idbTx.objectStore(STORES.CATEGORIES);
+          catStore.clear();
+          categoriesToImport!.forEach((c) => catStore.put(c));
+        }
+        if (db.objectStoreNames.contains(STORES.BUCKETS)) {
+          const bucketStore = idbTx.objectStore(STORES.BUCKETS);
+          bucketStore.clear();
+          categoriesToImport!.forEach((c) => bucketStore.put(c));
+        }
       }
-      if (db.objectStoreNames.contains(STORES.BUCKETS)) {
-        const bucketStore = idbTx.objectStore(STORES.BUCKETS);
-        bucketStore.clear();
-        categoriesToImport.forEach((c) => bucketStore.put(c));
-      }
-      if (
-        Array.isArray(config.manualTransactions) &&
-        db.objectStoreNames.contains(STORES.TRANSACTIONS)
-      ) {
+
+      if (hasTransactions && db.objectStoreNames.contains(STORES.TRANSACTIONS)) {
         const txStore = idbTx.objectStore(STORES.TRANSACTIONS);
-        config.manualTransactions.forEach((t) => txStore.put(this.sanitizeForPersistence(t)));
+        txStore.clear();
+        config.transactions!.forEach((t) => txStore.put(this.sanitizeForPersistence(t)));
+      } else if (hasManualTransactions && db.objectStoreNames.contains(STORES.TRANSACTIONS)) {
+        const txStore = idbTx.objectStore(STORES.TRANSACTIONS);
+        config.manualTransactions!.forEach((t) => txStore.put(this.sanitizeForPersistence(t)));
       }
-      if (
-        Array.isArray(config.deletedTransactions) &&
-        db.objectStoreNames.contains(STORES.DELETED_TRANSACTIONS)
-      ) {
+
+      if (hasDeletedTransactions && db.objectStoreNames.contains(STORES.DELETED_TRANSACTIONS)) {
         const delStore = idbTx.objectStore(STORES.DELETED_TRANSACTIONS);
         delStore.clear();
-        config.deletedTransactions.forEach((t) => delStore.put(this.sanitizeForPersistence(t)));
+        config.deletedTransactions!.forEach((t) => delStore.put(this.sanitizeForPersistence(t)));
       }
 
+      idbTx.oncomplete = () => resolve();
+      idbTx.onerror = () => reject(idbTx.error);
+    });
+  },
+
+  /**
+   * Setzt selektive Stores in der Datenbank zurück oder leert sie.
+   */
+  async resetDatabase(options: ResetOptions = DEFAULT_RESET_OPTIONS): Promise<void> {
+    const storesToClear: string[] = [];
+    if (options.resetAccounts) storesToClear.push(STORES.ACCOUNTS);
+    if (options.resetCategories) {
+      storesToClear.push(STORES.CATEGORIES);
+      storesToClear.push(STORES.BUCKETS);
+    }
+    if (options.resetTransactions) storesToClear.push(STORES.TRANSACTIONS);
+    if (options.resetDeletedTransactions) storesToClear.push(STORES.DELETED_TRANSACTIONS);
+
+    if (!isIndexedDBAvailable()) {
+      if (options.resetAccounts) memoryStore.accounts.clear();
+      if (options.resetCategories) memoryStore.categories.clear();
+      if (options.resetTransactions) memoryStore.transactions.clear();
+      if (options.resetDeletedTransactions) memoryStore.deletedTransactions.clear();
+      return;
+    }
+
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const storeNames = storesToClear.filter((name) => db.objectStoreNames.contains(name));
+      if (storeNames.length === 0) {
+        resolve();
+        return;
+      }
+      const idbTx = db.transaction(storeNames, 'readwrite');
+      storeNames.forEach((name) => {
+        idbTx.objectStore(name).clear();
+      });
       idbTx.oncomplete = () => resolve();
       idbTx.onerror = () => reject(idbTx.error);
     });

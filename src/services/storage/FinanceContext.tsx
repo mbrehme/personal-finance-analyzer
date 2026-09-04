@@ -209,9 +209,31 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         loadedAccounts = seededAccounts;
       }
 
+      // Migration: Transaktionen mit accountId aber ohne accountIban mit der IBAN des Kontos anreichern
+      const accountsMap = new Map(loadedAccounts.map((a) => [a.id, a]));
+      let txsMigrated = false;
+      const migratedTransactions = loadedTransactions.map((tx) => {
+        if (!tx.accountIban && tx.accountId) {
+          const acc = accountsMap.get(tx.accountId);
+          if (acc?.iban) {
+            txsMigrated = true;
+            return {
+              ...tx,
+              accountIban: acc.iban,
+              originalAccountIban: tx.originalAccountIban ?? acc.iban,
+            };
+          }
+        }
+        return tx;
+      });
+
+      if (txsMigrated) {
+        await financeDB.saveTransactions(migratedTransactions);
+      }
+
       setAccounts(loadedAccounts);
       setCategories(loadedCategories);
-      setTransactions(sortTransactionsDesc(loadedTransactions));
+      setTransactions(sortTransactionsDesc(migratedTransactions));
       setDeletedTransactions(sortTransactionsDesc(validDeleted));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Finanzdaten.');
@@ -477,6 +499,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalReceiver: oldTx?.originalReceiver ?? oldTx?.receiver,
       originalIssuer: oldTx?.originalIssuer ?? oldTx?.issuer,
       originalAccountId: oldTx?.originalAccountId ?? oldTx?.accountId,
+      originalAccountIban: oldTx?.originalAccountIban ?? oldTx?.accountIban,
       originalValueDate: oldTx?.originalValueDate ?? oldTx?.valueDate,
       originalIban: oldTx?.originalIban ?? oldTx?.iban,
     };
@@ -516,6 +539,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalSubject: originalTx.originalSubject ?? originalTx.subject,
       originalReceiver: originalTx.originalReceiver ?? originalTx.receiver,
       originalAccountId: originalTx.originalAccountId ?? originalTx.accountId,
+      originalAccountIban: originalTx.originalAccountIban ?? originalTx.accountIban,
       originalValueDate: originalTx.originalValueDate ?? originalTx.valueDate,
       originalIban: originalTx.originalIban ?? originalTx.iban,
     };
@@ -525,6 +549,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newSplitTx: Transaction = {
       id: splitId,
       accountId: originalTx.accountId,
+      accountIban: originalTx.accountIban,
       valueDate: originalTx.valueDate,
       bookingDate: originalTx.bookingDate,
       issuer: originalTx.issuer,

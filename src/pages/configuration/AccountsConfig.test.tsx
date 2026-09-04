@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AccountsConfig } from './AccountsConfig';
 import { FinanceProvider } from '@/services/storage/FinanceContext';
 
@@ -24,5 +24,25 @@ describe('AccountsConfig Subpage', () => {
     const dragHandles = screen.getAllByTitle('Ziehen zum Umsortieren');
     expect(dragHandles.length).toBeGreaterThan(0);
     expect(screen.getByText(/Stichtag:/i)).toBeInTheDocument();
+  });
+
+  it('renders real account with Bankkonto badge and Unterkonto quick action', async () => {
+    render(
+      <FinanceProvider>
+        <AccountsConfig />
+      </FinanceProvider>
+    );
+
+    await screen.findByText(/Verwaltete Konten/i);
+    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
+    expect(screen.getByText('Bankkonto')).toBeInTheDocument();
+    expect(screen.getByText('Unterkonto anlegen')).toBeInTheDocument();
+
+    // Click on "Unterkonto anlegen"
+    fireEvent.click(screen.getByText('Unterkonto anlegen'));
+
+    // Verify modal is open and has preselected parent account
+    expect(screen.getByText('Neues virtuelles Unterkonto anlegen')).toBeInTheDocument();
+    expect(screen.getByText(/Übergeordnetes echtes Bankkonto/i)).toBeInTheDocument();
   });
 });

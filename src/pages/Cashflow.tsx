@@ -67,7 +67,7 @@ interface YearGroup {
 }
 
 export const Cashflow: React.FC = () => {
-  const { categories, transactions } = useFinance();
+  const { categories, transactions, accounts } = useFinance();
   const { granularity, selectedAccountId, startDate, endDate, selectedCategoryIds } =
     useAnalyticsFilter();
 
@@ -89,9 +89,7 @@ export const Cashflow: React.FC = () => {
   };
 
   const isCurrentPeriodInRange = useMemo(() => {
-    if (!startDate && !endDate) return true;
-    const now = new Date();
-    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayIso = new Date().toISOString().substring(0, 10);
     if (startDate && todayIso < startDate) return false;
     if (endDate && todayIso > endDate) return false;
     return true;
@@ -108,6 +106,7 @@ export const Cashflow: React.FC = () => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         selectedCategoryIds: selectedCategoryIds || undefined,
+        accounts,
       }
     );
   }, [
@@ -119,6 +118,7 @@ export const Cashflow: React.FC = () => {
     startDate,
     endDate,
     selectedCategoryIds,
+    accounts,
   ]);
 
   const currentPeriodKey = useMemo(() => getCurrentPeriodKey(granularity), [granularity]);

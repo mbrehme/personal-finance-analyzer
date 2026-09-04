@@ -12,7 +12,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   // Monat August 2026
   {
     id: 'seed-tx-01',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-01',
     bookingDate: '2026-08-01',
     issuer: 'Arbeitgeber Tech AG',
@@ -25,7 +25,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-02',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-01',
     bookingDate: '2026-08-01',
     issuer: 'Klinikum Mitte',
@@ -38,7 +38,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-03',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-05',
     bookingDate: '2026-08-05',
     issuer: 'Familienkasse',
@@ -51,7 +51,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-04',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-02',
     bookingDate: '2026-08-02',
     issuer: 'Martin',
@@ -64,7 +64,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-05',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-02',
     bookingDate: '2026-08-02',
     issuer: 'Martin',
@@ -77,7 +77,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-06',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-03',
     bookingDate: '2026-08-03',
     issuer: 'Martin',
@@ -90,7 +90,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-07',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-03',
     bookingDate: '2026-08-03',
     issuer: 'Denise',
@@ -103,7 +103,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-08',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-04',
     bookingDate: '2026-08-04',
     issuer: 'Martin',
@@ -116,7 +116,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-09',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-08',
     bookingDate: '2026-08-08',
     issuer: 'Martin',
@@ -128,7 +128,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-10',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-15',
     bookingDate: '2026-08-15',
     issuer: 'Denise',
@@ -140,7 +140,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-11',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-18',
     bookingDate: '2026-08-18',
     issuer: 'Denise',
@@ -152,7 +152,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-12',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-20',
     bookingDate: '2026-08-20',
     issuer: 'Martin',
@@ -164,7 +164,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-13',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-22',
     bookingDate: '2026-08-22',
     issuer: 'Martin',
@@ -176,7 +176,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-14',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-08-25',
     bookingDate: '2026-08-25',
     issuer: 'Martin',
@@ -186,11 +186,35 @@ export const SEED_TRANSACTIONS: Transaction[] = [
     value: -78.3,
     assignmentSource: 'manual',
   },
+  {
+    id: 'seed-tx-transfer-1',
+    accountIban: 'DE44500105175407324900',
+    valueDate: '2026-08-10',
+    bookingDate: '2026-08-10',
+    issuer: 'Martin',
+    receiver: 'Tagesgeldkonto',
+    subject: 'Umbuchung Tagesgeld Rücklage',
+    iban: 'DE44500105175407324995',
+    value: -500,
+    assignmentSource: 'manual',
+  },
+  {
+    id: 'seed-tx-transfer-2',
+    accountIban: 'DE44500105175407324900',
+    valueDate: '2026-08-28',
+    bookingDate: '2026-08-28',
+    issuer: 'Tagesgeldkonto',
+    receiver: 'Martin',
+    subject: 'Rücküberweisung vom Tagesgeld',
+    iban: 'DE44500105175407324995',
+    value: 200,
+    assignmentSource: 'manual',
+  },
 
   // Monat September 2026
   {
     id: 'seed-tx-15',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-09-01',
     bookingDate: '2026-09-01',
     issuer: 'Arbeitgeber Tech AG',
@@ -203,7 +227,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-16',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-09-01',
     bookingDate: '2026-09-01',
     issuer: 'Klinikum Mitte',
@@ -216,7 +240,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-17',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-09-02',
     bookingDate: '2026-09-02',
     issuer: 'Martin',
@@ -229,7 +253,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-18',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-09-02',
     bookingDate: '2026-09-02',
     issuer: 'Martin',
@@ -242,7 +266,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'seed-tx-19',
-    accountId: 'acc-giro-main',
+    accountIban: 'DE44500105175407324900',
     valueDate: '2026-09-03',
     bookingDate: '2026-09-03',
     issuer: 'Martin',

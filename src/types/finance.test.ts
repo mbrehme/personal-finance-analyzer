@@ -316,4 +316,118 @@ describe('finance domain helpers', () => {
     expect(restored.deletedAt).toBeUndefined();
     expect(isTransactionOverridden(restored)).toBe(false);
   });
+
+  it('normalizes IBAN by removing spaces and capitalizing', async () => {
+    const { normalizeIban } = await import('./finance');
+
+    expect(normalizeIban('de89 3704 0044 0532 0130 00')).toBe('DE89370400440532013000');
+    expect(normalizeIban('DE12345')).toBe('DE12345');
+    expect(normalizeIban('')).toBe('');
+    expect(normalizeIban(undefined)).toBe('');
+  });
+
+  it('determines all accounts for a transaction (primary, counter-account and virtual subaccounts)', async () => {
+    const { getTransactionAccountInfo, isTransactionMatchingAccount } = await import('./finance');
+
+    const accounts = [
+      {
+        id: 'acc-giro',
+        name: 'Girokonto',
+        accountType: 'real' as const,
+        iban: 'DE1111',
+        balanceEntries: [],
+      },
+      {
+        id: 'acc-tagesgeld',
+        name: 'Tagesgeld',
+        accountType: 'real' as const,
+        iban: 'DE2222',
+        balanceEntries: [],
+      },
+      {
+        id: 'acc-sub-urlaub',
+        name: 'Urlaubstopf',
+        accountType: 'virtual' as const,
+        parentAccountId: 'acc-giro',
+        categoryIds: ['cat-urlaub'],
+        balanceEntries: [],
+      },
+    ];
+
+    // 1. Umbuchung von Girokonto auf Tagesgeld
+    const transferTx: Transaction = {
+      id: 'tx-transfer',
+      accountId: 'acc-giro',
+      valueDate: '2026-08-10',
+      bookingDate: '2026-08-10',
+      issuer: 'Martin',
+      receiver: 'Tagesgeld',
+      subject: 'Umbuchung Tagesgeld',
+      iban: 'DE2222',
+      value: -500,
+      assignmentSource: 'unassigned',
+    };
+
+    const transferInfo = getTransactionAccountInfo(transferTx, accounts);
+    expect(transferInfo.primaryAccount?.id).toBe('acc-giro');
+    expect(transferInfo.counterAccount?.id).toBe('acc-tagesgeld');
+    expect(transferInfo.virtualAccounts).toHaveLength(0);
+    expect(transferInfo.allAccounts).toHaveLength(2);
+
+    expect(isTransactionMatchingAccount(transferTx, 'acc-giro', accounts)).toBe(true);
+    expect(isTransactionMatchingAccount(transferTx, 'acc-tagesgeld', accounts)).toBe(true);
+    expect(isTransactionMatchingAccount(transferTx, 'acc-sub-urlaub', accounts)).toBe(false);
+
+    // 2. Buchung auf Girokonto, die zum virtuellen Unterkonto Urlaubstopf gehört
+    const vacationTx: Transaction = {
+      id: 'tx-vacation',
+      accountId: 'acc-giro',
+      valueDate: '2026-08-12',
+      bookingDate: '2026-08-12',
+      issuer: 'Martin',
+      receiver: 'Lufthansa',
+      subject: 'Flugticket',
+      iban: 'DE9999',
+      value: -300,
+      categoryId: 'cat-urlaub',
+      assignmentSource: 'unassigned',
+    };
+
+    const vacationInfo = getTransactionAccountInfo(vacationTx, accounts);
+    expect(vacationInfo.primaryAccount?.id).toBe('acc-giro');
+    expect(vacationInfo.counterAccount).toBeUndefined();
+    expect(vacationInfo.virtualAccounts).toHaveLength(1);
+    expect(vacationInfo.virtualAccounts[0].id).toBe('acc-sub-urlaub');
+    expect(vacationInfo.allAccounts).toHaveLength(2);
+
+    expect(isTransactionMatchingAccount(vacationTx, 'acc-giro', accounts)).toBe(true);
+    expect(isTransactionMatchingAccount(vacationTx, 'acc-sub-urlaub', accounts)).toBe(true);
+    expect(isTransactionMatchingAccount(vacationTx, 'acc-tagesgeld', accounts)).toBe(false);
+
+    // 3. Transaktion OHNE accountId, rein über accountIban und categoryId aufgelöst
+    const purelyVirtualTx: Transaction = {
+      id: 'tx-no-account-id',
+      accountIban: 'DE1111',
+      valueDate: '2026-08-15',
+      bookingDate: '2026-08-15',
+      issuer: 'Martin',
+      receiver: 'Hotel Strandlust',
+      subject: 'Urlaub Übernachtung',
+      iban: 'DE7777',
+      value: -150,
+      categoryId: 'cat-urlaub',
+      assignmentSource: 'unassigned',
+    };
+
+    const purelyVirtualInfo = getTransactionAccountInfo(purelyVirtualTx, accounts);
+    expect(purelyVirtualInfo.primaryAccount?.id).toBe('acc-giro');
+    expect(purelyVirtualInfo.counterAccount).toBeUndefined();
+    expect(purelyVirtualInfo.virtualAccounts).toHaveLength(1);
+    expect(purelyVirtualInfo.virtualAccounts[0].id).toBe('acc-sub-urlaub');
+    expect(purelyVirtualInfo.allAccounts).toHaveLength(2);
+
+    expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-giro', accounts)).toBe(true);
+    expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-sub-urlaub', accounts)).toBe(true);
+    expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-tagesgeld', accounts)).toBe(false);
+  });
 });

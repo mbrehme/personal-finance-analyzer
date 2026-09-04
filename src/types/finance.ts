@@ -123,12 +123,42 @@ export interface BalanceEntry {
 }
 
 /**
- * Repräsentiert ein Bankkonto, Depot oder eine Wallet des Benutzers.
+ * Art des Kontos:
+ * - 'real': Echtes Bankkonto (Girokonto, Tagesgeld, Sparkonto etc.) mit IBAN, ohne manuelle Kategorien
+ * - 'virtual': Virtuelles Unterkonto (Urlaubstopf, Rücklagen etc.) unter einem echten Konto, gesteuert über Filter-Kategorien
+ */
+export type AccountType = 'real' | 'virtual';
+
+/**
+ * Normalisiert eine IBAN durch Entfernen von Leerzeichen und Konvertierung in Großbuchstaben.
+ *
+ * @param {string} [iban] - Zu normalisierende IBAN
+ * @returns {string} Bereinigte IBAN (z. B. 'DE89370400440532013000')
+ * @example
+ * normalizeIban('DE89 3704 0044') // 'DE8937040044'
+ */
+export function normalizeIban(iban?: string): string {
+  if (!iban) return '';
+  return iban.replace(/\s+/g, '').toUpperCase();
+}
+
+/**
+ * Repräsentiert ein Bankkonto, Depot oder ein virtuelles Unterkonto des Benutzers.
  */
 export interface Account extends EntityVisualMetadata {
   /** Eindeutige ID des Kontos */
   id: string;
-  /** IDs der diesem Konto zugeordneten Kategorien */
+  /**
+   * Kontotyp:
+   * - 'real': Echtes Bankkonto mit IBAN, ohne manuelle Kategorien
+   * - 'virtual': Virtuelles Unterkonto unter einem echten Konto mit Filter-Kategorien
+   */
+  accountType?: AccountType;
+  /** IBAN bei echten Konten (z. B. 'DE89370400440532013000') */
+  iban?: string;
+  /** ID des übergeordneten echten Kontos (nur bei accountType === 'virtual') */
+  parentAccountId?: string | null;
+  /** IDs der diesem Konto zugeordneten Kategorien (relevant für virtuelle Unterkonten) */
   categoryIds?: string[];
   /** @deprecated Verwende categoryIds */
   bucketIds?: string[];
@@ -142,8 +172,12 @@ export interface Account extends EntityVisualMetadata {
 export interface Transaction {
   /** Eindeutige, deterministische ID (generiert aus Datum, Betrag, IBAN, Text) */
   id: string;
-  /** ID des zugehörigen Kontos */
-  accountId: string;
+  /**
+   * @deprecated Nicht mehr statisch persistieren. Kontozugehörigkeit wird dynamisch via accountIban / IBAN oder CategoryId ermittelt.
+   */
+  accountId?: string;
+  /** Eigene Bank-IBAN des Kontos, auf dem die Buchung gebucht wurde */
+  accountIban?: string;
   /** Valuta- / Wertstellungsdatum */
   valueDate: ISODateString;
   /** Buchungsdatum */
@@ -188,7 +222,9 @@ export interface Transaction {
   splitFromId?: string;
 
   /* Flache Original-Felder der Bank-Rohdaten (nur bei importierten Buchungen vorhanden) */
+  /** @deprecated Verwende originalAccountIban */
   originalAccountId?: string;
+  originalAccountIban?: string;
   originalValueDate?: ISODateString;
   originalBookingDate?: ISODateString;
   originalValue?: number;
@@ -224,6 +260,7 @@ export function isTransactionOverridden(tx: Transaction): boolean {
     (tx.originalSubject !== undefined && tx.subject !== tx.originalSubject) ||
     isPartnerOverridden ||
     (tx.originalValueDate !== undefined && tx.valueDate !== tx.originalValueDate) ||
+    (tx.originalAccountIban !== undefined && tx.accountIban !== tx.originalAccountIban) ||
     (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId) ||
     (tx.originalIban !== undefined && tx.iban !== tx.originalIban) ||
     Boolean(tx.splitFromId)
@@ -261,6 +298,7 @@ export function resetTransactionToOriginal(tx: Transaction): Transaction {
     valueDate: tx.originalValueDate ?? tx.valueDate,
     bookingDate: tx.originalBookingDate ?? tx.bookingDate,
     accountId: tx.originalAccountId ?? tx.accountId,
+    accountIban: tx.originalAccountIban ?? tx.accountIban,
     iban: tx.originalIban ?? tx.iban,
     categoryId: null,
     bucketId: null,
@@ -374,12 +412,130 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
       }
     }
   }
-
   return result;
 }
 
 /**
- * Optionen für den granularen Daten-Export.
+ * Detaillierte Kontozuordnung für eine Transaktion.
+ * Berücksichtigt das primäre Buchungskonto, das Gegenkonto (bei Umbuchungen zwischen echten Konten)
+ * sowie alle betroffenen virtuellen Unterkonten.
+ */
+export interface TransactionAccountInfo {
+  /** Das primäre Buchungskonto der Transaktion */
+  primaryAccount?: Account;
+  /** Das Gegenkonto bei einer erkannten Umbuchung zwischen zwei echten Konten */
+  counterAccount?: Account;
+  /** Virtuelle Unterkonten, deren Filter-Kriterien auf diese Buchung zutreffen */
+  virtualAccounts: Account[];
+  /** Alle eindeutigen Konten (primär, Gegenkonto und virtuelle Unterkonten) */
+  allAccounts: Account[];
+}
+
+/**
+ * Ermittelt alle Konten, die einer Transaktion zugeordnet sind.
+ * - Primäres Konto: Entspricht `tx.accountId` bzw. matching IBAN.
+ * - Gegenkonto: Wenn `tx.iban` mit der IBAN eines anderen echten Kontos übereinstimmt (Umbuchung zwischen realen Konten).
+ * - Virtuelle Unterkonten: Alle Unterkonten des primären Kontos (oder des Gegenkontos),
+ *   deren Kategorie-Filter mit der Kategorie der Transaktion übereinstimmt.
+ *
+ * @param {Transaction} tx - Die zu prüfende Transaktion
+ * @param {Account[]} accounts - Alle im Workspace konfigurierten Konten
+ * @returns {TransactionAccountInfo} Vollständige Kontozuordnung der Transaktion
+ * @example
+ * const info = getTransactionAccountInfo(tx, accounts);
+ * console.log(info.primaryAccount?.name, info.counterAccount?.name, info.virtualAccounts);
+ */
+export function getTransactionAccountInfo(
+  tx: Transaction,
+  accounts: Account[]
+): TransactionAccountInfo {
+  const normAccountIban = normalizeIban(tx.accountIban);
+  const normTxIban = normalizeIban(tx.iban);
+
+  // 1. Primäres Buchungskonto:
+  // Vorrang 1: tx.accountIban matcht ein echtes Konto
+  // Vorrang 2: tx.accountId (Abwärtskompatibilität für Altdaten)
+  // Vorrang 3: tx.iban matcht ein echtes Konto (falls nur Gegenkonto/IBAN gesetzt)
+  let primaryAccount: Account | undefined;
+  if (normAccountIban) {
+    primaryAccount = accounts.find(
+      (a) => a.accountType !== 'virtual' && a.iban && normalizeIban(a.iban) === normAccountIban
+    );
+  }
+  if (!primaryAccount && tx.accountId) {
+    primaryAccount = accounts.find((a) => a.id === tx.accountId);
+  }
+  if (!primaryAccount && normTxIban) {
+    primaryAccount = accounts.find(
+      (a) => a.accountType !== 'virtual' && a.iban && normalizeIban(a.iban) === normTxIban
+    );
+  }
+
+  // 2. Gegenkonto bei Umbuchung (Transfer zwischen echten Bankkonten via IBAN)
+  const counterAccount =
+    normTxIban && primaryAccount
+      ? accounts.find(
+          (a) =>
+            a.id !== primaryAccount.id &&
+            a.accountType !== 'virtual' &&
+            Boolean(a.iban && normalizeIban(a.iban) === normTxIban)
+        )
+      : undefined;
+
+  // 3. Virtuelle Unterkonten (Category Match)
+  const txCatId = tx.categoryId ?? tx.bucketId ?? null;
+  const virtualAccounts = accounts.filter((a) => {
+    if (a.accountType !== 'virtual' || !txCatId) return false;
+    const catIds = a.categoryIds || a.bucketIds || [];
+    if (!catIds.includes(txCatId)) return false;
+
+    if (a.parentAccountId) {
+      const isUnderPrimary = primaryAccount ? a.parentAccountId === primaryAccount.id : false;
+      const isUnderCounter = counterAccount ? a.parentAccountId === counterAccount.id : false;
+      return isUnderPrimary || isUnderCounter;
+    }
+    return true;
+  });
+
+  // 4. Alle eindeutigen Konten
+  const accountMap = new Map<string, Account>();
+  if (primaryAccount) accountMap.set(primaryAccount.id, primaryAccount);
+  if (counterAccount) accountMap.set(counterAccount.id, counterAccount);
+  virtualAccounts.forEach((v) => accountMap.set(v.id, v));
+
+  return {
+    primaryAccount,
+    counterAccount,
+    virtualAccounts,
+    allAccounts: Array.from(accountMap.values()),
+  };
+}
+
+/**
+ * Prüft, ob eine Transaktion mit einem ausgewählten Konto-Filter übereinstimmt.
+ * Berücksichtigt primäre Konten, Gegenkonten (bei Umbuchungen) und virtuelle Unterkonten.
+ *
+ * @param {Transaction} tx - Die zu prüfende Transaktion
+ * @param {string} accountId - Die ausgewählte Konto-ID oder 'all'
+ * @param {Account[]} accounts - Alle verfügbaren Konten
+ * @returns {boolean} True, wenn die Buchung zum Konto gehört
+ * @example
+ * if (isTransactionMatchingAccount(tx, 'acc-unterkonto', accounts)) {
+ *   // Transaktion betrifft dieses Unterkonto
+ * }
+ */
+export function isTransactionMatchingAccount(
+  tx: Transaction,
+  accountId: string,
+  accounts: Account[]
+): boolean {
+  if (accountId === 'all') return true;
+  const info = getTransactionAccountInfo(tx, accounts);
+  return info.allAccounts.some((a) => a.id === accountId);
+}
+
+/**
+ * Optionen für den Export von Finanzdaten.
  */
 export interface ExportOptions {
   /** Konten inklusive Saldenverläufen exportieren */

@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Account, Transaction } from '@/types/finance';
+import { Account, Transaction, normalizeIban } from '@/types/finance';
 import {
   parseRawCsv,
   convertRowsToTransactions,
@@ -71,6 +71,20 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         };
         setMapping(safeMapping);
 
+        // Auto-Erkennung des Ziel-Kontos anhand der IBAN in den CSV-Zeilen
+        if (safeMapping.ibanColumn) {
+          const rowWithIban = parsed.rows.find((r) => r[safeMapping.ibanColumn!]);
+          const csvIban = rowWithIban ? rowWithIban[safeMapping.ibanColumn!] : '';
+          if (csvIban) {
+            const matched = accounts.find(
+              (a) => a.iban && normalizeIban(a.iban) === normalizeIban(csvIban)
+            );
+            if (matched) {
+              setSelectedAccountId(matched.id);
+            }
+          }
+        }
+
         if (!selectedAccountId && accounts.length > 0) {
           setSelectedAccountId(accounts[0].id);
         }
@@ -87,12 +101,26 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
       ...mapping,
       [field]: value || undefined,
     });
+
+    if (field === 'ibanColumn' && value && parseResult) {
+      const rowWithIban = parseResult.rows.find((r) => r[value]);
+      const csvIban = rowWithIban ? rowWithIban[value] : '';
+      if (csvIban) {
+        const matched = accounts.find(
+          (a) => a.iban && normalizeIban(a.iban) === normalizeIban(csvIban)
+        );
+        if (matched) {
+          setSelectedAccountId(matched.id);
+        }
+      }
+    }
   };
 
-  const effectiveAccountId = selectedAccountId || accounts[0]?.id || '';
+  const effectiveAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
+  const effectiveAccountIban = effectiveAccount?.iban || '';
 
   const handleExecuteImport = async () => {
-    if (!parseResult || !mapping || !effectiveAccountId) return;
+    if (!parseResult || !mapping || !effectiveAccount) return;
 
     try {
       setImporting(true);
@@ -100,7 +128,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
       const transactions = convertRowsToTransactions(
         parseResult.rows,
         mapping,
-        effectiveAccountId,
+        effectiveAccountIban,
         fileName
       );
 
@@ -179,7 +207,11 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name}
+                      {acc.accountType === 'virtual'
+                        ? `${acc.name} (Virtuelles Unterkonto)`
+                        : acc.iban
+                          ? `${acc.name} (${acc.iban})`
+                          : acc.name}
                     </option>
                   ))}
                 </select>
@@ -418,7 +450,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                     !mapping.valueDateColumn ||
                     !mapping.valueColumn ||
                     !mapping.subjectColumn ||
-                    !effectiveAccountId ||
+                    !effectiveAccount ||
                     importing
                   }
                   className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"

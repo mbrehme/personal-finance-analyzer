@@ -12,7 +12,7 @@ import { IconRenderer } from '@/components/IconRenderer';
 import { formatPeriodLabel } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { useAnalyticsFilter } from '@/pages/analytics';
-import { Wallet, Landmark, ShieldCheck, Calendar } from 'lucide-react';
+import { Wallet, Landmark, ShieldCheck, Calendar, CornerDownRight } from 'lucide-react';
 
 export const Balances: React.FC = () => {
   const { accounts, transactions } = useFinance();
@@ -83,55 +83,81 @@ export const Balances: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {balanceMatrix.rows.length > 0 ? (
-                balanceMatrix.rows.map((row) => (
-                  <tr key={row.account.id} className="transition-colors hover:bg-slate-50/80">
-                    {/* Konto Name */}
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-2.5">
+                balanceMatrix.rows.map((row) => {
+                  const isVirtual = row.account.accountType === 'virtual';
+
+                  return (
+                    <tr
+                      key={row.account.id}
+                      className={
+                        isVirtual
+                          ? 'bg-slate-50/50 transition-colors hover:bg-slate-100/60'
+                          : 'transition-colors hover:bg-slate-50/80'
+                      }
+                    >
+                      {/* Konto Name */}
+                      <td className="whitespace-nowrap px-4 py-3">
                         <div
-                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-white"
-                          style={{ backgroundColor: row.account.color || '#3b82f6' }}
+                          className={`flex items-center gap-2.5 ${isVirtual ? 'pl-5 sm:pl-7' : ''}`}
                         >
-                          <IconRenderer name={row.account.icon} className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-900">{row.account.name}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Perioden Salden */}
-                    {balanceMatrix.periodKeys.map((pKey) => {
-                      const pData = row.periods[pKey] || {
-                        startBalance: 0,
-                        cashflow: 0,
-                        endBalance: 0,
-                      };
-
-                      return (
-                        <td key={pKey} className="whitespace-nowrap px-4 py-3 text-right font-mono">
-                          <div className="font-bold text-slate-900">
-                            {formatMoney(pData.endBalance)}
-                          </div>
-                          {pData.cashflow !== 0 && (
-                            <div
-                              className={`text-[10px] ${
-                                pData.cashflow >= 0 ? 'text-emerald-600' : 'text-slate-500'
-                              }`}
-                            >
-                              ({formatMoney(pData.cashflow, { signDisplay: 'always' })})
-                            </div>
+                          {isVirtual && (
+                            <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                           )}
-                        </td>
-                      );
-                    })}
+                          <div
+                            className="shadow-2xs flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-white"
+                            style={{ backgroundColor: row.account.color || '#3b82f6' }}
+                          >
+                            <IconRenderer name={row.account.icon} className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900">{row.account.name}</span>
+                              {isVirtual && (
+                                <span className="inline-flex items-center rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700">
+                                  Virtuell
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
 
-                    {/* Aktueller Stand */}
-                    <td className="whitespace-nowrap bg-slate-50/50 px-4 py-3 text-right font-mono text-sm font-bold text-slate-900">
-                      {formatMoney(row.latestBalance)}
-                    </td>
-                  </tr>
-                ))
+                      {/* Perioden Salden */}
+                      {balanceMatrix.periodKeys.map((pKey) => {
+                        const pData = row.periods[pKey] || {
+                          startBalance: 0,
+                          cashflow: 0,
+                          endBalance: 0,
+                        };
+
+                        return (
+                          <td
+                            key={pKey}
+                            className="whitespace-nowrap px-4 py-3 text-right font-mono"
+                          >
+                            <div className="font-bold text-slate-900">
+                              {formatMoney(pData.endBalance)}
+                            </div>
+                            {pData.cashflow !== 0 && (
+                              <div
+                                className={`text-[10px] ${
+                                  pData.cashflow >= 0 ? 'text-emerald-600' : 'text-slate-500'
+                                }`}
+                              >
+                                ({formatMoney(pData.cashflow, { signDisplay: 'always' })})
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      {/* Aktueller Stand */}
+                      <td className="whitespace-nowrap bg-slate-50/50 px-4 py-3 text-right font-mono text-sm font-bold text-slate-900">
+                        {formatMoney(row.latestBalance)}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td

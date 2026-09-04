@@ -5,6 +5,8 @@
     {
       "id": "acc-giro-main",
       "name": "Haupt-Girokonto",
+      "accountType": "real",
+      "iban": "DE44500105175407324900",
       "color": "#3b82f6",
       "icon": "Landmark",
       "categoryIds": [],
@@ -14,6 +16,40 @@
           "date": "2026-08-01",
           "amount": 3500,
           "note": "Eröffnungssaldo"
+        }
+      ]
+    },
+    {
+      "id": "acc-tagesgeld",
+      "name": "Tagesgeldkonto",
+      "accountType": "real",
+      "iban": "DE44500105175407324995",
+      "color": "#10b981",
+      "icon": "Landmark",
+      "categoryIds": [],
+      "balanceEntries": [
+        {
+          "id": "be-seed-tg-1",
+          "date": "2026-08-01",
+          "amount": 5000,
+          "note": "Eröffnungssaldo"
+        }
+      ]
+    },
+    {
+      "id": "acc-virt-wohnen",
+      "name": "Wohnungs-Rücklage",
+      "accountType": "virtual",
+      "parentAccountId": "acc-giro-main",
+      "categoryIds": ["b-wh-hausgeld", "b-kredite-wohnungsdarlehen"],
+      "color": "#8b5cf6",
+      "icon": "FolderTree",
+      "balanceEntries": [
+        {
+          "id": "be-seed-virt-1",
+          "date": "2026-08-01",
+          "amount": 1500,
+          "note": "Startguthaben Rücklage"
         }
       ]
     }

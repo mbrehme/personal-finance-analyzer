@@ -11,7 +11,7 @@ import { Account, Category, Transaction } from '@/types/finance';
 
 describe('TransactionModal', () => {
   const mockAccounts: Account[] = [
-    { id: 'acc-1', name: 'Girokonto', categoryIds: [], balanceEntries: [] },
+    { id: 'acc-1', name: 'Girokonto', iban: 'DE12345', categoryIds: [], balanceEntries: [] },
   ];
   const mockCategories: Category[] = [
     { id: 'cat-food', name: 'Lebensmittel', parentId: null },
@@ -20,7 +20,7 @@ describe('TransactionModal', () => {
 
   const mockTransaction: Transaction = {
     id: 'tx-1',
-    accountId: 'acc-1',
+    accountIban: 'DE12345',
     valueDate: '2026-09-01',
     bookingDate: '2026-09-01',
     issuer: '',
@@ -36,6 +36,7 @@ describe('TransactionModal', () => {
     originalValue: -100,
     originalSubject: 'REWE SAG DANKE FILIALE 1234',
     originalReceiver: 'REWE Markt GmbH',
+    originalAccountIban: 'DE12345',
     originalIban: 'DE8937040044',
   };
 
@@ -77,7 +78,7 @@ describe('TransactionModal', () => {
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        accountId: 'acc-1',
+        accountIban: 'DE12345',
         subject: 'Bargeld Einkauf',
         value: -45,
       })

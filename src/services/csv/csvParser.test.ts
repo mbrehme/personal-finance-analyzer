@@ -64,11 +64,12 @@ describe('csvParser', () => {
         subjectColumn: 'Verwendungszweck',
         valueColumn: 'Betrag',
       },
-      'acc-ing-1'
+      'DE11112222'
     );
 
     expect(transactions).toHaveLength(2);
-    expect(transactions[0].accountId).toBe('acc-ing-1');
+    expect(transactions[0].accountIban).toBe('DE11112222');
+    expect(transactions[0].accountId).toBeUndefined();
     expect(transactions[0].valueDate).toBe('2026-09-01');
     expect(transactions[0].receiver).toBe('Rewe Markt');
     expect(transactions[0].value).toBe(-45.5);
@@ -79,7 +80,7 @@ describe('csvParser', () => {
     expect(transactions[0].originalValue).toBe(-45.5);
     expect(transactions[0].originalSubject).toBe('Lebensmitteleinkauf');
     expect(transactions[0].originalReceiver).toBe('Rewe Markt');
-    expect(transactions[0].originalAccountId).toBe('acc-ing-1');
+    expect(transactions[0].originalAccountIban).toBe('DE11112222');
 
     expect(transactions[1].valueDate).toBe('2026-09-02');
     expect(transactions[1].value).toBe(3200);

@@ -391,4 +391,102 @@ describe('Transactions Page', () => {
     expect(badges).toHaveLength(1);
     expect(badges[0].closest('td')).toHaveTextContent('30.05.2026');
   });
+
+  it('renders multiple accounts for transfers between real accounts and virtual subaccounts', async () => {
+    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        {
+          id: 'acc-giro',
+          name: 'Haupt-Girokonto',
+          accountType: 'real',
+          iban: 'DE1111',
+          color: '#3b82f6',
+          icon: 'Landmark',
+          balanceEntries: [],
+        },
+        {
+          id: 'acc-tagesgeld',
+          name: 'Tagesgeldkonto',
+          accountType: 'real',
+          iban: 'DE2222',
+          color: '#10b981',
+          icon: 'Landmark',
+          balanceEntries: [],
+        },
+        {
+          id: 'acc-sub-urlaub',
+          name: 'Urlaubstopf',
+          accountType: 'virtual',
+          parentAccountId: 'acc-giro',
+          categoryIds: ['cat-urlaub'],
+          color: '#8b5cf6',
+          icon: 'FolderTree',
+          balanceEntries: [],
+        },
+      ] as any,
+      categories: [
+        { id: 'cat-urlaub', name: 'Urlaub & Reisen', parentId: null, color: '#f59e0b' },
+      ] as any,
+      buckets: [] as any,
+      transactions: [
+        // 1. Umbuchung von Girokonto auf Tagesgeld
+        {
+          id: 'tx-transfer-1',
+          accountId: 'acc-giro',
+          valueDate: '2026-08-10',
+          bookingDate: '2026-08-10',
+          receiver: 'Tagesgeldkonto',
+          issuer: 'Martin',
+          subject: 'Umbuchung Tagesgeld Rücklage',
+          type: 'outbound',
+          iban: 'DE2222',
+          value: -500,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+        },
+        // 2. Buchung auf Girokonto, die auch zum virtuellen Unterkonto Urlaubstopf gehört
+        {
+          id: 'tx-vacation-1',
+          accountId: 'acc-giro',
+          valueDate: '2026-08-15',
+          bookingDate: '2026-08-15',
+          receiver: 'Lufthansa',
+          issuer: 'Martin',
+          subject: 'Flug nach Mallorca',
+          type: 'outbound',
+          iban: 'DE9999',
+          value: -350,
+          categoryId: 'cat-urlaub',
+          assignmentSource: 'auto_regex',
+        },
+      ] as any,
+      deletedTransactions: [],
+      deleteTransaction: vi.fn(),
+      restoreTransaction: vi.fn(),
+      permanentlyDeleteTransaction: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      splitTransaction: vi.fn(),
+      resetTransactionToOriginal: vi.fn(),
+      loading: false,
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Prüfe, dass die Umbuchung beide echten Konten anzeigt (Tagesgeldkonto als Empfänger und als Gegenkonto)
+    expect(screen.getAllByText('Tagesgeldkonto').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Haupt-Girokonto').length).toBeGreaterThanOrEqual(1);
+
+    // Prüfe, dass das virtuelle Unterkonto angezeigt wird
+    expect(screen.getByText('Urlaubstopf')).toBeInTheDocument();
+
+    vi.restoreAllMocks();
+  });
 });

@@ -12,6 +12,7 @@ import {
   Category,
   TransactionType,
   ISODateString,
+  normalizeIban,
   isTransactionOverridden,
   resetTransactionToOriginal,
 } from '@/types/finance';
@@ -118,7 +119,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setSubject('');
       setCategoryId(null);
     } else if (initialTransaction) {
-      setAccountId(initialTransaction.accountId);
+      const matchingAcc = initialTransaction.accountIban
+        ? accounts.find(
+            (a) => a.iban && normalizeIban(a.iban) === normalizeIban(initialTransaction.accountIban)
+          )
+        : accounts.find((a) => a.id === initialTransaction.accountId);
+      setAccountId(matchingAcc?.id || accounts[0]?.id || '');
       setValueDate(initialTransaction.valueDate);
       setAmount(Math.abs(initialTransaction.value));
       setReceiver(initialTransaction.receiver || initialTransaction.issuer || '');
@@ -213,9 +219,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
     try {
       setSaving(true);
+      const selectedAcc = accounts.find((a) => a.id === accountId);
+      const accountIban = selectedAcc?.iban || '';
+
       if (mode === 'create') {
         await onSave({
-          accountId,
+          accountIban,
           valueDate: valueDate as ISODateString,
           bookingDate: valueDate as ISODateString,
           issuer: !isOutbound ? receiver : '',
@@ -228,7 +237,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           origin: 'manual',
         });
       } else if (initialTransaction) {
-        const { type: _discardedType, ...rest } = initialTransaction;
+        const {
+          type: _discardedType,
+          accountId: _discardedAccountId,
+          ...rest
+        } = initialTransaction;
 
         // Partner (Empfänger/Auftraggeber) sauber behandeln:
         // Wurde das Partner-Eingabefeld überhaupt verändert?
@@ -261,7 +274,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
         await onSave({
           ...rest,
-          accountId,
+          accountIban: accountIban || initialTransaction.accountIban,
           valueDate: valueDate as ISODateString,
           value: signedValue,
           receiver: finalReceiver,
@@ -730,7 +743,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name}
+                      {acc.accountType === 'virtual'
+                        ? `${acc.name} (Virtuelles Unterkonto)`
+                        : acc.iban
+                          ? `${acc.name} (${acc.iban})`
+                          : acc.name}
                     </option>
                   ))}
                 </select>

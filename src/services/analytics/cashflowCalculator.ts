@@ -5,7 +5,13 @@
  * @module services/analytics/cashflowCalculator
  */
 
-import { Category, PeriodGranularity, Transaction } from '@/types/finance';
+import {
+  Account,
+  Category,
+  PeriodGranularity,
+  Transaction,
+  isTransactionMatchingAccount,
+} from '@/types/finance';
 import {
   fillPeriodKeyRange,
   getCurrentPeriodKey,
@@ -91,11 +97,17 @@ export function calculateCashflowMatrix(
     startDate?: string;
     endDate?: string;
     selectedCategoryIds?: string[];
+    accounts?: Account[];
   }
 ): CashflowAnalysisResult {
   // 1. Transaktionen filtern (nach Konto, Datumsbereich und/oder Kategorien)
   let filteredTx = selectedAccountId
-    ? transactions.filter((t) => t.accountId === selectedAccountId)
+    ? transactions.filter((t) => {
+        if (options?.accounts) {
+          return isTransactionMatchingAccount(t, selectedAccountId, options.accounts);
+        }
+        return t.accountId === selectedAccountId;
+      })
     : transactions;
 
   if (options?.startDate || options?.endDate) {

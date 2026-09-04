@@ -16,6 +16,8 @@ import {
   isTransactionOverridden,
   getTransactionType,
   Transaction,
+  getTransactionAccountInfo,
+  isTransactionMatchingAccount,
 } from '@/types/finance';
 import { IconRenderer } from '@/components/IconRenderer';
 import { DateRangePicker } from '@/components/DateRangePicker';
@@ -37,6 +39,8 @@ import {
   Plus,
   Pencil,
   Scissors,
+  ArrowRight,
+  FolderTree,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -192,11 +196,6 @@ export const Transactions: React.FC = () => {
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Schnelle Lookups per Map
-  const accountsMap = useMemo(() => {
-    return new Map(accounts.map((a) => [a.id, a]));
-  }, [accounts]);
-
   // Strukturierte Kategorie-Optionen für schnelle und übersichtliche Auswahl
   const categoryOptions = useMemo(() => {
     const childrenMap = new Map<string | null, typeof categories>();
@@ -272,8 +271,8 @@ export const Transactions: React.FC = () => {
     const matches = transactions.filter((tx) => {
       const txCatId = tx.categoryId ?? tx.bucketId ?? null;
 
-      // 1. Account Filter
-      if (accountId !== 'all' && tx.accountId !== accountId) {
+      // 1. Account Filter (prüft Buchungskonto, Gegenkonto bei Umbuchung und virtuelle Unterkonten)
+      if (accountId !== 'all' && !isTransactionMatchingAccount(tx, accountId, accounts)) {
         return false;
       }
 
@@ -621,7 +620,11 @@ export const Transactions: React.FC = () => {
               <option value="all">Alle Konten</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name}
+                  {a.accountType === 'virtual'
+                    ? `↳ ${a.name} (Virtuell)`
+                    : a.iban
+                      ? `${a.name} (${a.iban})`
+                      : a.name}
                 </option>
               ))}
             </select>
@@ -707,7 +710,7 @@ export const Transactions: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {displayedTransactions.length > 0 ? (
                 displayedTransactions.map((tx) => {
-                  const account = accountsMap.get(tx.accountId);
+                  const accountInfo = getTransactionAccountInfo(tx, accounts);
                   const isOutbound = tx.value < 0;
                   const isSplitParent = splitParentIds.has(tx.id);
                   const isSplitChild = Boolean(tx.splitFromId);
@@ -770,28 +773,90 @@ export const Transactions: React.FC = () => {
 
                       {/* Konto */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {account ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
-                              <IconRenderer
-                                name={account.icon}
-                                style={{ color: account.color }}
-                                className="h-3.5 w-3.5"
-                              />
-                              {account.name}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
-                          {tx.originalAccountId !== undefined &&
-                            tx.accountId !== tx.originalAccountId && (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            {accountInfo.counterAccount ? (
+                              isOutbound ? (
+                                <>
+                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
+                                    <IconRenderer
+                                      name={accountInfo.primaryAccount?.icon}
+                                      style={{ color: accountInfo.primaryAccount?.color }}
+                                      className="h-3.5 w-3.5 shrink-0"
+                                    />
+                                    <span>{accountInfo.primaryAccount?.name || 'Unbekannt'}</span>
+                                  </span>
+                                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-900">
+                                    <IconRenderer
+                                      name={accountInfo.counterAccount.icon}
+                                      style={{ color: accountInfo.counterAccount.color }}
+                                      className="h-3.5 w-3.5 shrink-0"
+                                    />
+                                    <span>{accountInfo.counterAccount.name}</span>
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-900">
+                                    <IconRenderer
+                                      name={accountInfo.counterAccount.icon}
+                                      style={{ color: accountInfo.counterAccount.color }}
+                                      className="h-3.5 w-3.5 shrink-0"
+                                    />
+                                    <span>{accountInfo.counterAccount.name}</span>
+                                  </span>
+                                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
+                                    <IconRenderer
+                                      name={accountInfo.primaryAccount?.icon}
+                                      style={{ color: accountInfo.primaryAccount?.color }}
+                                      className="h-3.5 w-3.5 shrink-0"
+                                    />
+                                    <span>{accountInfo.primaryAccount?.name || 'Unbekannt'}</span>
+                                  </span>
+                                </>
+                              )
+                            ) : accountInfo.primaryAccount ? (
+                              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
+                                <IconRenderer
+                                  name={accountInfo.primaryAccount.icon}
+                                  style={{ color: accountInfo.primaryAccount.color }}
+                                  className="h-3.5 w-3.5 shrink-0"
+                                />
+                                <span>{accountInfo.primaryAccount.name}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+
+                            {((tx.originalAccountIban !== undefined &&
+                              tx.accountIban !== tx.originalAccountIban) ||
+                              (tx.originalAccountId !== undefined &&
+                                tx.accountId !== tx.originalAccountId)) && (
                               <span
-                                className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                                className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
                                 title="Konto manuell angepasst"
                               >
                                 Geändert
                               </span>
                             )}
+                          </div>
+
+                          {accountInfo.virtualAccounts.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 pl-1">
+                              {accountInfo.virtualAccounts.map((v) => (
+                                <span
+                                  key={v.id}
+                                  className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700"
+                                  title={`Zugeordnetes virtuelles Unterkonto: ${v.name}`}
+                                >
+                                  <FolderTree className="h-3 w-3 text-purple-600" />
+                                  {v.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </td>
 

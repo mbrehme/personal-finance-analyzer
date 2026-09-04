@@ -214,7 +214,7 @@ export function parseCurrencyValue(raw: string): number {
  * Erzeugt einen deterministischen Hash/ID für eine Transaktion zur Duplikatsvermeidung.
  */
 export function generateTransactionId(
-  accountId: string,
+  accountIban: string,
   valueDate: string,
   value: number,
   subject: string,
@@ -222,7 +222,7 @@ export function generateTransactionId(
   issuer: string,
   receiver: string
 ): string {
-  const rawKey = `${accountId}|${valueDate}|${value.toFixed(2)}|${subject.trim()}|${iban.trim()}|${issuer.trim()}|${receiver.trim()}`;
+  const rawKey = `${accountIban}|${valueDate}|${value.toFixed(2)}|${subject.trim()}|${iban.trim()}|${issuer.trim()}|${receiver.trim()}`;
   let hash = 0;
   for (let i = 0; i < rawKey.length; i++) {
     hash = (hash << 5) - hash + rawKey.charCodeAt(i);
@@ -235,17 +235,17 @@ export function generateTransactionId(
  * Berechnet einen deterministischen, tagesgenauen Fingerabdruck (FNV-1a 32-Bit Hash)
  * für eine importierte Bank-Rohbuchung.
  *
- * @param {string} accountId - Konto-ID
+ * @param {string} accountIban - Bankkonto-IBAN (oder Konto-Identifikator)
  * @param {string} valueDate - Valutadatum (YYYY-MM-DD)
  * @param {number} value - Exakter Betrag
  * @param {string} subject - Verwendungszweck der Bank
  * @param {string} [partner=''] - Zahlungspartner (Empfänger oder Auftraggeber)
- * @param {string} [iban=''] - IBAN
+ * @param {string} [iban=''] - Gegenkonto-IBAN
  * @param {number} [occurrenceIndex=0] - Zähler für Mehrfachbuchungen am exakt selben Tag
  * @returns {string} Einzigartiger Fingerprint-String mit Präfix 'fp-'
  */
 export function computeRawFingerprint(
-  accountId: string,
+  accountIban: string,
   valueDate: string,
   value: number,
   subject: string,
@@ -256,7 +256,7 @@ export function computeRawFingerprint(
   const normSubject = (subject || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const normPartner = (partner || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const normIban = (iban || '').trim().toUpperCase().replace(/\s+/g, '');
-  const rawKey = `${accountId}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}|${occurrenceIndex}`;
+  const rawKey = `${accountIban}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}|${occurrenceIndex}`;
 
   let hash = 2166136261;
   for (let i = 0; i < rawKey.length; i++) {
@@ -271,7 +271,7 @@ export function computeRawFingerprint(
  *
  * @param {Record<string, string>[]} rows - Geparste CSV-Zeilen
  * @param {CsvColumnMapping} mapping - Spaltenzuordnung
- * @param {string} accountId - Zielkonto-ID
+ * @param {string} accountIban - Zielkonto-IBAN
  * @param {string} [filename] - Optionaler Dateiname der Import-CSV
  * @param {string} [importedAt] - Optionaler Zeitstempel des Imports
  * @returns {Transaction[]} Typisierte Transaktionsobjekte mit importIndex
@@ -279,12 +279,13 @@ export function computeRawFingerprint(
 export function convertRowsToTransactions(
   rows: Record<string, string>[],
   mapping: CsvColumnMapping,
-  accountId: string,
+  accountIban: string,
   filename?: string,
   importedAt?: string
 ): Transaction[] {
   const timestamp = importedAt || new Date().toISOString();
   const dayOccurrences = new Map<string, number>();
+  const normAccountIban = (accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
 
   return rows.map((row, index) => {
     const rawValDate = row[mapping.valueDateColumn] || '';
@@ -305,13 +306,13 @@ export function convertRowsToTransactions(
     const normSubject = subject.trim().toLowerCase().replace(/\s+/g, ' ');
     const normPartner = partner.trim().toLowerCase().replace(/\s+/g, ' ');
     const normIban = iban.trim().toUpperCase().replace(/\s+/g, '');
-    const dayKey = `${accountId}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}`;
+    const dayKey = `${normAccountIban}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}`;
 
     const occurrenceIndex = dayOccurrences.get(dayKey) || 0;
     dayOccurrences.set(dayKey, occurrenceIndex + 1);
 
     const rawFingerprint = computeRawFingerprint(
-      accountId,
+      normAccountIban,
       valueDate,
       value,
       subject,
@@ -321,7 +322,7 @@ export function convertRowsToTransactions(
     );
 
     const baseId = generateTransactionId(
-      accountId,
+      normAccountIban,
       valueDate,
       value,
       subject,
@@ -334,7 +335,7 @@ export function convertRowsToTransactions(
 
     return {
       id,
-      accountId,
+      accountIban: normAccountIban,
       valueDate,
       bookingDate,
       issuer,
@@ -355,7 +356,7 @@ export function convertRowsToTransactions(
       importedAt: timestamp,
 
       // Flache Original-Rohdaten aus der Bank-CSV
-      originalAccountId: accountId,
+      originalAccountIban: normAccountIban,
       originalValueDate: valueDate,
       originalBookingDate: bookingDate,
       originalValue: value,

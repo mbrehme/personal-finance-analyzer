@@ -91,6 +91,8 @@ describe('ResetModal', () => {
       resetAccounts: false,
       resetCategories: true,
       resetTransactions: false,
+      resetOverrides: false,
+      resetSplits: false,
       resetDeletedTransactions: false,
       includeSampleTransactions: false,
     });
@@ -105,9 +107,9 @@ describe('ResetModal', () => {
     const emptyBtn = screen.getByTestId('reset-target-empty');
     await user.click(emptyBtn);
 
-    // Button label changes to "Ausgewählte Bereiche löschen"
+    // Button label changes to "Ausgewählte Bereiche zurücksetzen"
     const confirmBtn = screen.getByRole('button', {
-      name: /Ausgewählte Bereiche löschen/i,
+      name: /Ausgewählte Bereiche zurücksetzen/i,
     });
     await user.click(confirmBtn);
 
@@ -116,9 +118,67 @@ describe('ResetModal', () => {
       resetAccounts: true,
       resetCategories: true,
       resetTransactions: true,
+      resetOverrides: false,
+      resetSplits: false,
       resetDeletedTransactions: true,
       includeSampleTransactions: false,
     });
     expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('provides independent checkboxes for importierte Transaktionen, Overrides, and Splits in clear mode', async () => {
+    const user = userEvent.setup();
+    render(<ResetModal isOpen={true} onClose={mockOnClose} />);
+
+    // Switch to empty / clear mode
+    await user.click(screen.getByTestId('reset-target-empty'));
+
+    const allTxCheckbox = screen.getByTestId('reset-option-transactions');
+    const overridesCheckbox = screen.getByTestId('reset-option-overrides');
+    const splitsCheckbox = screen.getByTestId('reset-option-splits');
+
+    // Default in empty mode: all transactions checked, overrides unchecked, splits unchecked
+    expect(allTxCheckbox).toBeChecked();
+    expect(overridesCheckbox).not.toBeChecked();
+    expect(splitsCheckbox).not.toBeChecked();
+
+    // Checkboxes are independent, NOT either-or! Checking overrides does NOT uncheck transactions
+    await user.click(overridesCheckbox);
+    expect(overridesCheckbox).toBeChecked();
+    expect(allTxCheckbox).toBeChecked();
+
+    // Checking splits is also independent
+    await user.click(splitsCheckbox);
+    expect(splitsCheckbox).toBeChecked();
+    expect(overridesCheckbox).toBeChecked();
+    expect(allTxCheckbox).toBeChecked();
+
+    // Use "Nur Overrides" quick selection
+    await user.click(screen.getByRole('button', { name: 'Nur Overrides' }));
+    expect(overridesCheckbox).toBeChecked();
+    expect(splitsCheckbox).not.toBeChecked();
+    expect(allTxCheckbox).not.toBeChecked();
+
+    // Use "Nur Splits" quick selection
+    await user.click(screen.getByRole('button', { name: 'Nur Splits' }));
+    expect(splitsCheckbox).toBeChecked();
+    expect(overridesCheckbox).not.toBeChecked();
+    expect(allTxCheckbox).not.toBeChecked();
+
+    const confirmBtn = screen.getByRole('button', {
+      name: /Ausgewählte Bereiche zurücksetzen/i,
+    });
+    await user.click(confirmBtn);
+
+    expect(mockResetWorkspace).toHaveBeenCalledWith({
+      target: 'empty',
+      resetAccounts: false,
+      resetCategories: false,
+      resetTransactions: false,
+      resetOverrides: false,
+      resetSplits: true,
+      resetDeletedTransactions: false,
+      includeSampleTransactions: false,
+    });
   });
 });

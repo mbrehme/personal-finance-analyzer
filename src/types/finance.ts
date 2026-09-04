@@ -651,8 +651,21 @@ export interface ResetOptions {
   resetAccounts?: boolean;
   /** Kategorien auf Standard-Kategorien zurücksetzen oder leeren */
   resetCategories?: boolean;
-  /** Alle Transaktionen / Buchungen zurücksetzen oder leeren */
+  /** Importierte Transaktionen / Buchungen löschen (oder im Seed-Modus Beispieldaten laden) */
   resetTransactions?: boolean;
+  /**
+   * Setzt manuelle Überschreibungen auf die Bank-Originaldaten zurück und matchet die Kategorien neu.
+   */
+  resetOverrides?: boolean;
+  /**
+   * Löst Split-Buchungen auf (entfernt Split-Kinder und stellt den vollen Betrag der Ursprungsbuchung wieder her).
+   */
+  resetSplits?: boolean;
+  /**
+   * @deprecated Verwende stattdessen resetOverrides und/oder resetSplits.
+   * Setzt manuelle Überschreibungen und Splits auf die Bank-Originaldaten zurück.
+   */
+  resetTransactionOverrides?: boolean;
   /** Gelöschte Transaktionen (Papierkorb) leeren */
   resetDeletedTransactions?: boolean;
   /** Bei target === 'seed': Ob zusätzlich realistische Beispieldaten für Buchungen geladen werden sollen */
@@ -667,6 +680,9 @@ export const DEFAULT_RESET_OPTIONS: ResetOptions = {
   resetAccounts: true,
   resetCategories: true,
   resetTransactions: true,
+  resetOverrides: false,
+  resetSplits: false,
+  resetTransactionOverrides: false,
   resetDeletedTransactions: true,
 };
 

@@ -6,9 +6,14 @@
  * @module components/modals/ResetModal
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/services/storage/FinanceContext';
-import { ResetOptions, ResetTarget, DEFAULT_RESET_OPTIONS } from '@/types/finance';
+import {
+  ResetOptions,
+  ResetTarget,
+  DEFAULT_RESET_OPTIONS,
+  isTransactionOverridden,
+} from '@/types/finance';
 import {
   RotateCcw,
   X,
@@ -19,6 +24,7 @@ import {
   Trash2,
   Sparkles,
   Info,
+  Split,
 } from 'lucide-react';
 
 export interface ResetModalProps {
@@ -36,9 +42,27 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
     resetAccounts: DEFAULT_RESET_OPTIONS.resetAccounts ?? true,
     resetCategories: DEFAULT_RESET_OPTIONS.resetCategories ?? true,
     resetTransactions: DEFAULT_RESET_OPTIONS.resetTransactions ?? true,
+    resetOverrides: false,
+    resetSplits: false,
     resetDeletedTransactions: DEFAULT_RESET_OPTIONS.resetDeletedTransactions ?? true,
   });
   const [isResetting, setIsResetting] = useState(false);
+
+  // Zähle Buchungen mit aktiven Overrides (ohne reine Split-Zuordnung)
+  const overridesCount = useMemo(() => {
+    return transactions.filter(
+      (t) =>
+        t.origin !== 'manual' &&
+        (isTransactionOverridden(t) ||
+          t.assignmentSource === 'manual' ||
+          (t.originalValue !== undefined && t.value !== t.originalValue))
+    ).length;
+  }, [transactions]);
+
+  // Zähle Split-Transaktionen (Split-Kinder)
+  const splitsCount = useMemo(() => {
+    return transactions.filter((t) => Boolean(t.splitFromId)).length;
+  }, [transactions]);
 
   if (!isOpen) return null;
 
@@ -46,11 +70,24 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
     setOptions((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const handleSelectTarget = (newTarget: ResetTarget) => {
+    setTarget(newTarget);
+    if (newTarget === 'seed') {
+      setOptions((prev) => ({
+        ...prev,
+        resetOverrides: false,
+        resetSplits: false,
+      }));
+    }
+  };
+
   const handleSelectAll = () => {
     setOptions({
       resetAccounts: true,
       resetCategories: true,
       resetTransactions: true,
+      resetOverrides: !isSeed,
+      resetSplits: !isSeed,
       resetDeletedTransactions: true,
     });
   };
@@ -60,6 +97,8 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
       resetAccounts: false,
       resetCategories: true,
       resetTransactions: false,
+      resetOverrides: false,
+      resetSplits: false,
       resetDeletedTransactions: false,
     });
   };
@@ -69,7 +108,31 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
       resetAccounts: false,
       resetCategories: false,
       resetTransactions: true,
+      resetOverrides: false,
+      resetSplits: false,
       resetDeletedTransactions: true,
+    });
+  };
+
+  const handleSelectOverridesOnly = () => {
+    setOptions({
+      resetAccounts: false,
+      resetCategories: false,
+      resetTransactions: false,
+      resetOverrides: true,
+      resetSplits: false,
+      resetDeletedTransactions: false,
+    });
+  };
+
+  const handleSelectSplitsOnly = () => {
+    setOptions({
+      resetAccounts: false,
+      resetCategories: false,
+      resetTransactions: false,
+      resetOverrides: false,
+      resetSplits: true,
+      resetDeletedTransactions: false,
     });
   };
 
@@ -139,7 +202,7 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
             {/* Option 1: Beispieldaten */}
             <button
               type="button"
-              onClick={() => setTarget('seed')}
+              onClick={() => handleSelectTarget('seed')}
               data-testid="reset-target-seed"
               className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
                 isSeed
@@ -159,7 +222,7 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
             {/* Option 2: Löschen */}
             <button
               type="button"
-              onClick={() => setTarget('empty')}
+              onClick={() => handleSelectTarget('empty')}
               data-testid="reset-target-empty"
               className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
                 !isSeed
@@ -205,6 +268,26 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
             >
               Nur Buchungen
             </button>
+            {!isSeed && (
+              <>
+                <span className="text-slate-300">&bull;</span>
+                <button
+                  type="button"
+                  onClick={handleSelectOverridesOnly}
+                  className="font-medium text-amber-700 hover:text-amber-800 hover:underline"
+                >
+                  Nur Overrides
+                </button>
+                <span className="text-slate-300">&bull;</span>
+                <button
+                  type="button"
+                  onClick={handleSelectSplitsOnly}
+                  className="font-medium text-indigo-700 hover:text-indigo-800 hover:underline"
+                >
+                  Nur Splits
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -224,7 +307,8 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
               <div>
                 <span className="font-bold">Achtung:</span> Ausgewählte Bereiche werden
-                unwiderruflich und restlos gelöscht. Erstelle bei Bedarf vorher einen JSON-Export.
+                unwiderruflich zurückgesetzt bzw. gelöscht. Erstelle bei Bedarf vorher einen
+                JSON-Export.
               </div>
             </div>
           )}
@@ -254,8 +338,8 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
               </div>
               <p className="mt-0.5 text-[11px] text-slate-500">
                 {isSeed
-                  ? 'Stellt alle Standard-Kategorien, Hierarchien, Budgets und Regex-Regeln wieder her.'
-                  : 'Entfernt alle Kategorien vollständig aus dem Workspace.'}
+                  ? 'Stellt 8 Standard-Kategorien (Wohnen, Mobilität, etc.) inklusive Zuordnungsregeln wieder her.'
+                  : 'Löscht alle Kategorien und deren automatische Match-Regeln.'}
               </p>
             </div>
           </label>
@@ -274,7 +358,7 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
                   <Landmark className="h-3.5 w-3.5 text-blue-600" />
-                  {isSeed ? 'Konten auf Standardkonto zurücksetzen' : 'Alle Konten löschen'}
+                  {isSeed ? 'Konten auf Standard zurücksetzen' : 'Konten restlos löschen'}
                 </span>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
                   {accounts.length} {accounts.length === 1 ? 'Konto' : 'Konten'}
@@ -282,39 +366,117 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
               </div>
               <p className="mt-0.5 text-[11px] text-slate-500">
                 {isSeed
-                  ? 'Stellt das vorkonfigurierte Haupt-Girokonto mit Eröffnungssaldo wieder her.'
+                  ? 'Erstellt ein Standard-Girokonto mit Initial-Saldo.'
                   : 'Löscht alle Konten und hinterlegten Saldenverläufe.'}
               </p>
             </div>
           </label>
 
           {/* 3. Buchungen / Transaktionen */}
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors hover:bg-slate-50">
-            <input
-              type="checkbox"
-              checked={options.resetTransactions}
-              onChange={() => toggleOption('resetTransactions')}
-              className={`mt-0.5 h-4 w-4 rounded border-slate-300 ${
-                isSeed ? 'text-blue-600 focus:ring-blue-500' : 'text-rose-600 focus:ring-rose-500'
-              }`}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <Receipt className="h-3.5 w-3.5 text-indigo-600" />
-                  {isSeed ? 'Beispiel-Buchungen laden' : 'Buchungen / Transaktionen löschen'}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
-                  {transactions.length} {transactions.length === 1 ? 'Buchung' : 'Buchungen'}
-                </span>
+          {isSeed ? (
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={options.resetTransactions}
+                onChange={() => toggleOption('resetTransactions')}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                    <Receipt className="h-3.5 w-3.5 text-indigo-600" />
+                    Beispiel-Buchungen laden
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
+                    {transactions.length} {transactions.length === 1 ? 'Buchung' : 'Buchungen'}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Lädt 19 realistische Demo-Transaktionen zur sofortigen Analyse &
+                  Diagrammdarstellung.
+                </p>
               </div>
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                {isSeed
-                  ? 'Lädt 19 realistische Demo-Transaktionen zur sofortigen Analyse & Diagrammdarstellung.'
-                  : 'Löscht alle importierten und manuell erfassten Buchungen unwiderruflich.'}
-              </p>
-            </div>
-          </label>
+            </label>
+          ) : (
+            <>
+              {/* Option 1: Importierte Transaktionen löschen */}
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={options.resetTransactions}
+                  onChange={() => toggleOption('resetTransactions')}
+                  data-testid="reset-option-transactions"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                      <Receipt className="h-3.5 w-3.5 text-rose-600" />
+                      Importierte Transaktionen
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
+                      {transactions.length} {transactions.length === 1 ? 'Buchung' : 'Buchungen'}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    Löscht alle importierten Buchungen vollständig aus dem Workspace.
+                  </p>
+                </div>
+              </label>
+
+              {/* Option 2: Overrides zurücksetzen */}
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={options.resetOverrides}
+                  onChange={() => toggleOption('resetOverrides')}
+                  data-testid="reset-option-overrides"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                      Overrides
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
+                      {overridesCount} {overridesCount === 1 ? 'Override' : 'Overrides'}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    Setzt manuell geänderte Felder auf Bank-Originaldaten zurück und führt ein
+                    Kategorien-Rematching durch.
+                  </p>
+                </div>
+              </label>
+
+              {/* Option 3: Splits auflösen */}
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={options.resetSplits}
+                  onChange={() => toggleOption('resetSplits')}
+                  data-testid="reset-option-splits"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                      <Split className="h-3.5 w-3.5 text-indigo-600" />
+                      Splits
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
+                      {splitsCount} {splitsCount === 1 ? 'Split-Buchung' : 'Split-Buchungen'}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    Löst Split-Buchungen auf, entfernt Teilbuchungen und stellt den vollen
+                    Ursprungsbetrag der Buchung wieder her.
+                  </p>
+                </div>
+              </label>
+            </>
+          )}
 
           {/* 4. Papierkorb */}
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition-colors hover:bg-slate-50">
@@ -374,7 +536,7 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
                 ? 'Wird zurückgesetzt...'
                 : isSeed
                   ? 'Auf Beispieldaten zurücksetzen'
-                  : 'Ausgewählte Bereiche löschen'}
+                  : 'Ausgewählte Bereiche zurücksetzen'}
             </button>
           </div>
         </div>

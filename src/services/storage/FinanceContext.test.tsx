@@ -568,4 +568,130 @@ describe('FinanceContext', () => {
       expect(result.current.reMatchStatus).toBe('has_progressed');
     });
   });
+
+  it('resets overrides and splits while keeping imported transactions intact when resetTransactionOverrides is true', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // 1. Zwei importierte Buchungen einfügen
+    await act(async () => {
+      await result.current.importTransactions([
+        {
+          id: 'tx-to-split',
+          accountId: 'acc-giro-main',
+          date: '2026-09-01',
+          valueDate: '2026-09-01',
+          bookingDate: '2026-09-01',
+          issuer: 'Einkaufszentrum',
+          receiver: 'Einkaufszentrum',
+          subject: 'Großer Einkauf',
+          type: 'outbound',
+          iban: 'DE00',
+          value: -100,
+          originalValue: -100,
+          originalSubject: 'Großer Einkauf',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-to-override',
+          accountId: 'acc-giro-main',
+          date: '2026-09-02',
+          valueDate: '2026-09-02',
+          bookingDate: '2026-09-02',
+          issuer: 'Buchladen',
+          receiver: 'Buchladen',
+          subject: 'Fachbuch',
+          type: 'outbound',
+          iban: 'DE00',
+          value: -30,
+          originalValue: -30,
+          originalSubject: 'Fachbuch',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ]);
+    });
+
+    // 2. tx-to-split aufteilen (Split erzeugen)
+    await act(async () => {
+      await result.current.splitTransaction('tx-to-split', 40, {
+        subject: 'Teil 2',
+        receiver: 'Shop B',
+        categoryId: null,
+      });
+    });
+
+    // tx-to-override manuell bearbeiten
+    const cat = result.current.categories[0];
+    await act(async () => {
+      await result.current.assignTransactionCategory('tx-to-override', cat.id);
+    });
+    await act(async () => {
+      const tx = result.current.transactions.find((t) => t.id === 'tx-to-override')!;
+      await result.current.updateTransaction({
+        ...tx,
+        subject: 'Bearbeiteter Betreff',
+      });
+    });
+
+    // Prüfen: 3 Buchungen vorhanden (Parent -60, Child -40, Override -30)
+    expect(
+      result.current.transactions.filter(
+        (t) => ['tx-to-split', 'tx-to-override'].includes(t.id) || t.splitFromId === 'tx-to-split'
+      )
+    ).toHaveLength(3);
+
+    // 3. Jetzt Workspace-Reset nur für Splits ausführen (resetSplits: true, resetOverrides: false)
+    await act(async () => {
+      await result.current.resetWorkspace({
+        target: 'empty',
+        resetAccounts: false,
+        resetCategories: false,
+        resetTransactions: false,
+        resetOverrides: false,
+        resetSplits: true,
+        resetDeletedTransactions: false,
+      });
+    });
+
+    // 4. Prüfen nach resetSplits:
+    // - Split-Kind ist weg
+    // - Root-Buchung hat wieder vollen Betrag -100
+    // - Override-Buchung ist NOCH NICHT zurückgesetzt (subject ist weiterhin 'Bearbeiteter Betreff', manuelle Kategorie noch da)
+    const txSplitAfterSplitsReset = result.current.transactions.find((t) => t.id === 'tx-to-split');
+    expect(txSplitAfterSplitsReset?.value).toBe(-100);
+    const splitChildrenAfterSplitsReset = result.current.transactions.filter(
+      (t) => t.splitFromId === 'tx-to-split'
+    );
+    expect(splitChildrenAfterSplitsReset).toHaveLength(0);
+
+    const txOverrideStillModified = result.current.transactions.find(
+      (t) => t.id === 'tx-to-override'
+    );
+    expect(txOverrideStillModified?.subject).toBe('Bearbeiteter Betreff');
+    expect(txOverrideStillModified?.assignmentSource).toBe('manual');
+
+    // 5. Jetzt Workspace-Reset nur für Overrides ausführen (resetOverrides: true)
+    await act(async () => {
+      await result.current.resetWorkspace({
+        target: 'empty',
+        resetAccounts: false,
+        resetCategories: false,
+        resetTransactions: false,
+        resetOverrides: true,
+        resetSplits: false,
+        resetDeletedTransactions: false,
+      });
+    });
+
+    // 6. Prüfen nach resetOverrides:
+    // - Override-Buchung hat wieder originalSubject 'Fachbuch' und manuelle Kategorie ist zurückgesetzt
+    const txOverrideRestored = result.current.transactions.find((t) => t.id === 'tx-to-override');
+    expect(txOverrideRestored).toBeDefined();
+    expect(txOverrideRestored?.subject).toBe('Fachbuch');
+    expect(txOverrideRestored?.assignmentSource).not.toBe('manual');
+  });
 });

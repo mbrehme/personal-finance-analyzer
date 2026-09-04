@@ -1243,7 +1243,69 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           await financeDB.saveTransactions(SEED_TRANSACTIONS);
           setTransactions(SEED_TRANSACTIONS);
         } else {
+          await financeDB.clearTransactions();
           setTransactions([]);
+        }
+      } else {
+        const doResetSplits = Boolean(options.resetSplits || options.resetTransactionOverrides);
+        const doResetOverrides = Boolean(
+          options.resetOverrides || options.resetTransactionOverrides
+        );
+
+        if (doResetSplits || doResetOverrides) {
+          const baseTransactions =
+            transactions.length > 0 ? transactions : await financeDB.getTransactions();
+
+          let workingTransactions = [...baseTransactions];
+
+          // 1. Splits auflösen: Split-Kinder entfernen und Elternbuchungen auf den vollen Betrag zurücksetzen
+          if (doResetSplits) {
+            workingTransactions = workingTransactions
+              .filter((t) => !t.splitFromId && t.origin !== 'manual')
+              .map((t) => {
+                if (t.originalValue !== undefined && t.value !== t.originalValue) {
+                  return {
+                    ...t,
+                    value: t.originalValue,
+                  };
+                }
+                return t;
+              });
+          }
+
+          // 2. Overrides zurücksetzen: Bank-Originalwerte wiederherstellen & manuelle Zuweisungen aufheben
+          let currentCats = categories;
+          if (options.resetCategories) {
+            currentCats = isSeed ? SEED_CATEGORIES : [];
+          }
+
+          if (doResetOverrides) {
+            // Kategorien von manuellen Transaktions-IDs bereinigen
+            if (!options.resetCategories && currentCats.length > 0) {
+              const cleanedCats = currentCats.map((c) => ({
+                ...c,
+                manualTransactionIds: [],
+              }));
+              await financeDB.saveCategories(cleanedCats);
+              setCategories(cleanedCats);
+              currentCats = cleanedCats;
+            }
+
+            // Alle importierten Buchungen auf Bank-Originaldaten zurücksetzen
+            const restoredTxs = workingTransactions.map((t) => {
+              if (t.origin === 'manual') return t;
+              return resetTransactionToOriginal(t);
+            });
+
+            // Neu matchen gegen aktuelle Kategorien
+            workingTransactions = reMatchAllTransactions(restoredTxs, currentCats);
+          }
+
+          await financeDB.clearTransactions();
+          if (workingTransactions.length > 0) {
+            await financeDB.saveTransactions(workingTransactions);
+          }
+          setTransactions(sortTransactionsDesc(workingTransactions));
         }
       }
 

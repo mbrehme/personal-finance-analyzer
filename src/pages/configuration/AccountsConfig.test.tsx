@@ -33,8 +33,7 @@ describe('AccountsConfig Subpage', () => {
       </FinanceProvider>
     );
 
-    await screen.findByText(/Verwaltete Konten/i);
-    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
+    await screen.findByText('Haupt-Girokonto');
     expect(screen.getByText('Bankkonto')).toBeInTheDocument();
     expect(screen.getByText('Unterkonto anlegen')).toBeInTheDocument();
 

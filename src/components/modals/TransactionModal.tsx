@@ -12,7 +12,6 @@ import {
   Category,
   TransactionType,
   ISODateString,
-  getTransactionType,
   isTransactionOverridden,
   resetTransactionToOriginal,
 } from '@/types/finance';
@@ -76,11 +75,15 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   // ================== FORMULAR-ZUSTÄNDE ==================
   const [accountId, setAccountId] = useState<string>('');
   const [valueDate, setValueDate] = useState<string>('');
-  const [type, setType] = useState<TransactionType>('outbound');
+  const [createType, setCreateType] = useState<TransactionType>('outbound');
   const [amount, setAmount] = useState<number>(0);
   const [receiver, setReceiver] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+
+  // Der Typ (Einnahme vs Ausgabe) ist bei bestehenden Buchungen unveränderbar und rein implizit
+  const isOutbound =
+    mode === 'create' ? createType === 'outbound' : (initialTransaction?.value ?? 0) < 0;
 
   // Split-spezifische Zustände
   const [splitAmount, setSplitAmount] = useState<number>(0);
@@ -109,7 +112,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     if (mode === 'create') {
       setAccountId(accounts[0]?.id || '');
       setValueDate(new Date().toISOString().substring(0, 10));
-      setType('outbound');
+      setCreateType('outbound');
       setAmount(0);
       setReceiver('');
       setSubject('');
@@ -117,7 +120,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     } else if (initialTransaction) {
       setAccountId(initialTransaction.accountId);
       setValueDate(initialTransaction.valueDate);
-      setType(getTransactionType(initialTransaction.value));
       setAmount(Math.abs(initialTransaction.value));
       setReceiver(initialTransaction.receiver || initialTransaction.issuer || '');
       setSubject(initialTransaction.subject || '');
@@ -159,7 +161,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     if (!initialTransaction) return;
     const restored = resetTransactionToOriginal(initialTransaction);
     setValueDate(restored.valueDate);
-    setType(getTransactionType(restored.value));
     setAmount(Math.abs(restored.value));
     setReceiver(restored.receiver || restored.issuer || '');
     setSubject(restored.subject || '');
@@ -208,7 +209,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       return;
     }
 
-    const signedValue = type === 'outbound' ? -Math.abs(amount) : Math.abs(amount);
+    const signedValue = isOutbound ? -Math.abs(amount) : Math.abs(amount);
 
     try {
       setSaving(true);
@@ -217,8 +218,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           accountId,
           valueDate: valueDate as ISODateString,
           bookingDate: valueDate as ISODateString,
-          issuer: type === 'inbound' ? receiver : '',
-          receiver: type === 'outbound' ? receiver : '',
+          issuer: !isOutbound ? receiver : '',
+          receiver: isOutbound ? receiver : '',
           subject: subject.trim(),
           iban: '',
           value: signedValue,
@@ -248,8 +249,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           } else if (initialTransaction.issuer) {
             finalIssuer = trimmedPartner;
           } else {
-            finalReceiver = type === 'outbound' ? trimmedPartner : '';
-            finalIssuer = type === 'inbound' ? trimmedPartner : '';
+            finalReceiver = isOutbound ? trimmedPartner : '';
+            finalIssuer = !isOutbound ? trimmedPartner : '';
           }
         }
 
@@ -608,47 +609,29 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   />
                 </div>
 
-                {/* BETRAG & TYP */}
+                {/* BETRAG */}
                 <div>
                   <div className="mb-1 flex items-center justify-between">
-                    <label className="text-xs font-medium text-slate-700">Betrag & Typ</label>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-medium text-slate-700">Betrag</label>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                          isOutbound ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
+                        }`}
+                      >
+                        {isOutbound ? 'Ausgabe (-)' : 'Einnahme (+)'}
+                      </span>
+                    </div>
                     {amount !== Math.abs(originalValue) && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setAmount(Math.abs(originalValue));
-                          setType(originalValue >= 0 ? 'inbound' : 'outbound');
-                        }}
+                        onClick={() => setAmount(Math.abs(originalValue))}
                         className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
                         title="Auf Bankwert zurücksetzen"
                       >
                         <RotateCcw className="h-3 w-3" /> Zurücksetzen
                       </button>
                     )}
-                  </div>
-                  <div className="mb-2 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setType('outbound')}
-                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
-                        type === 'outbound'
-                          ? 'border-rose-300 bg-rose-50 font-semibold text-rose-700'
-                          : 'border-slate-200 text-slate-600'
-                      }`}
-                    >
-                      Ausgabe (-)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setType('inbound')}
-                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
-                        type === 'inbound'
-                          ? 'border-emerald-300 bg-emerald-50 font-semibold text-emerald-700'
-                          : 'border-slate-200 text-slate-600'
-                      }`}
-                    >
-                      Einnahme (+)
-                    </button>
                   </div>
                   <MoneyInput
                     value={amount}
@@ -754,7 +737,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </div>
 
               {/* DATUM & TYP */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div
+                className={`grid grid-cols-1 gap-4 ${mode === 'create' ? 'sm:grid-cols-2' : ''}`}
+              >
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
                     Valutadatum *
@@ -768,42 +753,55 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                    Buchungstyp
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setType('outbound')}
-                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
-                        type === 'outbound'
-                          ? 'border-rose-300 bg-rose-50 font-semibold text-rose-700'
-                          : 'border-slate-200 text-slate-600'
-                      }`}
-                    >
-                      Ausgabe (-)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setType('inbound')}
-                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
-                        type === 'inbound'
-                          ? 'border-emerald-300 bg-emerald-50 font-semibold text-emerald-700'
-                          : 'border-slate-200 text-slate-600'
-                      }`}
-                    >
-                      Einnahme (+)
-                    </button>
+                {mode === 'create' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                      Buchungstyp
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCreateType('outbound')}
+                        className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                          createType === 'outbound'
+                            ? 'border-rose-300 bg-rose-50 font-semibold text-rose-700'
+                            : 'border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        Ausgabe (-)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreateType('inbound')}
+                        className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                          createType === 'inbound'
+                            ? 'border-emerald-300 bg-emerald-50 font-semibold text-emerald-700'
+                            : 'border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        Einnahme (+)
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* BETRAG */}
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  Betrag (€) *
-                </label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    Betrag (€) *
+                  </label>
+                  {mode !== 'create' && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                        isOutbound ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
+                      }`}
+                    >
+                      {isOutbound ? 'Ausgabe (-)' : 'Einnahme (+)'}
+                    </span>
+                  )}
+                </div>
                 <MoneyInput
                   value={amount}
                   onChange={(val) => setAmount(Math.max(0, val))}
@@ -815,14 +813,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               {/* EMPFÄNGER / ZAHLUNGSPARTNER */}
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  {type === 'inbound' ? 'Auftraggeber / Absender' : 'Empfänger'}
+                  {isOutbound ? 'Empfänger' : 'Auftraggeber / Absender'}
                 </label>
                 <input
                   type="text"
                   value={receiver}
                   onChange={(e) => setReceiver(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                  placeholder={type === 'inbound' ? 'z. B. Arbeitgeber' : 'z. B. Supermarkt'}
+                  placeholder={isOutbound ? 'z. B. Supermarkt' : 'z. B. Arbeitgeber'}
                 />
               </div>
 

@@ -209,4 +209,24 @@ describe('TransactionModal', () => {
       })
     );
   });
+
+  it('does not render transaction type toggle buttons in edit mode', () => {
+    render(
+      <TransactionModal
+        isOpen={true}
+        mode="edit"
+        initialTransaction={mockTransaction}
+        accounts={mockAccounts}
+        categories={mockCategories}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    );
+
+    // Weder "Ausgabe (-)" noch "Einnahme (+)" als klickbare Buttons vorhanden
+    expect(screen.queryByRole('button', { name: /Ausgabe/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Einnahme/i })).not.toBeInTheDocument();
+    // Aber read-only Badge ist vorhanden
+    expect(screen.getByText('Ausgabe (-)')).toBeInTheDocument();
+  });
 });

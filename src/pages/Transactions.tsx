@@ -38,7 +38,6 @@ import {
   ChevronRight,
   Layers,
   Loader2,
-  Plus,
   Pencil,
   Scissors,
   ArrowRight,
@@ -164,12 +163,6 @@ export const Transactions: React.FC = () => {
   const handleOpenDetailModal = (tx: Transaction) => {
     setDetailTx(tx);
     setIsDetailModalOpen(true);
-  };
-
-  const handleOpenCreateModal = () => {
-    setSelectedTx(null);
-    setTxModalMode('create');
-    setIsTxModalOpen(true);
   };
 
   const handleOpenEditModal = (tx: Transaction) => {
@@ -490,15 +483,6 @@ export const Transactions: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleOpenCreateModal}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
-          >
-            <Plus className="h-4 w-4" />
-            Neue Buchung
-          </button>
-
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}

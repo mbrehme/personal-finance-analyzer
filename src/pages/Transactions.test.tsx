@@ -52,33 +52,18 @@ describe('Transactions Page', () => {
     await user.click(applyBtn);
   });
 
-  it('renders Neue Buchung button, origin filter, and opens creation modal', async () => {
-    const { userEvent } = await import('@testing-library/user-event');
-    const user = userEvent.setup();
-
+  it('does not render Neue Buchung button but renders origin filter and CSV import', async () => {
     render(
       <FinanceProvider>
         <Transactions />
       </FinanceProvider>
     );
 
-    // Verify Neue Buchung button and Quelle select are present
-    const newTxBtn = await screen.findByRole('button', { name: /Neue Buchung/i });
-    expect(newTxBtn).toBeInTheDocument();
+    // Wait for content to finish loading
+    expect(await screen.findByText('CSV Import')).toBeInTheDocument();
+    // Verify Neue Buchung button is NOT present (manual creation disabled)
+    expect(screen.queryByRole('button', { name: /Neue Buchung/i })).not.toBeInTheDocument();
     expect(screen.getByText('Alle Quellen')).toBeInTheDocument();
-
-    // Click Neue Buchung
-    await user.click(newTxBtn);
-
-    // Modal should be opened
-    expect(screen.getByText('Neue Buchung erfassen')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Beschreibung der Buchung...')).toBeInTheDocument();
-
-    // Close modal
-    const cancelBtn = screen.getByRole('button', { name: 'Abbrechen' });
-    await user.click(cancelBtn);
-
-    expect(screen.queryByText('Neue Buchung erfassen')).not.toBeInTheDocument();
   });
 
   it('filters transactions by origin (Manuell vs. Importiert)', async () => {

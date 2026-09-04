@@ -708,7 +708,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {onSplit && isOutbound && !isSplitChild && (
+            {onSplit && isOutbound && (
               <button
                 type="button"
                 onClick={() => {
@@ -718,7 +718,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 <Scissors className="h-3.5 w-3.5 text-slate-500" />
-                Aufteilen (Split)
+                {isSplitChild ? 'Aufteilung anpassen (Split)' : 'Aufteilen (Split)'}
               </button>
             )}
 

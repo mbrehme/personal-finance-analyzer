@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   PiggyBank,
-  Plus,
   Download,
   Receipt,
   Search,
@@ -71,9 +70,6 @@ export const Dashboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" icon={<Download className="h-4 w-4" />}>
             Export
-          </Button>
-          <Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />}>
-            Transaktion hinzufügen
           </Button>
         </div>
       </div>

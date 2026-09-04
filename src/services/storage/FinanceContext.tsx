@@ -24,6 +24,14 @@ import {
 import { financeDB } from './db';
 import { matchTransaction, reMatchAllTransactions } from '../matcher/regexMatcher';
 
+export interface SplitPartInput {
+  id?: string;
+  amount: number;
+  subject: string;
+  receiver: string;
+  categoryId: string | null;
+}
+
 export interface FinanceContextType {
   accounts: Account[];
   categories: Category[];
@@ -76,6 +84,11 @@ export interface FinanceContextType {
     splitAmount: number,
     splitData: { subject: string; receiver: string; categoryId: string | null }
   ) => Promise<void>;
+  /**
+   * Verwaltet alle Split-Teile einer Transaktion atomar und stellt sicher,
+   * dass die Summe aller Teile stets exakt dem Bank-Originalbetrag entspricht.
+   */
+  updateSplitGroup?: (rootTransactionId: string, splits: SplitPartInput[]) => Promise<void>;
   importTransactions: (newTransactions: Transaction[]) => Promise<number>;
   assignTransactionCategory: (transactionId: string, categoryId: string | null) => Promise<void>;
   /** @deprecated Verwende assignTransactionCategory */
@@ -595,6 +608,175 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
+  /**
+   * Aktualisiert alle Split-Teile einer Buchungsgruppe strikt betragserhaltend.
+   * Der Betrag der Root-Transaktion (Originalbuchung) ist fest vorgegeben (originalValue ?? value).
+   * Die Summe aller Split-Kinder wird abgezogen und der verbleibende Betrag auf die Root-Transaktion geschrieben.
+   */
+  const updateSplitGroup = async (
+    rootTransactionId: string,
+    splits: SplitPartInput[]
+  ): Promise<void> => {
+    // 1. Root-Transaktion finden (falls eine Child-ID übergeben wurde, zu Root auflösen)
+    let rootTx = transactions.find((t) => t.id === rootTransactionId);
+    if (!txExists(rootTx)) {
+      throw new Error('Root-Transaktion nicht gefunden.');
+    }
+    if (rootTx.splitFromId) {
+      const parent = transactions.find((t) => t.id === rootTx!.splitFromId);
+      if (parent) {
+        rootTx = parent;
+      }
+    }
+
+    const actualRootId = rootTx.id;
+    // Der ursprüngliche Gesamtbetrag aus den Bankdaten
+    const bankTotal = rootTx.originalValue !== undefined ? rootTx.originalValue : rootTx.value;
+    const bankTotalAbs = Math.round(Math.abs(bankTotal) * 100) / 100;
+    const sign = bankTotal < 0 ? -1 : 1;
+
+    // 2. Summe der Splits validieren
+    let totalSplitsAbs = 0;
+    for (const split of splits) {
+      if (split.amount <= 0) {
+        throw new Error('Der Betrag jedes Split-Teils muss größer als 0,00 € sein.');
+      }
+      totalSplitsAbs = Math.round((totalSplitsAbs + split.amount) * 100) / 100;
+    }
+
+    if (totalSplitsAbs >= bankTotalAbs) {
+      throw new Error(
+        'Die Summe aller Split-Teile muss kleiner als der Gesamtbetrag der Buchung sein, damit ein Restbetrag verbleibt.'
+      );
+    }
+
+    const remainingAbs = Math.round((bankTotalAbs - totalSplitsAbs) * 100) / 100;
+    const updatedRootValue = (sign * Math.round(remainingAbs * 100)) / 100;
+
+    const rootTxDate = rootTx.date ?? rootTx.valueDate;
+
+    // 3. Root-Transaktion vorbereiten
+    const updatedRootTx: Transaction = {
+      ...rootTx,
+      value: updatedRootValue,
+      originalValue: rootTx.originalValue ?? rootTx.value,
+      originalSubject: rootTx.originalSubject ?? rootTx.subject,
+      originalReceiver: rootTx.originalReceiver ?? rootTx.receiver,
+      originalAccountId: rootTx.originalAccountId ?? rootTx.accountId,
+      originalAccountIban: rootTx.originalAccountIban ?? rootTx.accountIban,
+      originalDate: rootTx.originalDate ?? rootTx.originalValueDate ?? rootTxDate,
+      originalValueDate: rootTx.originalValueDate ?? rootTx.valueDate,
+      originalIban: rootTx.originalIban ?? rootTx.iban,
+    };
+
+    // 4. Bestehende Kinder ermitteln
+    const existingChildren = transactions.filter((t) => t.splitFromId === actualRootId);
+    const existingChildrenMap = new Map(existingChildren.map((c) => [c.id, c]));
+
+    const retainedChildIds = new Set<string>();
+    const childrenToSave: Transaction[] = [];
+
+    // Category manualTransactionIds Updates
+    let updatedCategories = [...categories];
+
+    for (const split of splits) {
+      const splitValue = (sign * Math.round(split.amount * 100)) / 100;
+      if (split.id && existingChildrenMap.has(split.id)) {
+        // Bestehendes Kind aktualisieren
+        const existing = existingChildrenMap.get(split.id)!;
+        retainedChildIds.add(split.id);
+        const updatedChild: Transaction = {
+          ...existing,
+          value: splitValue,
+          receiver: split.receiver.trim() || updatedRootTx.receiver,
+          subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
+          categoryId: split.categoryId || null,
+          bucketId: split.categoryId || null,
+          assignmentSource: split.categoryId ? 'manual' : 'unassigned',
+        };
+        childrenToSave.push(updatedChild);
+
+        // Falls Kategorie geändert wurde, manualTransactionIds anpassen
+        if (existing.categoryId !== split.categoryId) {
+          updatedCategories = updatedCategories.map((c) => {
+            let list = c.manualTransactionIds || [];
+            if (c.id === existing.categoryId) {
+              list = list.filter((id) => id !== existing.id);
+            }
+            if (split.categoryId && c.id === split.categoryId && !list.includes(existing.id)) {
+              list = [...list, existing.id];
+            }
+            return { ...c, manualTransactionIds: list };
+          });
+        }
+      } else {
+        // Neues Kind erstellen
+        const newChildId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const newChild: Transaction = {
+          id: newChildId,
+          accountId: updatedRootTx.accountId,
+          accountIban: updatedRootTx.accountIban,
+          date: rootTxDate,
+          valueDate: rootTxDate,
+          bookingDate: rootTxDate,
+          issuer: updatedRootTx.issuer,
+          receiver: split.receiver.trim() || updatedRootTx.receiver,
+          subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
+          iban: updatedRootTx.iban,
+          value: splitValue,
+          categoryId: split.categoryId || null,
+          bucketId: split.categoryId || null,
+          assignmentSource: split.categoryId ? 'manual' : 'unassigned',
+          origin: 'manual',
+          splitFromId: actualRootId,
+        };
+        childrenToSave.push(newChild);
+
+        if (split.categoryId) {
+          updatedCategories = updatedCategories.map((c) => {
+            if (c.id === split.categoryId) {
+              const list = c.manualTransactionIds || [];
+              return {
+                ...c,
+                manualTransactionIds: list.includes(newChildId) ? list : [...list, newChildId],
+              };
+            }
+            return c;
+          });
+        }
+      }
+    }
+
+    // Kinder, die nicht mehr in `splits` vorhanden sind, löschen
+    const childrenToDelete = existingChildren.filter((c) => !retainedChildIds.has(c.id));
+    for (const child of childrenToDelete) {
+      await financeDB.deleteTransaction(child.id);
+      updatedCategories = updatedCategories.map((c) => ({
+        ...c,
+        manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== child.id),
+      }));
+    }
+
+    // Alle aktiven Kinder und Root speichern
+    await financeDB.saveTransaction(updatedRootTx);
+    await financeDB.saveTransactions(childrenToSave);
+    await financeDB.saveCategories(updatedCategories);
+    setCategories(updatedCategories);
+
+    const deletedIds = new Set(childrenToDelete.map((c) => c.id));
+    const savedIds = new Set(childrenToSave.map((c) => c.id));
+
+    setTransactions((prev) => {
+      const filtered = prev.filter((t) => !deletedIds.has(t.id) && !savedIds.has(t.id));
+      const updated = filtered.map((t) => (t.id === actualRootId ? updatedRootTx : t));
+      return sortTransactionsDesc([...updated, ...childrenToSave]);
+    });
+  };
+
+  function txExists(tx: Transaction | undefined): tx is Transaction {
+    return tx !== undefined;
+  }
+
   const importTransactions = async (newTransactions: Transaction[]): Promise<number> => {
     // 1. Vorhandene Fingerprints erfassen, um bestehende Overrides und Splits vor Überschreiben zu schützen
     const existingIds = new Set(transactions.map((t) => t.id));
@@ -704,6 +886,70 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const tx = transactions.find((t) => t.id === transactionId);
     if (!tx) return;
 
+    let updatedCategories = [...categories];
+
+    // Fall 1: Gelöschte Buchung ist ein Split-Kind (`splitFromId` vorhanden)
+    if (tx.splitFromId) {
+      const parentTx = transactions.find((t) => t.id === tx.splitFromId);
+      await financeDB.deleteTransaction(transactionId);
+
+      // Eventuell hinterlegte manualTransactionIds in Kategorien bereinigen
+      updatedCategories = updatedCategories.map((c) => ({
+        ...c,
+        manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== transactionId),
+      }));
+
+      if (parentTx) {
+        // Den Betrag des gelöschten Split-Teils wieder dem Parent gutschreiben
+        const newParentValue = Math.round((parentTx.value + tx.value) * 100) / 100;
+        const otherChildren = transactions.filter(
+          (t) => t.splitFromId === parentTx.id && t.id !== transactionId
+        );
+
+        // Falls keine weiteren Kinder mehr existieren und der Parent wieder den Originalwert hat,
+        // kann der Originalwert-Snapshot bereinigt werden, wenn keine anderen Felder abweichen
+        const updatedParent: Transaction = {
+          ...parentTx,
+          value: newParentValue,
+          originalValue:
+            otherChildren.length === 0 &&
+            parentTx.originalValue !== undefined &&
+            Math.abs(newParentValue - parentTx.originalValue) < 0.001 &&
+            parentTx.originalSubject === undefined &&
+            parentTx.originalReceiver === undefined
+              ? undefined
+              : parentTx.originalValue,
+        };
+
+        await financeDB.saveTransaction(updatedParent);
+        await financeDB.saveCategories(updatedCategories);
+        setCategories(updatedCategories);
+
+        setTransactions((prev) =>
+          prev
+            .filter((t) => t.id !== transactionId)
+            .map((t) => (t.id === parentTx.id ? updatedParent : t))
+        );
+      } else {
+        await financeDB.saveCategories(updatedCategories);
+        setCategories(updatedCategories);
+        setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
+      }
+      return;
+    }
+
+    // Fall 2: Gelöschte Buchung ist ein Split-Parent oder normale Buchung
+    // Falls es ein Parent ist: Alle Split-Kinder ebenfalls löschen
+    const children = transactions.filter((t) => t.splitFromId === transactionId);
+    const childIds = new Set(children.map((c) => c.id));
+    for (const child of children) {
+      await financeDB.deleteTransaction(child.id);
+      updatedCategories = updatedCategories.map((c) => ({
+        ...c,
+        manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== child.id),
+      }));
+    }
+
     // Nur importierte Bank-Transaktionen wandern in den Papierkorb (Gelöscht-Stapel & CSV-Tombstone).
     // Manuell erstellte Transaktionen (origin === 'manual') werden direkt endgültig gelöscht.
     const isManual = tx.origin === 'manual';
@@ -713,20 +959,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     await financeDB.deleteTransaction(transactionId);
 
-    // Eventuell hinterlegte manualTransactionIds in Kategorien bereinigen
-    const needsCatUpdate = categories.some(
-      (c) => c.manualTransactionIds && c.manualTransactionIds.includes(transactionId)
-    );
-    if (needsCatUpdate) {
-      const updatedCategories = categories.map((c) => ({
-        ...c,
-        manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== transactionId),
-      }));
-      await financeDB.saveCategories(updatedCategories);
-      setCategories(updatedCategories);
-    }
+    // Eventuell hinterlegte manualTransactionIds des gelöschten Eintrags bereinigen
+    updatedCategories = updatedCategories.map((c) => ({
+      ...c,
+      manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== transactionId),
+    }));
 
-    setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
+    await financeDB.saveCategories(updatedCategories);
+    setCategories(updatedCategories);
+
+    setTransactions((prev) => prev.filter((t) => t.id !== transactionId && !childIds.has(t.id)));
     if (!isManual) {
       setDeletedTransactions((prev) =>
         sortTransactionsDesc([...prev, { ...tx, deletedAt: new Date().toISOString() }])
@@ -736,16 +978,36 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   /**
    * Setzt eine importierte Transaktion auf ihre Original-Bankdaten zurück.
-   * Split-Teile werden dabei nicht gelöscht, sondern bleiben als eigenständige Buchungen erhalten.
+   * Split-Kinder werden dabei gelöscht, um Betragsverdopplung zu verhindern.
    */
   const resetTransaction = async (transactionId: string): Promise<void> => {
     const tx = transactions.find((t) => t.id === transactionId);
     if (!tx) return;
 
+    // Falls es sich um ein Split-Kind handelt, verhält sich reset wie das Löschen des Split-Teils (Rückführung auf Parent)
+    if (tx.splitFromId) {
+      await deleteTransaction(transactionId);
+      return;
+    }
+
+    // Falls es sich um eine Root-Buchung mit Split-Kindern handelt:
+    // Alle Split-Kinder löschen
+    const children = transactions.filter((t) => t.splitFromId === transactionId);
+    const childIds = new Set(children.map((c) => c.id));
+    let updatedCategories = [...categories];
+
+    for (const child of children) {
+      await financeDB.deleteTransaction(child.id);
+      updatedCategories = updatedCategories.map((c) => ({
+        ...c,
+        manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== child.id),
+      }));
+    }
+
     const restored = resetTransactionToOriginal(tx);
 
     // Re-Match auf der zurückgesetzten Transaktion
-    const match = matchTransaction(restored, categories);
+    const match = matchTransaction(restored, updatedCategories);
     const finalTx: Transaction = {
       ...restored,
       categoryId: match.categoryId,
@@ -754,8 +1016,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     await financeDB.saveTransaction(finalTx);
+    await financeDB.saveCategories(updatedCategories);
+    setCategories(updatedCategories);
+
     setTransactions((prev) =>
-      sortTransactionsDesc(prev.map((t) => (t.id === transactionId ? finalTx : t)))
+      sortTransactionsDesc(
+        prev.filter((t) => !childIds.has(t.id)).map((t) => (t.id === transactionId ? finalTx : t))
+      )
     );
   };
 
@@ -961,6 +1228,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addTransaction,
         updateTransaction,
         splitTransaction,
+        updateSplitGroup,
         importTransactions,
         assignTransactionCategory,
         assignTransactionBucket: assignTransactionCategory,

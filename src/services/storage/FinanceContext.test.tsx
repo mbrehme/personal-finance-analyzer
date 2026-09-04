@@ -215,7 +215,7 @@ describe('FinanceContext', () => {
     expect(parsed.manualTransactions).toHaveLength(2);
   });
 
-  it('restores a deleted split transaction back to its original full amount without split parts', async () => {
+  it('strictly preserves amounts on split, deleting split child, resetting, and updateSplitGroup', async () => {
     const { result } = renderHook(() => useFinance(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -223,14 +223,14 @@ describe('FinanceContext', () => {
       await result.current.clearTransactions();
     });
 
-    // 1. Bank-Transaktion importieren und aufteilen
+    // 1. Import transaction (-100 €)
     const mainTx: Transaction = {
-      id: 'tx-bank-test-1',
+      id: 'tx-split-root',
       accountId: result.current.accounts[0].id,
       date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
-      issuer: 'Bank',
+      issuer: '',
       receiver: 'Supermarkt',
       subject: 'Einkauf 100 Euro',
       value: -100,
@@ -246,6 +246,7 @@ describe('FinanceContext', () => {
       await result.current.importTransactions([mainTx]);
     });
 
+    // Initial split of 40 €
     await act(async () => {
       await result.current.splitTransaction(mainTx.id, 40, {
         subject: 'Split Teilbetrag',
@@ -257,49 +258,57 @@ describe('FinanceContext', () => {
     expect(result.current.transactions).toHaveLength(2);
     const parentAfterSplit = result.current.transactions.find((t) => t.id === mainTx.id);
     expect(parentAfterSplit?.value).toBe(-60);
+    const child = result.current.transactions.find((t) => t.splitFromId === mainTx.id)!;
+    expect(child.value).toBe(-40);
 
-    // 2. Original-Transaktion löschen: Split-Kind bleibt aktiv erhalten
+    // 2. Delete split child -> amount must return to parent!
     await act(async () => {
-      await result.current.deleteTransaction(mainTx.id);
+      await result.current.deleteTransaction(child.id);
     });
 
     expect(result.current.transactions).toHaveLength(1);
-    expect(result.current.transactions[0].subject).toBe('Split Teilbetrag');
-    expect(result.current.deletedTransactions).toHaveLength(1);
-    expect(result.current.deletedTransactions[0].id).toBe(mainTx.id);
+    const parentAfterChildDelete = result.current.transactions.find((t) => t.id === mainTx.id);
+    expect(parentAfterChildDelete?.value).toBe(-100);
 
-    // 3. Parent wiederherstellen -> Stellt den Originalbetrag (-100 €) wieder her;
-    // Split-Teil bleibt ebenfalls aktiv erhalten
+    // 3. updateSplitGroup with multiple parts
     await act(async () => {
-      await result.current.restoreTransaction(mainTx.id);
+      await result.current.updateSplitGroup!(mainTx.id, [
+        { amount: 30, subject: 'Teil 1', receiver: 'Partner 1', categoryId: null },
+        { amount: 20, subject: 'Teil 2', receiver: 'Partner 2', categoryId: null },
+      ]);
     });
 
-    expect(result.current.transactions).toHaveLength(2);
-    const restored = result.current.transactions.find((t) => t.id === mainTx.id);
-    expect(restored?.value).toBe(-100);
-    expect(restored?.splitFromId).toBeUndefined();
-    expect(result.current.transactions.some((t) => t.subject === 'Split Teilbetrag')).toBe(true);
-    expect(result.current.deletedTransactions).toHaveLength(0);
-
-    // 4. Weiterer Split und Reset der Transaktion testen: Split-Teil darf bei Reset nicht gelöscht werden
-    await act(async () => {
-      await result.current.splitTransaction(mainTx.id, 25, {
-        subject: 'Zweiter Split',
-        receiver: 'Drogerie',
-        categoryId: null,
-      });
-    });
     expect(result.current.transactions).toHaveLength(3);
+    const parentAfterGroup = result.current.transactions.find((t) => t.id === mainTx.id);
+    expect(parentAfterGroup?.value).toBe(-50); // 100 - (30 + 20) = 50
+    const parts = result.current.transactions.filter((t) => t.splitFromId === mainTx.id);
+    expect(parts).toHaveLength(2);
+    expect(parts.reduce((sum, p) => sum + Math.abs(p.value), 0)).toBe(50);
 
+    // 4. Reset parent -> deletes split children and restores original bank amount
     await act(async () => {
       await result.current.resetTransaction(mainTx.id);
     });
 
-    // Nach Reset des Parents auf Originalwerte: Split-Kinder bleiben aktiv erhalten
-    expect(result.current.transactions).toHaveLength(3);
+    expect(result.current.transactions).toHaveLength(1);
     const parentAfterReset = result.current.transactions.find((t) => t.id === mainTx.id);
     expect(parentAfterReset?.value).toBe(-100);
-    expect(result.current.transactions.some((t) => t.subject === 'Zweiter Split')).toBe(true);
+
+    // 5. Deleting parent -> deletes all split children too
+    await act(async () => {
+      await result.current.splitTransaction(mainTx.id, 35, {
+        subject: 'Split erneut',
+        receiver: 'Test',
+        categoryId: null,
+      });
+    });
+    expect(result.current.transactions).toHaveLength(2);
+
+    await act(async () => {
+      await result.current.deleteTransaction(mainTx.id);
+    });
+    // Transactions should be 0 because both parent and child are deleted
+    expect(result.current.transactions).toHaveLength(0);
   });
 
   it('permanently deletes manual transactions without adding them to deleted pile', async () => {

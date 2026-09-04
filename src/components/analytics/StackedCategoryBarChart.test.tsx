@@ -106,13 +106,17 @@ describe('StackedCategoryBarChart', () => {
     localStorage.clear();
   });
 
-  it('renders chart title, bar chart and donut pie chart', () => {
+  it('renders chart title, bar chart and donut pie chart with all categories', () => {
     render(<StackedCategoryBarChart result={mockResult} granularity="monthly" />);
 
-    expect(screen.getByText('Cashflow & Ø Ausgaben nach Kategorien')).toBeInTheDocument();
+    expect(screen.getByText('Cashflow & Ø Verteilung nach Kategorien')).toBeInTheDocument();
     expect(screen.getByTestId('chart-svg')).toBeInTheDocument();
     expect(screen.getByTestId('donut-chart-svg')).toBeInTheDocument();
     expect(screen.getByTestId('donut-legend')).toBeInTheDocument();
+
+    // Gehalt (Einnahmen) soll ebenfalls in der Donut-Legende vorhanden sein
+    expect(screen.getByText('Gehalt')).toBeInTheDocument();
+    expect(screen.getByText('Lebensmittel')).toBeInTheDocument();
 
     const rects = document.querySelectorAll('rect');
     expect(rects.length).toBeGreaterThanOrEqual(4);

@@ -416,7 +416,7 @@ describe('Cashflow Page', () => {
   it('renders stacked category bar chart above the matrix table', () => {
     renderInAnalytics();
     expect(screen.getByTestId('stacked-category-barchart')).toBeInTheDocument();
-    expect(screen.getByText('Cashflow & Ø Ausgaben nach Kategorien')).toBeInTheDocument();
+    expect(screen.getByText('Cashflow & Ø Verteilung nach Kategorien')).toBeInTheDocument();
   });
 
   it('allows filtering categories via category filter dropdown and updates matrix table', async () => {

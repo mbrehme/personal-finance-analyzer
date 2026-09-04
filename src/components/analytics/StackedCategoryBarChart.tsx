@@ -63,6 +63,7 @@ interface DonutSliceInfo {
   totalAmount: number;
   sharePercent: number;
   pathD: string;
+  net: number;
 }
 
 interface HoveredDonutSlice {
@@ -76,6 +77,7 @@ interface HoveredDonutSlice {
   sharePercent: number;
   x: number;
   y: number;
+  net: number;
 }
 
 const STORAGE_COLLAPSED_KEY = 'cashflow_chart_collapsed';
@@ -176,10 +178,13 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
     return map;
   }, [result.rows]);
 
-  // Alle einzelnen Kategorien ermitteln (Blatt-Kategorien ohne eigene Unterkategorien),
+  // Alle einzelnen Kategorien ermitteln (Blatt-Kategorien im aktuellen gefilterten Set),
   // damit jede Kategorie ihren eigenen Stapel hat und keine Doppelzählungen durch Sammelordner entstehen.
+  // Eine Kategorie wird nur dann als Sammelordner übersprungen, wenn mindestens eines ihrer Kinder
+  // ebenfalls im aktuellen gefilterten Set (result.rows) enthalten ist.
   const individualCategoryRows = useMemo(() => {
-    const leaves = result.rows.filter((r) => !r.hasChildren);
+    const parentIdsInResult = new Set(result.rows.map((r) => r.category.parentId).filter(Boolean));
+    const leaves = result.rows.filter((r) => !parentIdsInResult.has(r.category.id));
     return leaves.length > 0 ? leaves : result.rows;
   }, [result.rows]);
 
@@ -296,7 +301,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
     };
   }, [periodKeys, individualCategoryRows, result.uncategorizedRow, parentMap, granularity]);
 
-  // 2. Daten für das Tortendiagramm / Donut-Chart (Durchschnittsausgaben pro Zeiteinheit)
+  // 2. Daten für das Tortendiagramm / Donut-Chart (Durchschnittliche Verteilung pro Zeiteinheit)
   const donutData = useMemo(() => {
     const rawSlices: Array<{
       id: string;
@@ -306,12 +311,17 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
       icon?: string;
       avgAmount: number;
       totalAmount: number;
+      net: number;
     }> = [];
 
-    // Einzelne Kategorien
+    // Einzelne Kategorien / Konten
     individualCategoryRows.forEach((r) => {
-      const totalOutbound = Math.abs(r.totalOutbound);
-      if (totalOutbound > 0) {
+      // Effektiver Betrag: Netto-Betrag (oder Gesamtvolumen, falls Netto 0 ist aber Buchungen vorliegen)
+      const netAmount = r.totalNet;
+      const effectiveAmount =
+        Math.abs(netAmount) > 0 ? Math.abs(netAmount) : r.totalInbound + Math.abs(r.totalOutbound);
+
+      if (effectiveAmount > 0) {
         const parentName = parentMap.get(r.category.id);
         const fullName = parentName ? `${parentName} > ${r.category.name}` : r.category.name;
         rawSlices.push({
@@ -319,31 +329,40 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
           name: r.category.name,
           fullName,
           color: r.category.color || '#3b82f6',
-          icon: r.category.icon || 'Folder',
-          avgAmount: totalOutbound / numPeriods,
-          totalAmount: totalOutbound,
+          icon: r.category.icon || (mode === 'accounts' ? 'Landmark' : 'Folder'),
+          avgAmount: effectiveAmount / numPeriods,
+          totalAmount: effectiveAmount,
+          net: netAmount,
         });
       }
     });
 
-    // Unkategorisiert
-    const uncatOutbound = Math.abs(result.uncategorizedRow.totalOutbound);
-    if (uncatOutbound > 0) {
-      rawSlices.push({
-        id: UNCATEGORIZED_ID,
-        name: 'Nicht kategorisiert',
-        fullName: 'Nicht kategorisiert',
-        color: UNCATEGORIZED_COLOR,
-        icon: 'HelpCircle',
-        avgAmount: uncatOutbound / numPeriods,
-        totalAmount: uncatOutbound,
-      });
+    // Unkategorisiert (nur im Kategorien-Modus relevant)
+    if (mode === 'categories') {
+      const uncatNet = result.uncategorizedRow.totalNet;
+      const uncatEffective =
+        Math.abs(uncatNet) > 0
+          ? Math.abs(uncatNet)
+          : result.uncategorizedRow.totalInbound + Math.abs(result.uncategorizedRow.totalOutbound);
+
+      if (uncatEffective > 0) {
+        rawSlices.push({
+          id: UNCATEGORIZED_ID,
+          name: 'Nicht kategorisiert',
+          fullName: 'Nicht kategorisiert',
+          color: UNCATEGORIZED_COLOR,
+          icon: 'HelpCircle',
+          avgAmount: uncatEffective / numPeriods,
+          totalAmount: uncatEffective,
+          net: uncatNet,
+        });
+      }
     }
 
     // Absteigend nach Durchschnittsbetrag sortieren
     rawSlices.sort((a, b) => b.avgAmount - a.avgAmount);
 
-    const totalAvgOutbound = rawSlices.reduce((sum, s) => sum + s.avgAmount, 0);
+    const totalAvgAmount = rawSlices.reduce((sum, s) => sum + s.avgAmount, 0);
 
     // Geometrie Donut: Zentrum (90, 90), rOuter = 72, rInner = 46
     const cx = 90;
@@ -353,8 +372,8 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
 
     let currentAngle = -Math.PI / 2; // 12 Uhr Start
     const slices: DonutSliceInfo[] = rawSlices.map((s) => {
-      const sharePercent = totalAvgOutbound > 0 ? (s.avgAmount / totalAvgOutbound) * 100 : 0;
-      const angleSpan = totalAvgOutbound > 0 ? (s.avgAmount / totalAvgOutbound) * (2 * Math.PI) : 0;
+      const sharePercent = totalAvgAmount > 0 ? (s.avgAmount / totalAvgAmount) * 100 : 0;
+      const angleSpan = totalAvgAmount > 0 ? (s.avgAmount / totalAvgAmount) * (2 * Math.PI) : 0;
       const startAngle = currentAngle;
       const endAngle = currentAngle + angleSpan;
       currentAngle = endAngle;
@@ -370,11 +389,11 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
 
     return {
       slices,
-      totalAvgOutbound,
+      totalAvgAmount,
       cx,
       cy,
     };
-  }, [individualCategoryRows, parentMap, result.uncategorizedRow.totalOutbound, numPeriods]);
+  }, [individualCategoryRows, parentMap, result.uncategorizedRow, numPeriods, mode]);
 
   // Container-Breite dynamisch messen, damit das Balkendiagramm die gesamte verfügbare Breite ausfüllt
   const barChartContainerRef = useRef<HTMLDivElement>(null);
@@ -476,11 +495,11 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
           </div>
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Cashflow & Ø Ausgaben nach {mode === 'accounts' ? 'Konten' : 'Kategorien'}
+              Cashflow & Ø Verteilung nach {mode === 'accounts' ? 'Konten' : 'Kategorien'}
             </h2>
             <p className="text-xs text-slate-400">
-              Gestapelter Verlauf über/unter der Nulllinie und durchschnittliche Ausgabenverteilung
-              pro {granularityLabel}
+              Gestapelter Verlauf über/unter der Nulllinie und durchschnittliche Verteilung pro{' '}
+              {granularityLabel}
             </p>
           </div>
         </div>
@@ -764,10 +783,10 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                     <PieChartIcon className="h-3.5 w-3.5 text-indigo-600" />
-                    <span>Ø Ausgaben pro {granularityLabel}</span>
+                    <span>Ø Verteilung pro {granularityLabel}</span>
                   </div>
                   <span className="font-mono text-xs font-bold text-slate-900">
-                    {formatMoney(donutData.totalAvgOutbound)}
+                    {formatMoney(donutData.totalAvgAmount)}
                   </span>
                 </div>
 
@@ -777,7 +796,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                     data-testid="donut-empty-state"
                   >
                     <PieChartIcon className="mb-1.5 h-7 w-7 text-slate-300" />
-                    <p className="text-xs font-medium">Keine Ausgaben im ausgewählten Zeitraum.</p>
+                    <p className="text-xs font-medium">Keine Daten im ausgewählten Zeitraum.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center">
@@ -833,7 +852,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                           textAnchor="middle"
                           className="fill-slate-400 font-sans text-[9px] font-semibold uppercase tracking-wider"
                         >
-                          Ø Ausgaben
+                          Ø Gesamt
                         </text>
                         <text
                           x={donutData.cx}
@@ -841,7 +860,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                           textAnchor="middle"
                           className="fill-slate-900 font-mono text-xs font-bold"
                         >
-                          {formatMoney(donutData.totalAvgOutbound)}
+                          {formatMoney(donutData.totalAvgAmount)}
                         </text>
                         <text
                           x={donutData.cx}

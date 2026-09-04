@@ -26,6 +26,8 @@ const baseMockFinance: FinanceContextType = {
   needsReMatch: false,
   reMatching: false,
   setNeedsReMatch: vi.fn(),
+  autoReprogress: true,
+  setAutoReprogress: vi.fn(),
   addCategory: vi.fn(),
   updateCategory: vi.fn(),
   deleteCategory: vi.fn(),
@@ -155,5 +157,29 @@ describe('Header', () => {
     await user.click(dataMenuBtn);
     await user.click(screen.getByRole('button', { name: /Workspace zurücksetzen.../i }));
     expect(screen.getByRole('heading', { name: 'Workspace zurücksetzen' })).toBeInTheDocument();
+  });
+
+  it('renders auto-reprogress checkbox enabled by default and handles toggling', async () => {
+    const user = userEvent.setup();
+    const mockSetAutoReprogress = vi.fn();
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      ...baseMockFinance,
+      autoReprogress: true,
+      setAutoReprogress: mockSetAutoReprogress,
+    });
+
+    render(
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Header />
+      </BrowserRouter>
+    );
+
+    const checkbox = screen.getByTestId('auto-reprogress-checkbox');
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).toBeChecked();
+
+    await user.click(checkbox);
+    expect(mockSetAutoReprogress).toHaveBeenCalledWith(false);
   });
 });

@@ -45,6 +45,10 @@ export interface FinanceContextType {
   needsReMatch: boolean;
   reMatching: boolean;
   setNeedsReMatch: (val: boolean) => void;
+  /** Gibt an, ob Neu-Matching bei Konfigurationsänderungen automatisch ausgeführt wird */
+  autoReprogress: boolean;
+  /** Aktiviert oder deaktiviert automatisches Neu-Matching */
+  setAutoReprogress: (enabled: boolean) => void;
 
   // Category Operations
   addCategory: (category: Omit<Category, 'id'>) => Promise<Category>;
@@ -123,6 +127,7 @@ const SEED_ACCOUNTS: Account[] = SEED_CONFIG.accounts || [];
 const SEED_CATEGORIES: Category[] = SEED_CONFIG.categories || SEED_CONFIG.buckets || [];
 
 const REMATCH_STATUS_STORAGE_KEY = 'finance_rematch_status';
+const AUTO_REPROGRESS_STORAGE_KEY = 'finance_auto_reprogress';
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -167,6 +172,78 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setReMatchStatus(val ? 'needs_reprogress' : 'has_progressed');
     },
     [setReMatchStatus]
+  );
+
+  const [autoReprogress, setAutoReprogressState] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(AUTO_REPROGRESS_STORAGE_KEY);
+        if (stored !== null) {
+          return stored === 'true';
+        }
+      }
+    } catch {
+      // ignore storage access errors
+    }
+    return true;
+  });
+
+  const performReMatch = useCallback(
+    async (overrideTxs?: Transaction[], overrideCategories?: Category[]): Promise<void> => {
+      try {
+        setReMatchStatus('is_reprogressing');
+        const allTxs =
+          overrideTxs ??
+          (transactions.length > 0 ? transactions : await financeDB.getTransactions());
+        const allCategories =
+          overrideCategories ??
+          (categories.length > 0 ? categories : await financeDB.getCategories());
+        const updatedTxs = reMatchAllTransactions(allTxs, allCategories);
+
+        if (updatedTxs.length > 0) {
+          await financeDB.saveTransactions(updatedTxs);
+        }
+        setTransactions(sortTransactionsDesc(updatedTxs));
+        setReMatchStatus('has_progressed');
+      } catch (err) {
+        console.error('Re-Match fehlgeschlagen:', err);
+        setReMatchStatus('needs_reprogress');
+        throw err;
+      }
+    },
+    [transactions, categories, setReMatchStatus]
+  );
+
+  const triggerReMatch = useCallback(async (): Promise<void> => {
+    await performReMatch();
+  }, [performReMatch]);
+
+  const notifyConfigChanged = useCallback(
+    async (overrideTxs?: Transaction[], overrideCategories?: Category[]): Promise<void> => {
+      if (autoReprogress) {
+        await performReMatch(overrideTxs, overrideCategories);
+      } else {
+        setReMatchStatus('needs_reprogress');
+      }
+    },
+    [autoReprogress, performReMatch, setReMatchStatus]
+  );
+
+  const setAutoReprogress = useCallback(
+    (enabled: boolean) => {
+      setAutoReprogressState(enabled);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem(AUTO_REPROGRESS_STORAGE_KEY, String(enabled));
+        }
+      } catch {
+        // ignore storage access errors
+      }
+      if (enabled && reMatchStatus === 'needs_reprogress') {
+        void triggerReMatch();
+      }
+    },
+    [reMatchStatus, triggerReMatch]
   );
 
   // Initiales Laden aus IndexedDB / Seeden bei erstem Start
@@ -354,7 +431,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     await financeDB.saveCategory(newCategory);
     setCategories(updatedCategories);
-    setReMatchStatus('needs_reprogress');
+    await notifyConfigChanged(transactions, updatedCategories);
 
     return newCategory;
   };
@@ -384,7 +461,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     await financeDB.saveCategory(sanitizedUpdated);
     setCategories(updatedCategories);
-    setReMatchStatus('needs_reprogress');
+    await notifyConfigChanged(transactions, updatedCategories);
   };
 
   const reorderCategories = async (updatedCategories: Category[]): Promise<void> => {
@@ -400,7 +477,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     await financeDB.saveCategories(sanitized);
     setCategories(sanitized);
-    setReMatchStatus('needs_reprogress');
+    await notifyConfigChanged(transactions, sanitized);
   };
 
   const deleteCategory = async (categoryId: string): Promise<void> => {
@@ -417,7 +494,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
     await financeDB.saveTransactions(updatedTxs);
     setTransactions(sortTransactionsDesc(updatedTxs));
-    setReMatchStatus('needs_reprogress');
+    await notifyConfigChanged(updatedTxs, updatedCategories);
   };
 
   /* ================== TRANSACTIONS ================== */
@@ -1061,25 +1138,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTransactions([]);
   };
 
-  const triggerReMatch = async (): Promise<void> => {
-    try {
-      setReMatchStatus('is_reprogressing');
-      const allTxs = transactions.length > 0 ? transactions : await financeDB.getTransactions();
-      const allCategories = categories.length > 0 ? categories : await financeDB.getCategories();
-      const updatedTxs = reMatchAllTransactions(allTxs, allCategories);
-
-      if (updatedTxs.length > 0) {
-        await financeDB.saveTransactions(updatedTxs);
-      }
-      setTransactions(sortTransactionsDesc(updatedTxs));
-      setReMatchStatus('has_progressed');
-    } catch (err) {
-      console.error('Re-Match fehlgeschlagen:', err);
-      setReMatchStatus('needs_reprogress');
-      throw err;
-    }
-  };
-
   /* ================== EXPORT & IMPORT ================== */
   const exportConfiguration = async (
     options: ExportOptions = DEFAULT_EXPORT_OPTIONS
@@ -1107,21 +1165,25 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAccounts(parsed.accounts);
       accountsCount = parsed.accounts.length;
     }
+    let nextCategories = categories;
     if (Array.isArray(loadedCats)) {
+      nextCategories = loadedCats;
       setCategories(loadedCats);
       categoriesCount = loadedCats.length;
     }
 
+    let nextTransactions = transactions;
     if (Array.isArray(parsed.transactions)) {
-      setTransactions(sortTransactionsDesc(parsed.transactions));
+      nextTransactions = sortTransactionsDesc(parsed.transactions);
+      setTransactions(nextTransactions);
       transactionsCount = parsed.transactions.length;
     } else if (Array.isArray(parsed.manualTransactions) && parsed.manualTransactions.length > 0) {
       const manualTxs = parsed.manualTransactions;
-      setTransactions((prev) => {
-        const existingIds = new Set(manualTxs.map((m) => m.id));
-        const merged = prev.filter((p) => !existingIds.has(p.id)).concat(manualTxs);
-        return sortTransactionsDesc(merged);
-      });
+      const existingIds = new Set(manualTxs.map((m) => m.id));
+      nextTransactions = sortTransactionsDesc(
+        transactions.filter((p) => !existingIds.has(p.id)).concat(manualTxs)
+      );
+      setTransactions(nextTransactions);
       transactionsCount = manualTxs.length;
     }
 
@@ -1129,7 +1191,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setDeletedTransactions(sortTransactionsDesc(parsed.deletedTransactions));
     }
 
-    setReMatchStatus('needs_reprogress');
+    await notifyConfigChanged(nextTransactions, nextCategories);
     return { accountsCount, categoriesCount, transactionsCount };
   };
 
@@ -1211,6 +1273,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         needsReMatch,
         reMatching,
         setNeedsReMatch,
+        autoReprogress,
+        setAutoReprogress,
         addAccount,
         updateAccount,
         deleteAccount,

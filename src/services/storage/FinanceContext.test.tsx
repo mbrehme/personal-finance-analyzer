@@ -432,4 +432,140 @@ describe('FinanceContext', () => {
 
     expect(result.current.transactions.length).toBeGreaterThan(0);
   });
+
+  it('initializes autoReprogress as true by default and allows toggling', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.autoReprogress).toBe(true);
+
+    act(() => {
+      result.current.setAutoReprogress(false);
+    });
+
+    expect(result.current.autoReprogress).toBe(false);
+  });
+
+  it('triggers rematch automatically on category update when autoReprogress is true', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Sicherstellen, dass autoReprogress aktiv ist
+    act(() => {
+      result.current.setAutoReprogress(true);
+    });
+
+    // Unzugewiesene Buchung hinzufügen
+    await act(async () => {
+      await result.current.importTransactions([
+        {
+          id: 'tx-auto-rematch',
+          accountId: 'acc-giro-main',
+          date: '2026-09-01',
+          valueDate: '2026-09-01',
+          bookingDate: '2026-09-01',
+          issuer: 'AutoSupermarkt',
+          receiver: 'AutoSupermarkt',
+          subject: 'Einkauf Supermarkt Express',
+          type: 'outbound',
+          iban: 'DE00',
+          value: -42,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+        },
+      ]);
+    });
+
+    const unassignedTx = result.current.transactions.find((t) => t.id === 'tx-auto-rematch');
+    expect(unassignedTx?.categoryId).toBeNull();
+
+    // Kategorie mit passendem Regex hinzufügen
+    await act(async () => {
+      await result.current.addCategory({
+        name: 'Auto-Supermarkt',
+        regexPattern: 'AutoSupermarkt',
+        parentId: null,
+      });
+    });
+
+    // Durch autoReprogress muss die Transaktion direkt zugeordnet worden sein und der Status has_progressed sein
+    await waitFor(() => {
+      const updatedTx = result.current.transactions.find((t) => t.id === 'tx-auto-rematch');
+      expect(updatedTx?.categoryId).toBeDefined();
+      expect(updatedTx?.assignmentSource).toBe('auto_regex');
+      expect(result.current.reMatchStatus).toBe('has_progressed');
+    });
+  });
+
+  it('sets needs_reprogress when autoReprogress is false and auto-triggers rematch when re-enabled', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      result.current.setAutoReprogress(false);
+    });
+    expect(result.current.autoReprogress).toBe(false);
+
+    // Kategorie hinzufügen
+    await act(async () => {
+      await result.current.addCategory({
+        name: 'Manuelle Kategorie',
+        parentId: null,
+      });
+    });
+
+    expect(result.current.reMatchStatus).toBe('needs_reprogress');
+    expect(result.current.needsReMatch).toBe(true);
+
+    // Jetzt autoReprogress wieder aktivieren -> sollte sofort triggerReMatch anstoßen
+    await act(async () => {
+      result.current.setAutoReprogress(true);
+    });
+
+    await waitFor(() => {
+      expect(result.current.reMatchStatus).toBe('has_progressed');
+      expect(result.current.needsReMatch).toBe(false);
+    });
+  });
+
+  it('handles config import with autoReprogress correctly', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      result.current.setAutoReprogress(false);
+    });
+
+    const exportData = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      categories: [
+        {
+          id: 'cat-import-test',
+          name: 'Importierte Kategorie',
+          color: '#123456',
+        },
+      ],
+      accounts: [],
+    };
+
+    await act(async () => {
+      await result.current.importConfiguration(JSON.stringify(exportData));
+    });
+
+    expect(result.current.reMatchStatus).toBe('needs_reprogress');
+
+    // Mit autoReprogress = true
+    act(() => {
+      result.current.setAutoReprogress(true);
+    });
+
+    await act(async () => {
+      await result.current.importConfiguration(JSON.stringify(exportData));
+    });
+
+    await waitFor(() => {
+      expect(result.current.reMatchStatus).toBe('has_progressed');
+    });
+  });
 });

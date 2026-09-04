@@ -25,7 +25,8 @@ import {
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
-  const { reMatchStatus, triggerReMatch, importConfiguration } = useFinance();
+  const { reMatchStatus, triggerReMatch, importConfiguration, autoReprogress, setAutoReprogress } =
+    useFinance();
 
   const [isDataMenuOpen, setIsDataMenuOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -116,50 +117,94 @@ export const Header: React.FC = () => {
 
           {/* Header Actions: Re-Match & Global Data Management */}
           <div className="flex items-center gap-2">
-            {/* Re-Match Button */}
-            <button
-              type="button"
-              onClick={triggerReMatch}
-              disabled={reMatchStatus === 'is_reprogressing'}
-              data-testid="rematch-button"
-              data-status={reMatchStatus}
-              title={
+            {/* Re-Match Button & Auto-Reprogress Toggle */}
+            <div
+              className={`inline-flex h-8 items-center rounded-lg border text-xs shadow-sm transition-all ${
                 reMatchStatus === 'needs_reprogress'
-                  ? 'Regeln oder Konfiguration wurden geändert. Klicke hier, um alle Buchungen neu zuzuordnen.'
+                  ? 'border-amber-300 bg-amber-50 text-amber-900'
                   : reMatchStatus === 'is_reprogressing'
-                    ? 'Buchungen werden aktuell neu zugeordnet...'
-                    : 'Alle Buchungen sind synchronisiert. Klicke für ein erneutes manuelles Matching.'
-              }
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-all ${
-                reMatchStatus === 'needs_reprogress'
-                  ? 'border border-amber-300 bg-amber-50 font-semibold text-amber-900 shadow-sm hover:bg-amber-100'
-                  : reMatchStatus === 'is_reprogressing'
-                    ? 'cursor-wait border border-blue-200 bg-blue-50 font-medium text-blue-800'
-                    : 'border border-slate-200/80 bg-white font-medium text-slate-600 shadow-sm hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40'
+                    ? 'border-blue-200 bg-blue-50 text-blue-800'
+                    : 'border-slate-200/80 bg-white text-slate-600'
               }`}
             >
-              <RefreshCw
-                className={`h-3.5 w-3.5 shrink-0 transition-transform ${
-                  reMatchStatus === 'is_reprogressing'
-                    ? 'animate-spin text-blue-600'
-                    : reMatchStatus === 'needs_reprogress'
-                      ? 'text-amber-600'
-                      : 'text-slate-400'
+              <button
+                type="button"
+                onClick={triggerReMatch}
+                disabled={reMatchStatus === 'is_reprogressing'}
+                data-testid="rematch-button"
+                data-status={reMatchStatus}
+                title={
+                  reMatchStatus === 'needs_reprogress'
+                    ? 'Regeln oder Konfiguration wurden geändert. Klicke hier, um alle Buchungen neu zuzuordnen.'
+                    : reMatchStatus === 'is_reprogressing'
+                      ? 'Buchungen werden aktuell neu zugeordnet...'
+                      : 'Alle Buchungen sind synchronisiert. Klicke für ein erneutes manuelles Matching.'
+                }
+                className={`inline-flex h-full items-center gap-1.5 rounded-l-[7px] px-2.5 font-medium transition-colors hover:bg-black/5 disabled:opacity-40 ${
+                  reMatchStatus === 'needs_reprogress'
+                    ? 'bg-amber-50 font-semibold text-amber-900 hover:bg-amber-100/60'
+                    : reMatchStatus === 'is_reprogressing'
+                      ? 'cursor-wait bg-blue-50 text-blue-800'
+                      : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                    reMatchStatus === 'is_reprogressing'
+                      ? 'animate-spin text-blue-600'
+                      : reMatchStatus === 'needs_reprogress'
+                        ? 'text-amber-600'
+                        : 'text-slate-400'
+                  }`}
+                />
+                <span>
+                  {reMatchStatus === 'is_reprogressing' ? 'Progressing...' : 'Reprogress'}
+                </span>
+                {reMatchStatus === 'needs_reprogress' ? (
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
+                  </span>
+                ) : reMatchStatus === 'has_progressed' ? (
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+                    title="Synchronisiert"
+                  ></span>
+                ) : null}
+              </button>
+
+              <div
+                className={`h-4 w-px shrink-0 ${
+                  reMatchStatus === 'needs_reprogress'
+                    ? 'bg-amber-300'
+                    : reMatchStatus === 'is_reprogressing'
+                      ? 'bg-blue-200'
+                      : 'bg-slate-200'
                 }`}
               />
-              <span>{reMatchStatus === 'is_reprogressing' ? 'Progressing...' : 'Reprogress'}</span>
-              {reMatchStatus === 'needs_reprogress' ? (
-                <span className="relative flex h-2 w-2 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
-                </span>
-              ) : reMatchStatus === 'has_progressed' ? (
+
+              <label
+                className="inline-flex h-full cursor-pointer select-none items-center gap-1.5 rounded-r-[7px] px-2 text-[11px] font-medium transition-colors hover:bg-black/5"
+                title="Auto-Reprogress: Änderungen an Regeln und Kategorien automatisch sofort anwenden"
+              >
+                <input
+                  type="checkbox"
+                  checked={autoReprogress}
+                  onChange={(e) => setAutoReprogress(e.target.checked)}
+                  data-testid="auto-reprogress-checkbox"
+                  className="h-3.5 w-3.5 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500"
+                />
                 <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
-                  title="Synchronisiert"
-                ></span>
-              ) : null}
-            </button>
+                  className={
+                    reMatchStatus === 'needs_reprogress'
+                      ? 'font-semibold text-amber-900'
+                      : 'text-slate-600'
+                  }
+                >
+                  Auto
+                </span>
+              </label>
+            </div>
 
             {/* Globales Datenverwaltungs-Dropdown */}
             <div className="relative" ref={menuRef}>

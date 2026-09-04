@@ -52,6 +52,8 @@ describe('Balances Page', () => {
       needsReMatch: false,
       reMatching: false,
       setNeedsReMatch: vi.fn(),
+      autoReprogress: true,
+      setAutoReprogress: vi.fn(),
       addCategory: vi.fn(),
       updateCategory: vi.fn(),
       deleteCategory: vi.fn(),

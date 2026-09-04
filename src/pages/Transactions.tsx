@@ -487,18 +487,6 @@ export const Transactions: React.FC = () => {
               {displayedTransactions.length} sichtbar)
             </p>
           </div>
-
-          {filteredTransactions.length > 0 && (
-            <div className="hidden items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-inner sm:flex">
-              <CircularGauge percentage={loadedPercentage} size={36} strokeWidth={4} />
-              <div className="text-left leading-tight">
-                <div className="text-[11px] font-bold text-slate-700">Geladen</div>
-                <div className="text-[10px] text-slate-400">
-                  {displayedTransactions.length}/{filteredTransactions.length}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-2">

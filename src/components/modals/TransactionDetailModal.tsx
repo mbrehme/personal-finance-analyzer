@@ -5,16 +5,18 @@
  * @module components/modals/TransactionDetailModal
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Transaction,
   Account,
   Category,
+  ISODateString,
+  normalizeIban,
   buildCompoundSearchField,
   getTransactionAccountInfo,
   isTransactionOverridden,
+  resetTransactionToOriginal,
 } from '@/types/finance';
-import { formatDate } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/components/IconRenderer';
 import {
@@ -26,12 +28,14 @@ import {
   FolderTree,
   Tag,
   Calendar,
-  Pencil,
   Scissors,
   FileText,
   Clock,
   Fingerprint,
   RotateCcw,
+  Lock,
+  Save,
+  AlertCircle,
 } from 'lucide-react';
 
 export interface TransactionDetailModalProps {
@@ -40,6 +44,7 @@ export interface TransactionDetailModalProps {
   transaction: Transaction | null;
   accounts: Account[];
   categories: Category[];
+  onSave?: (updatedTx: Transaction) => Promise<void>;
   onEdit?: (tx: Transaction) => void;
   onSplit?: (tx: Transaction) => void;
   onReset?: (txId: string) => void;
@@ -51,31 +56,138 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   transaction,
   accounts,
   categories,
-  onEdit,
+  onSave,
+  onEdit: _deprecatedOnEdit,
   onSplit,
   onReset,
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // ================== INLINE-EDIT FORM STATES ==================
+  const [subject, setSubject] = useState<string>('');
+  const [partner, setPartner] = useState<string>('');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [valueDate, setValueDate] = useState<string>('');
+  const [bookingDate, setBookingDate] = useState<string>('');
+  const [accountId, setAccountId] = useState<string>('');
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Nur reale Bankkonten stehen als Buchungskonto zur Verfügung
+  const realAccounts = useMemo(
+    () => accounts.filter((acc) => acc.accountType !== 'virtual'),
+    [accounts]
+  );
+
+  // Strukturierte Kategoriepfade für das Dropdown
+  const categoryOptions = useMemo(() => {
+    const getPathName = (c: Category): string => {
+      const parts = [c.name];
+      let currentParentId = c.parentId;
+      while (currentParentId) {
+        const parent = categories.find((p) => p.id === currentParentId);
+        if (parent) {
+          if (parent.parentId !== null) {
+            parts.unshift(parent.name);
+          }
+          currentParentId = parent.parentId;
+        } else {
+          break;
+        }
+      }
+      return parts.join(' > ');
+    };
+
+    return categories
+      .map((c) => ({
+        id: c.id,
+        name: getPathName(c),
+        raw: c,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }, [categories]);
+
+  useEffect(() => {
+    if (!isOpen || !transaction) return;
+    setError(null);
+    setSaving(false);
+    setSubject(transaction.subject || '');
+    setPartner(transaction.receiver || transaction.issuer || '');
+    setCategoryId(transaction.categoryId ?? transaction.bucketId ?? null);
+    setValueDate(transaction.valueDate);
+    setBookingDate(transaction.bookingDate || transaction.valueDate);
+
+    const matchingAcc = transaction.accountIban
+      ? realAccounts.find(
+          (a) => a.iban && normalizeIban(a.iban) === normalizeIban(transaction.accountIban)
+        )
+      : realAccounts.find((a) => a.id === transaction.accountId);
+    setAccountId(matchingAcc?.id || realAccounts[0]?.id || '');
+  }, [isOpen, transaction, realAccounts]);
+
+  const isOutbound = (transaction?.value ?? 0) < 0;
+  const isSplitChild = Boolean(transaction?.splitFromId);
+  const isOverridden = transaction ? isTransactionOverridden(transaction) : false;
+
+  const selectedCategory = useMemo(
+    () => categories.find((c) => c.id === categoryId),
+    [categories, categoryId]
+  );
+
+  const selectedRealAccount = useMemo(
+    () => realAccounts.find((a) => a.id === accountId),
+    [realAccounts, accountId]
+  );
+
+  // Dynamischer Suchstring basierend auf den aktuellen Eingaben
+  const compoundSearchString = useMemo(() => {
+    if (!transaction) return '';
+    const previewTx: Transaction = {
+      ...transaction,
+      subject: subject.trim(),
+      receiver: isOutbound ? partner.trim() : transaction.receiver ? partner.trim() : '',
+      issuer: !isOutbound ? partner.trim() : transaction.issuer ? partner.trim() : '',
+      valueDate: (valueDate || transaction.valueDate) as ISODateString,
+    };
+    return buildCompoundSearchField(previewTx);
+  }, [transaction, subject, partner, isOutbound, valueDate]);
+
+  const accountInfo = useMemo(() => {
+    if (!transaction) {
+      return { primaryAccount: null, counterAccount: null, virtualAccounts: [] };
+    }
+    return getTransactionAccountInfo(
+      {
+        ...transaction,
+        accountIban: selectedRealAccount?.iban || transaction.accountIban,
+      },
+      accounts
+    );
+  }, [transaction, selectedRealAccount, accounts]);
+
+  const primaryVirtuals = useMemo(
+    () =>
+      accountInfo.primaryAccount
+        ? accountInfo.virtualAccounts.filter(
+            (v) => v.parentAccountId === accountInfo.primaryAccount?.id
+          )
+        : [],
+    [accountInfo]
+  );
+
+  const counterVirtuals = useMemo(
+    () =>
+      accountInfo.counterAccount
+        ? accountInfo.virtualAccounts.filter(
+            (v) => v.parentAccountId === accountInfo.counterAccount?.id
+          )
+        : [],
+    [accountInfo]
+  );
+
   if (!isOpen || !transaction) return null;
 
   const tx = transaction;
-  const isOutbound = tx.value < 0;
-  const accountInfo = getTransactionAccountInfo(tx, accounts);
-  const primaryVirtuals = accountInfo.primaryAccount
-    ? accountInfo.virtualAccounts.filter(
-        (v) => v.parentAccountId === accountInfo.primaryAccount?.id
-      )
-    : [];
-  const counterVirtuals = accountInfo.counterAccount
-    ? accountInfo.virtualAccounts.filter(
-        (v) => v.parentAccountId === accountInfo.counterAccount?.id
-      )
-    : [];
-  const compoundSearchString = buildCompoundSearchField(tx);
-  const category = categories.find((c) => c.id === (tx.categoryId ?? tx.bucketId));
-  const isOverridden = isTransactionOverridden(tx);
-  const isSplitChild = Boolean(tx.splitFromId);
 
   const copyToClipboard = async (text: string, keyName: string) => {
     try {
@@ -86,6 +198,83 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
       }
     } catch {
       // Fallback ignore clipboard errors
+    }
+  };
+
+  const handleResetToOriginal = () => {
+    if (!tx) return;
+    const restored = resetTransactionToOriginal(tx);
+    setSubject(restored.subject || '');
+    setPartner(restored.receiver || restored.issuer || '');
+    setValueDate(restored.valueDate);
+    setBookingDate(restored.bookingDate || restored.valueDate);
+    setCategoryId(null);
+
+    const matchingAcc = restored.accountIban
+      ? realAccounts.find(
+          (a) => a.iban && normalizeIban(a.iban) === normalizeIban(restored.accountIban)
+        )
+      : realAccounts.find((a) => a.id === restored.accountId);
+    setAccountId(matchingAcc?.id || realAccounts[0]?.id || '');
+
+    if (onReset) {
+      onReset(tx.id);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!tx) return;
+    setError(null);
+
+    try {
+      setSaving(true);
+      const targetAccountIban = selectedRealAccount?.iban || tx.accountIban;
+
+      const initialPartner = (tx.receiver || tx.issuer || '').trim();
+      const trimmedPartner = partner.trim();
+      const isPartnerFieldChanged = trimmedPartner !== initialPartner;
+
+      let finalReceiver = tx.receiver;
+      let finalIssuer = tx.issuer;
+
+      if (isPartnerFieldChanged) {
+        if (tx.receiver) {
+          finalReceiver = trimmedPartner;
+        } else if (tx.issuer) {
+          finalIssuer = trimmedPartner;
+        } else {
+          finalReceiver = isOutbound ? trimmedPartner : '';
+          finalIssuer = !isOutbound ? trimmedPartner : '';
+        }
+      }
+
+      const initialCategoryId = tx.categoryId ?? tx.bucketId ?? null;
+      const isCategoryFieldChanged = categoryId !== initialCategoryId;
+
+      const updatedTx: Transaction = {
+        ...tx,
+        accountIban: targetAccountIban,
+        valueDate: (valueDate || tx.valueDate) as ISODateString,
+        bookingDate: (bookingDate || tx.bookingDate || valueDate || tx.valueDate) as ISODateString,
+        subject: subject.trim(),
+        receiver: finalReceiver,
+        issuer: finalIssuer,
+        categoryId,
+        assignmentSource: isCategoryFieldChanged
+          ? categoryId
+            ? 'manual'
+            : 'unassigned'
+          : tx.assignmentSource,
+      };
+
+      if (onSave) {
+        await onSave(updatedTx);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Speichern der Buchung.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -122,10 +311,26 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
         {/* Scrollbarer Inhaltsbereich */}
         <div className="flex-1 space-y-6 overflow-y-auto p-6 text-xs text-slate-700">
-          {/* Betrag & Status Highlight */}
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Betrag & Status Highlight (Betrag nicht direkt editierbar) */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
             <div>
-              <span className="text-[11px] font-medium text-slate-500">Betrag</span>
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                <span>Betrag</span>
+                <span
+                  className="inline-flex items-center gap-1 rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                  title="Der Betrag kann nicht direkt überschrieben werden, sondern nur aufgeteilt (Split)."
+                >
+                  <Lock className="h-3 w-3 text-slate-500" />
+                  Fest (nur über Split änderbar)
+                </span>
+              </div>
               <div
                 className={`font-mono text-2xl font-extrabold ${
                   isOutbound ? 'text-slate-900' : 'text-emerald-600'
@@ -171,7 +376,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               <button
                 type="button"
                 onClick={() => copyToClipboard(compoundSearchString, 'searchString')}
-                className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2 py-1 text-[11px] font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+                className="shadow-xs inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50"
                 title="Suchstring kopieren"
               >
                 {copiedKey === 'searchString' ? (
@@ -185,7 +390,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 )}
               </button>
             </div>
-            <div className="select-all break-all rounded-lg border border-blue-200 bg-white p-2.5 font-mono text-xs text-blue-950">
+            <div className="select-text break-all rounded-lg border border-blue-200 bg-white p-2.5 font-mono text-xs text-blue-950">
               {compoundSearchString}
             </div>
             <p className="text-[11px] leading-relaxed text-blue-700/80">
@@ -197,37 +402,63 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           {/* Basisdaten: Text, Partner, Datum */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
-              <span className="font-semibold text-slate-500">Verwendungszweck</span>
-              <p className="select-all break-words rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 font-medium text-slate-800">
-                {tx.subject || '-'}
-              </p>
+              <label htmlFor="edit-tx-subject" className="font-semibold text-slate-500">
+                Verwendungszweck
+              </label>
+              <input
+                id="edit-tx-subject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white p-2.5 font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Verwendungszweck eingeben..."
+              />
             </div>
 
             <div className="space-y-1">
-              <span className="font-semibold text-slate-500">
+              <label htmlFor="edit-tx-partner" className="font-semibold text-slate-500">
                 {isOutbound ? 'Empfänger / Begünstigter' : 'Auftraggeber / Absender'}
-              </span>
-              <p className="select-all rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 font-medium text-slate-800">
-                {tx.receiver || tx.issuer || '-'}
-              </p>
+              </label>
+              <input
+                id="edit-tx-partner"
+                type="text"
+                value={partner}
+                onChange={(e) => setPartner(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white p-2.5 font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder={isOutbound ? 'Empfänger...' : 'Auftraggeber...'}
+              />
             </div>
 
             <div className="space-y-1">
-              <span className="flex items-center gap-1 font-semibold text-slate-500">
+              <label
+                htmlFor="edit-tx-valuta"
+                className="flex items-center gap-1 font-semibold text-slate-500"
+              >
                 <Calendar className="h-3.5 w-3.5" /> Valuta- / Wertstellungsdatum
-              </span>
-              <p className="rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 font-medium text-slate-800">
-                {formatDate(tx.valueDate)}
-              </p>
+              </label>
+              <input
+                id="edit-tx-valuta"
+                type="date"
+                value={valueDate}
+                onChange={(e) => setValueDate(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white p-2.5 font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
 
             <div className="space-y-1">
-              <span className="flex items-center gap-1 font-semibold text-slate-500">
+              <label
+                htmlFor="edit-tx-booking"
+                className="flex items-center gap-1 font-semibold text-slate-500"
+              >
                 <Calendar className="h-3.5 w-3.5" /> Buchungsdatum
-              </span>
-              <p className="rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 font-medium text-slate-800">
-                {formatDate(tx.bookingDate || tx.valueDate)}
-              </p>
+              </label>
+              <input
+                id="edit-tx-booking"
+                type="date"
+                value={bookingDate}
+                onChange={(e) => setBookingDate(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white p-2.5 font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
             </div>
           </div>
 
@@ -240,26 +471,33 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <span className="font-semibold text-slate-500">Gebuchtes Konto</span>
-                <p className="select-all break-all rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 font-mono text-xs font-medium text-slate-800">
-                  {tx.accountIban || accountInfo.primaryAccount?.iban || 'Keine IBAN angegeben'}
-                </p>
-                {accountInfo.primaryAccount ? (
+                <label htmlFor="edit-tx-account" className="font-semibold text-slate-500">
+                  Buchungskonto
+                </label>
+                <select
+                  id="edit-tx-account"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {realAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} {acc.iban ? `(${acc.iban})` : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedRealAccount && (
                   <div className="space-y-1.5 pt-0.5">
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
-                      <IconRenderer
-                        name={accountInfo.primaryAccount.icon}
-                        style={{ color: accountInfo.primaryAccount.color }}
-                        className="h-3.5 w-3.5 shrink-0"
-                      />
-                      <span>{accountInfo.primaryAccount.name}</span>
-                    </span>
+                    <p className="select-all break-all rounded-lg border border-slate-200 bg-slate-50/50 p-2 font-mono text-[11px] text-slate-700">
+                      IBAN: {selectedRealAccount.iban || tx.accountIban || 'Keine IBAN angegeben'}
+                    </p>
 
                     {primaryVirtuals.length > 0 && (
                       <div className="space-y-1 pl-1 pt-0.5">
                         <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
                           <FolderTree className="h-3 w-3 text-purple-600" />
-                          Virtuelles Unterkonto
+                          Virtuelle Unterkonten
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {primaryVirtuals.map((v) => (
@@ -279,8 +517,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                       </div>
                     )}
                   </div>
-                ) : (
-                  <span className="text-[11px] text-slate-400">Kein verwaltetes Konto</span>
                 )}
               </div>
 
@@ -333,43 +569,67 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Kategorie & Herkunft */}
+          {/* Kategorie & Zuweisung */}
           <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-            <span className="flex items-center gap-1.5 font-bold text-slate-800">
+            <label
+              htmlFor="edit-tx-category"
+              className="flex items-center gap-1.5 font-bold text-slate-800"
+            >
               <Tag className="h-4 w-4 text-slate-600" />
-              Kategorie & Zuweisungs-Herkunft
-            </span>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {category ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800">
+              Kategorie
+            </label>
+            <div className="space-y-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  id="edit-tx-category"
+                  value={categoryId || ''}
+                  onChange={(e) => setCategoryId(e.target.value || null)}
+                  className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">(Keine Kategorie zugewiesen)</option>
+                  {categoryOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedCategory && (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800">
                     <IconRenderer
-                      name={category.icon}
-                      style={{ color: category.color }}
+                      name={selectedCategory.icon}
+                      style={{ color: selectedCategory.color }}
                       className="h-3.5 w-3.5"
                     />
-                    {category.name}
+                    {selectedCategory.name}
                   </span>
-                ) : (
-                  <span className="italic text-slate-400">Keine Kategorie zugewiesen</span>
                 )}
               </div>
 
-              <div>
-                {tx.assignmentSource === 'auto_regex' && (
-                  <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                    Automatisch via Regex
+              <div className="flex items-center gap-2 pt-1 text-[11px]">
+                <span className="text-slate-500">Status / Herkunft:</span>
+                {categoryId !== (tx.categoryId ?? tx.bucketId ?? null) ? (
+                  <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
+                    Wird als manuell zugewiesen gespeichert
                   </span>
-                )}
-                {tx.assignmentSource === 'manual' && (
-                  <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                    Manuell zugewiesen
-                  </span>
-                )}
-                {tx.assignmentSource === 'unassigned' && (
-                  <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                    Nicht zugewiesen
-                  </span>
+                ) : (
+                  <>
+                    {tx.assignmentSource === 'auto_regex' && (
+                      <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-700">
+                        Automatisch via Regex
+                      </span>
+                    )}
+                    {tx.assignmentSource === 'manual' && (
+                      <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">
+                        Manuell zugewiesen
+                      </span>
+                    )}
+                    {(!tx.assignmentSource || tx.assignmentSource === 'unassigned') && (
+                      <span className="rounded-md bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">
+                        Nicht zugewiesen
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -448,14 +708,12 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         {/* Footer Aktionen */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/75 px-6 py-3">
           <div className="flex items-center gap-2">
-            {isOverridden && onReset && (
+            {isOverridden && (
               <button
                 type="button"
-                onClick={() => {
-                  onReset(tx.id);
-                  onClose();
-                }}
+                onClick={handleResetToOriginal}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                title="Manuelle Änderungen verwerfen und auf Bank-Rohdaten zurücksetzen"
               >
                 <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
                 Auf Bankdaten zurücksetzen
@@ -478,26 +736,23 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               </button>
             )}
 
-            {onEdit && (
-              <button
-                type="button"
-                onClick={() => {
-                  onEdit(tx);
-                  onClose();
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Bearbeiten
-              </button>
-            )}
-
             <button
               type="button"
               onClick={onClose}
+              disabled={saving}
               className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             >
-              Schließen
+              Abbrechen
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Save className="h-3.5 w-3.5" />
+              {saving ? 'Speichern...' : 'Speichern'}
             </button>
           </div>
         </div>

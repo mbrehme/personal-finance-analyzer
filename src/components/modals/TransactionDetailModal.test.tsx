@@ -1,11 +1,11 @@
 /**
  * @file TransactionDetailModal.test.tsx
- * @description Unit-Tests für das TransactionDetailModal.
+ * @description Unit-Tests für das vereinheitlichte TransactionDetailModal mit Inline-Editing.
  * @module components/modals/TransactionDetailModal.test
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { Transaction, Account, Category } from '@/types/finance';
 
@@ -58,7 +58,7 @@ describe('TransactionDetailModal', () => {
     rawFingerprint: 'fp-lufthansa-123',
   };
 
-  it('renders complete transaction details including compound search string', () => {
+  it('renders complete transaction details with inline inputs and non-editable amount notice', () => {
     const handleClose = vi.fn();
 
     render(
@@ -75,25 +75,25 @@ describe('TransactionDetailModal', () => {
     expect(screen.getByText('Buchungsdetails')).toBeInTheDocument();
     expect(screen.getByText('ID: tx-101')).toBeInTheDocument();
 
-    // Betrag
+    // Betrag (nicht editierbar) & Sperr-Badge
     expect(screen.getByText('-450,00 €')).toBeInTheDocument();
+    expect(screen.getByText('Fest (nur über Split änderbar)')).toBeInTheDocument();
     expect(screen.getByText('Ausgabe')).toBeInTheDocument();
 
-    // Suchstring
+    // Initialer Suchstring
     expect(
       screen.getByText('[Ausgang] Lufthansa AG: Flugbuchung Sommerurlaub (DE991234567890)')
     ).toBeInTheDocument();
 
-    // Basisdaten
-    expect(screen.getByText('Flugbuchung Sommerurlaub')).toBeInTheDocument();
-    expect(screen.getByText('Lufthansa AG')).toBeInTheDocument();
+    // Inline-Eingabefelder für Verwendungszweck und Partner
+    expect(screen.getByDisplayValue('Flugbuchung Sommerurlaub')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Lufthansa AG')).toBeInTheDocument();
 
     // Konten & Virtuelle Unterkonten
-    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
+    expect(screen.getByText(/IBAN: DE44500105175407324900/)).toBeInTheDocument();
     expect(screen.getByText('Urlaubstopf')).toBeInTheDocument();
 
-    // Kategorie
-    expect(screen.getByText('Reisen & Urlaub')).toBeInTheDocument();
+    // Kategorie & Herkunft
     expect(screen.getByText('Automatisch via Regex')).toBeInTheDocument();
 
     // Import-Metadaten
@@ -102,9 +102,88 @@ describe('TransactionDetailModal', () => {
     expect(screen.getByText('fp-lufthansa-123')).toBeInTheDocument();
   });
 
-  it('handles edit and split action clicks', () => {
+  it('excludes virtual accounts from the booking account dropdown', () => {
+    render(
+      <TransactionDetailModal
+        isOpen={true}
+        onClose={vi.fn()}
+        transaction={mockTx}
+        accounts={mockAccounts}
+        categories={mockCategories}
+      />
+    );
+
+    const accountSelect = screen.getByLabelText('Buchungskonto') as HTMLSelectElement;
+    const optionTexts = Array.from(accountSelect.options).map((opt) => opt.textContent || '');
+
+    // Reale Konten sind vorhanden
+    expect(optionTexts.some((text) => text.includes('Haupt-Girokonto'))).toBe(true);
+    expect(optionTexts.some((text) => text.includes('Tagesgeldkonto'))).toBe(true);
+
+    // Virtuelle Unterkonten sind NICHT als Auswahloption vorhanden
+    expect(optionTexts.some((text) => text.includes('Urlaubstopf'))).toBe(false);
+  });
+
+  it('dynamically updates compound search string when editing subject or partner', () => {
+    render(
+      <TransactionDetailModal
+        isOpen={true}
+        onClose={vi.fn()}
+        transaction={mockTx}
+        accounts={mockAccounts}
+        categories={mockCategories}
+      />
+    );
+
+    const subjectInput = screen.getByLabelText('Verwendungszweck');
+    fireEvent.change(subjectInput, { target: { value: 'Geänderter Urlaubszweck' } });
+
+    // Compound search string updates in real time
+    expect(
+      screen.getByText('[Ausgang] Lufthansa AG: Geänderter Urlaubszweck (DE991234567890)')
+    ).toBeInTheDocument();
+  });
+
+  it('saves updated transaction and sets assignmentSource to manual when category changes', async () => {
+    const handleSave = vi.fn().mockResolvedValue(undefined);
     const handleClose = vi.fn();
-    const handleEdit = vi.fn();
+
+    render(
+      <TransactionDetailModal
+        isOpen={true}
+        onClose={handleClose}
+        transaction={mockTx}
+        accounts={mockAccounts}
+        categories={mockCategories}
+        onSave={handleSave}
+      />
+    );
+
+    // Verwendungszweck ändern
+    const subjectInput = screen.getByLabelText('Verwendungszweck');
+    fireEvent.change(subjectInput, { target: { value: 'Flug nach Mallorca' } });
+
+    // Kategorie ändern auf Lebensmittel
+    const categorySelect = screen.getByLabelText('Kategorie');
+    fireEvent.change(categorySelect, { target: { value: 'cat-essen' } });
+
+    // Speichern anklicken
+    const saveButton = screen.getByRole('button', { name: /Speichern/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(handleSave).toHaveBeenCalledTimes(1);
+    });
+
+    const savedTx = handleSave.mock.calls[0][0] as Transaction;
+    expect(savedTx.subject).toBe('Flug nach Mallorca');
+    expect(savedTx.categoryId).toBe('cat-essen');
+    expect(savedTx.assignmentSource).toBe('manual');
+    expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('handles split action button click', () => {
+    const handleClose = vi.fn();
     const handleSplit = vi.fn();
 
     render(
@@ -114,19 +193,49 @@ describe('TransactionDetailModal', () => {
         transaction={mockTx}
         accounts={mockAccounts}
         categories={mockCategories}
-        onEdit={handleEdit}
         onSplit={handleSplit}
       />
     );
 
-    // Klick auf Bearbeiten
-    fireEvent.click(screen.getByText('Bearbeiten'));
-    expect(handleEdit).toHaveBeenCalledWith(mockTx);
-    expect(handleClose).toHaveBeenCalled();
+    // Klick auf Aufteilen (Split) im Footer
+    const splitButton = screen.getByRole('button', { name: 'Aufteilen (Split)' });
+    fireEvent.click(splitButton);
 
-    // Klick auf Aufteilen
-    fireEvent.click(screen.getByText('Aufteilen (Split)'));
     expect(handleSplit).toHaveBeenCalledWith(mockTx);
+    expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('renders reset button for overridden transaction and invokes onReset', () => {
+    const overriddenTx: Transaction = {
+      ...mockTx,
+      originalSubject: 'Ursprünglicher Flug',
+      originalReceiver: 'LH Group',
+      subject: 'Manueller Flug',
+    };
+    const handleReset = vi.fn();
+
+    render(
+      <TransactionDetailModal
+        isOpen={true}
+        onClose={vi.fn()}
+        transaction={overriddenTx}
+        accounts={mockAccounts}
+        categories={mockCategories}
+        onReset={handleReset}
+      />
+    );
+
+    // Badge "Manuell angepasst" und Rohdatenanzeige
+    expect(screen.getByText('Manuell angepasst')).toBeInTheDocument();
+    expect(screen.getByText('Ursprüngliche Bank-Rohdaten:')).toBeInTheDocument();
+    expect(screen.getByText('Ursprünglicher Flug')).toBeInTheDocument();
+
+    // Reset-Button
+    const resetButton = screen.getByRole('button', { name: /Auf Bankdaten zurücksetzen/i });
+    expect(resetButton).toBeInTheDocument();
+
+    fireEvent.click(resetButton);
+    expect(handleReset).toHaveBeenCalledWith(overriddenTx.id);
   });
 
   it('does not render when isOpen is false', () => {
@@ -143,7 +252,7 @@ describe('TransactionDetailModal', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders IBAN as text and managed account pills consistently for internal transfers', () => {
+  it('renders managed counter account pill for internal transfers', () => {
     const transferTx: Transaction = {
       id: 'tx-transfer-99',
       accountIban: 'DE44500105175407324900',
@@ -168,16 +277,13 @@ describe('TransactionDetailModal', () => {
       />
     );
 
-    // Beide IBANs sind als Text sichtbar
-    expect(screen.getByText('DE44500105175407324900')).toBeInTheDocument();
+    // Gegenkonto IBAN und Name sichtbar
     expect(screen.getByText('DE44500105175407324995')).toBeInTheDocument();
-
-    // Beide Konten sind als Pill darunter sichtbar (Tagesgeldkonto taucht als Empfänger und als Pill auf)
-    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
-    expect(screen.getAllByText('Tagesgeldkonto').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/IBAN: DE44500105175407324900/)).toBeInTheDocument();
+    expect(screen.getByText('Tagesgeldkonto')).toBeInTheDocument();
   });
 
-  it('renders IBAN as text and marks external counter account when counter account is not managed', () => {
+  it('marks external counter account when counter account is not managed', () => {
     render(
       <TransactionDetailModal
         isOpen={true}
@@ -188,11 +294,7 @@ describe('TransactionDetailModal', () => {
       />
     );
 
-    // Gebuchtes Konto hat IBAN als Text und Pill darunter
-    expect(screen.getByText('DE44500105175407324900')).toBeInTheDocument();
-    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
-
-    // Gegenkonto hat IBAN als Text und Hinweistext als unmanaged darunter
+    // Gegenkonto hat IBAN als Text und Hinweistext als extern darunter
     expect(screen.getByText('DE991234567890')).toBeInTheDocument();
     expect(screen.getByText('Externes Konto (nicht verwaltet)')).toBeInTheDocument();
   });

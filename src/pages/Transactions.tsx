@@ -43,7 +43,6 @@ import {
   Scissors,
   ArrowRight,
   FolderTree,
-  Eye,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -174,9 +173,7 @@ export const Transactions: React.FC = () => {
   };
 
   const handleOpenEditModal = (tx: Transaction) => {
-    setSelectedTx(tx);
-    setTxModalMode('edit');
-    setIsTxModalOpen(true);
+    handleOpenDetailModal(tx);
   };
 
   const handleOpenSplitModal = (tx: Transaction) => {
@@ -711,12 +708,12 @@ export const Transactions: React.FC = () => {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
-                <th className="px-4 py-3">Datum</th>
-                <th className="px-4 py-3">Konto</th>
+                <th className="whitespace-nowrap px-4 py-3">Datum</th>
+                <th className="whitespace-nowrap px-4 py-3">Konto</th>
                 <th className="px-4 py-3">Empfänger / Sender & Text</th>
-                <th className="px-4 py-3 text-right">Betrag</th>
-                <th className="px-4 py-3">Kategorie & Zuweisung</th>
-                <th className="px-4 py-3 text-right">Aktionen</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right">Betrag</th>
+                <th className="whitespace-nowrap px-4 py-3">Kategorie & Zuweisung</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right">Aktionen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -887,9 +884,9 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Partner & Subject */}
-                      <td className="max-w-xs px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-semibold text-slate-800">
+                      <td className="min-w-0 max-w-[200px] px-4 py-3 lg:max-w-xs">
+                        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                          <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">
                             {tx.receiver || tx.issuer || 'Kein Empfänger'}
                           </span>
                           {(() => {
@@ -915,8 +912,10 @@ export const Transactions: React.FC = () => {
                             );
                           })()}
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5">
-                          <span className="truncate text-[11px] text-slate-500">{tx.subject}</span>
+                        <div className="mt-0.5 flex min-w-0 max-w-full items-center gap-1.5">
+                          <span className="min-w-0 flex-1 truncate text-[11px] text-slate-500">
+                            {tx.subject}
+                          </span>
                           {tx.originalSubject !== undefined &&
                             tx.subject !== tx.originalSubject && (
                               <span
@@ -951,13 +950,13 @@ export const Transactions: React.FC = () => {
                         className="whitespace-nowrap px-4 py-3"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <select
                             value={tx.categoryId || tx.bucketId || ''}
                             onChange={(e) =>
                               assignTransactionCategory(tx.id, e.target.value || null)
                             }
-                            className="max-w-[200px] rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="max-w-[160px] truncate rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">(Keine Kategorie)</option>
                             {categoryOptions.map((c) => (
@@ -970,7 +969,7 @@ export const Transactions: React.FC = () => {
                           {/* Geändert Badge bei manueller Zuweisung */}
                           {tx.origin !== 'manual' && tx.assignmentSource === 'manual' && (
                             <span
-                              className="inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
+                              className="inline-flex shrink-0 items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
                               title="Kategorie manuell zugewiesen / angepasst"
                             >
                               Geändert
@@ -999,16 +998,6 @@ export const Transactions: React.FC = () => {
                             </button>
                           ) : (
                             <>
-                              {/* Detail-Knopf */}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenDetailModal(tx)}
-                                className="rounded p-1 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                                title="Details & Suchstring anzeigen"
-                                aria-label="Details anzeigen"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
                               {/* Reset-Knopf: wenn Transaktion von Originaldaten abweicht */}
                               {isTransactionOverridden(tx) && tx.originalValue !== undefined && (
                                 <button
@@ -1034,7 +1023,7 @@ export const Transactions: React.FC = () => {
                                 type="button"
                                 onClick={() => handleOpenEditModal(tx)}
                                 className="rounded p-1 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
-                                title="Bearbeiten"
+                                title="Details & Bearbeiten"
                                 aria-label="Buchung bearbeiten"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -1157,14 +1146,14 @@ export const Transactions: React.FC = () => {
         onSplit={handleSplitTransaction}
       />
 
-      {/* BUCHUNGS-DETAIL-MODAL (INKL. SUCHSTRING) */}
+      {/* BUCHUNGS-DETAIL- & BEARBEITEN-MODAL */}
       <TransactionDetailModal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         transaction={detailTx}
         accounts={accounts}
         categories={categories}
-        onEdit={(tx) => handleOpenEditModal(tx)}
+        onSave={handleSaveTransaction}
         onSplit={(tx) => handleOpenSplitModal(tx)}
         onReset={(id) => resetTransaction(id)}
       />

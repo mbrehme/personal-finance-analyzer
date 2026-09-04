@@ -102,7 +102,10 @@ export function extractPeriodKeys(
 ): string[] {
   const keys = new Set<string>();
   transactions.forEach((tx) => {
-    keys.add(getPeriodKey(tx.valueDate, granularity));
+    const d = tx.date || tx.valueDate || '';
+    if (d) {
+      keys.add(getPeriodKey(d, granularity));
+    }
   });
 
   return Array.from(keys).sort();
@@ -137,8 +140,9 @@ export function calculateCashflowMatrix(
 
   if (options?.startDate || options?.endDate) {
     filteredTx = filteredTx.filter((tx) => {
-      if (options.startDate && tx.valueDate < options.startDate) return false;
-      if (options.endDate && tx.valueDate > options.endDate) return false;
+      const txDate = tx.date || tx.valueDate || '';
+      if (options.startDate && txDate < options.startDate) return false;
+      if (options.endDate && txDate > options.endDate) return false;
       return true;
     });
   }
@@ -214,7 +218,8 @@ export function calculateCashflowMatrix(
   };
 
   filteredTx.forEach((tx) => {
-    const pKey = getPeriodKey(tx.valueDate, granularity);
+    const txDate = tx.date || tx.valueDate || '';
+    const pKey = getPeriodKey(txDate, granularity);
     const rawCatId = tx.categoryId ?? tx.bucketId ?? null;
     const catId = rawCatId && categoryIdsSet.has(rawCatId) ? rawCatId : uncategorizedCategoryId;
     const catPeriods = directSums.get(catId);
@@ -408,7 +413,8 @@ export function calculateCashflowMatrix(
     let outbound = 0;
 
     filteredTx.forEach((tx) => {
-      if (getPeriodKey(tx.valueDate, granularity) === pKey) {
+      const txDate = tx.date || tx.valueDate || '';
+      if (getPeriodKey(txDate, granularity) === pKey) {
         const val = getEffectiveValue(tx);
         if (val >= 0) {
           inbound += val;
@@ -502,8 +508,9 @@ export function calculateAccountCashflowMatrix(
 
   if (options?.startDate || options?.endDate) {
     filteredTx = filteredTx.filter((tx) => {
-      if (options.startDate && tx.valueDate < options.startDate) return false;
-      if (options.endDate && tx.valueDate > options.endDate) return false;
+      const txDate = tx.date || tx.valueDate || '';
+      if (options.startDate && txDate < options.startDate) return false;
+      if (options.endDate && txDate > options.endDate) return false;
       return true;
     });
   }
@@ -617,7 +624,8 @@ export function calculateAccountCashflowMatrix(
     const isVirtual = row.account.accountType === 'virtual';
 
     filteredTx.forEach((tx) => {
-      const pKey = getPeriodKey(tx.valueDate, granularity);
+      const txDate = tx.date || tx.valueDate || '';
+      const pKey = getPeriodKey(txDate, granularity);
       const p = row.periods[pKey];
       if (!p) return;
 

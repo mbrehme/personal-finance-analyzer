@@ -10,7 +10,11 @@ import { toISODateString } from '@/utils/dateUtils';
 import { roundToTwoDecimals } from '@/utils/moneyUtils';
 
 export interface CsvColumnMapping {
-  valueDateColumn: string;
+  /** Spalte für das Wertstellungsdatum (Valutadatum) */
+  dateColumn: string;
+  /** @deprecated Verwende dateColumn */
+  valueDateColumn?: string;
+  /** @deprecated Verwende dateColumn */
   bookingDateColumn?: string;
   issuerColumn?: string;
   receiverColumn?: string;
@@ -133,14 +137,30 @@ export function guessColumnMapping(headers: string[]): CsvColumnMapping {
   };
 
   return {
+    dateColumn:
+      findHeader([
+        /valuta/i,
+        /wertstellung/i,
+        /wertst/i,
+        /datum/i,
+        /date/i,
+        /buchungstag/i,
+        /buchungsdatum/i,
+        /booking/i,
+        /tag/i,
+      ]) ||
+      headers[0] ||
+      '',
     valueDateColumn:
       findHeader([
         /valuta/i,
         /wertstellung/i,
-        /buchungstag/i,
-        /buchungsdatum/i,
+        /wertst/i,
         /datum/i,
         /date/i,
+        /buchungstag/i,
+        /buchungsdatum/i,
+        /booking/i,
         /tag/i,
       ]) ||
       headers[0] ||
@@ -325,14 +345,14 @@ export function parseCurrencyValue(raw: string): number {
  */
 export function generateTransactionId(
   accountIban: string,
-  valueDate: string,
+  date: string,
   value: number,
   subject: string,
   iban: string,
   issuer: string,
   receiver: string
 ): string {
-  const rawKey = `${accountIban}|${valueDate}|${value.toFixed(2)}|${subject.trim()}|${iban.trim()}|${issuer.trim()}|${receiver.trim()}`;
+  const rawKey = `${accountIban}|${date}|${value.toFixed(2)}|${subject.trim()}|${iban.trim()}|${issuer.trim()}|${receiver.trim()}`;
   let hash = 0;
   for (let i = 0; i < rawKey.length; i++) {
     hash = (hash << 5) - hash + rawKey.charCodeAt(i);
@@ -343,10 +363,10 @@ export function generateTransactionId(
 
 /**
  * Berechnet einen deterministischen, tagesgenauen Fingerabdruck (FNV-1a 32-Bit Hash)
- * für eine importierte Bank-Rohbuchung.
+ * für eine importierte Bank-Rohbuchung basierend auf dem Wertstellungsdatum.
  *
  * @param {string} accountIban - Bankkonto-IBAN (oder Konto-Identifikator)
- * @param {string} valueDate - Valutadatum (YYYY-MM-DD)
+ * @param {string} date - Wertstellungsdatum / Valutadatum (YYYY-MM-DD)
  * @param {number} value - Exakter Betrag
  * @param {string} subject - Verwendungszweck der Bank
  * @param {string} [partner=''] - Zahlungspartner (Empfänger oder Auftraggeber)
@@ -356,7 +376,7 @@ export function generateTransactionId(
  */
 export function computeRawFingerprint(
   accountIban: string,
-  valueDate: string,
+  date: string,
   value: number,
   subject: string,
   partner: string = '',
@@ -366,7 +386,7 @@ export function computeRawFingerprint(
   const normSubject = (subject || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const normPartner = (partner || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const normIban = (iban || '').trim().toUpperCase().replace(/\s+/g, '');
-  const rawKey = `${accountIban}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}|${occurrenceIndex}`;
+  const rawKey = `${accountIban}|${date}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}|${occurrenceIndex}`;
 
   let hash = 2166136261;
   for (let i = 0; i < rawKey.length; i++) {
@@ -398,10 +418,9 @@ export function convertRowsToTransactions(
   const fallbackAccountIban = (accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
 
   return rows.map((row, index) => {
-    const rawValDate = row[mapping.valueDateColumn] || '';
-    const rawBookDate = mapping.bookingDateColumn ? row[mapping.bookingDateColumn] : rawValDate;
-    const valueDate: ISODateString = toISODateString(rawValDate);
-    const bookingDate: ISODateString = rawBookDate ? toISODateString(rawBookDate) : valueDate;
+    const rawValDate =
+      (mapping.dateColumn ? row[mapping.dateColumn] : row[mapping.valueDateColumn || '']) || '';
+    const date: ISODateString = toISODateString(rawValDate);
 
     const rawValue = row[mapping.valueColumn] || '0';
     let value = parseCurrencyValue(rawValue);
@@ -443,14 +462,14 @@ export function convertRowsToTransactions(
     const normSubject = subject.trim().toLowerCase().replace(/\s+/g, ' ');
     const normPartner = partner.trim().toLowerCase().replace(/\s+/g, ' ');
     const normIban = iban.trim().toUpperCase().replace(/\s+/g, '');
-    const dayKey = `${normAccountIban}|${valueDate}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}`;
+    const dayKey = `${normAccountIban}|${date}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}`;
 
     const occurrenceIndex = dayOccurrences.get(dayKey) || 0;
     dayOccurrences.set(dayKey, occurrenceIndex + 1);
 
     const rawFingerprint = computeRawFingerprint(
       normAccountIban,
-      valueDate,
+      date,
       value,
       subject,
       partner,
@@ -460,7 +479,7 @@ export function convertRowsToTransactions(
 
     const baseId = generateTransactionId(
       normAccountIban,
-      valueDate,
+      date,
       value,
       subject,
       iban,
@@ -473,8 +492,9 @@ export function convertRowsToTransactions(
     return {
       id,
       accountIban: normAccountIban,
-      valueDate,
-      bookingDate,
+      date,
+      valueDate: date,
+      bookingDate: date,
       issuer,
       receiver,
       subject,
@@ -494,8 +514,9 @@ export function convertRowsToTransactions(
 
       // Flache Original-Rohdaten aus der Bank-CSV
       originalAccountIban: normAccountIban,
-      originalValueDate: valueDate,
-      originalBookingDate: bookingDate,
+      originalDate: date,
+      originalValueDate: date,
+      originalBookingDate: date,
       originalValue: value,
       originalSubject: subject,
       originalReceiver: receiver,

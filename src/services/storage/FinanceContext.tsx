@@ -500,6 +500,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalIssuer: oldTx?.originalIssuer ?? oldTx?.issuer,
       originalAccountId: oldTx?.originalAccountId ?? oldTx?.accountId,
       originalAccountIban: oldTx?.originalAccountIban ?? oldTx?.accountIban,
+      originalDate:
+        oldTx?.originalDate ?? oldTx?.originalValueDate ?? oldTx?.date ?? oldTx?.valueDate,
       originalValueDate: oldTx?.originalValueDate ?? oldTx?.valueDate,
       originalIban: oldTx?.originalIban ?? oldTx?.iban,
     };
@@ -532,6 +534,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const remainingAbs = origAbs - splitAmount;
     const updatedOriginalValue = (sign * Math.round(remainingAbs * 100)) / 100;
 
+    const originalTxDate = originalTx.date ?? originalTx.valueDate;
+
     const updatedOriginalTx: Transaction = {
       ...originalTx,
       value: updatedOriginalValue,
@@ -540,6 +544,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalReceiver: originalTx.originalReceiver ?? originalTx.receiver,
       originalAccountId: originalTx.originalAccountId ?? originalTx.accountId,
       originalAccountIban: originalTx.originalAccountIban ?? originalTx.accountIban,
+      originalDate: originalTx.originalDate ?? originalTx.originalValueDate ?? originalTxDate,
       originalValueDate: originalTx.originalValueDate ?? originalTx.valueDate,
       originalIban: originalTx.originalIban ?? originalTx.iban,
     };
@@ -550,8 +555,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: splitId,
       accountId: originalTx.accountId,
       accountIban: originalTx.accountIban,
-      valueDate: originalTx.valueDate,
-      bookingDate: originalTx.bookingDate,
+      date: originalTxDate,
+      valueDate: originalTxDate,
+      bookingDate: originalTxDate,
       issuer: originalTx.issuer,
       receiver: splitData.receiver.trim() || originalTx.receiver,
       subject: splitData.subject.trim() || `${originalTx.subject} (Split)`,

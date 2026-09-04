@@ -54,6 +54,7 @@ describe('financeDB Storage Layer', () => {
       {
         id: 'tx-1',
         accountId: 'acc-1',
+        date: '2026-08-01',
         valueDate: '2026-08-01',
         bookingDate: '2026-08-01',
         issuer: 'AG',
@@ -68,6 +69,7 @@ describe('financeDB Storage Layer', () => {
       {
         id: 'tx-2',
         accountId: 'acc-1',
+        date: '2026-09-01',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
         issuer: 'AG',
@@ -113,6 +115,7 @@ describe('financeDB Storage Layer', () => {
     const manualTx: Transaction = {
       id: 'tx-man-1',
       accountId: 'acc-export',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: '',
@@ -153,6 +156,7 @@ describe('financeDB Storage Layer', () => {
     const rawTx: Transaction = {
       id: 'tx-persist-1',
       accountId: 'acc-1',
+      date: '2026-09-03',
       valueDate: '2026-09-03',
       bookingDate: '2026-09-03',
       issuer: 'Me',
@@ -184,6 +188,7 @@ describe('financeDB Storage Layer', () => {
     const deletedTx: Transaction = {
       id: 'tx-del-1',
       accountId: 'acc-1',
+      date: '2026-08-01',
       valueDate: '2026-08-01',
       bookingDate: '2026-08-01',
       issuer: 'Rewe',
@@ -245,6 +250,7 @@ describe('financeDB Storage Layer', () => {
     await financeDB.saveTransaction({
       id: 'tx-bank-1',
       accountId: 'acc-1',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'Cinema',

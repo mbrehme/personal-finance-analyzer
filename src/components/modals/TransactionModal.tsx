@@ -96,7 +96,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Original-Bankwerte der Buchung (falls importiert)
-  const originalValueDate = initialTransaction?.originalValueDate ?? initialTransaction?.valueDate;
+  const originalValueDate =
+    initialTransaction?.originalDate ??
+    initialTransaction?.originalValueDate ??
+    initialTransaction?.date ??
+    initialTransaction?.valueDate;
   const originalValue = initialTransaction?.originalValue ?? initialTransaction?.value ?? 0;
   const originalSubject = initialTransaction?.originalSubject ?? initialTransaction?.subject ?? '';
   const originalReceiver =
@@ -125,7 +129,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           )
         : accounts.find((a) => a.id === initialTransaction.accountId);
       setAccountId(matchingAcc?.id || accounts[0]?.id || '');
-      setValueDate(initialTransaction.valueDate);
+      setValueDate(initialTransaction.date || initialTransaction.valueDate || '');
       setAmount(Math.abs(initialTransaction.value));
       setReceiver(initialTransaction.receiver || initialTransaction.issuer || '');
       setSubject(initialTransaction.subject || '');
@@ -166,7 +170,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const resetFormToOriginal = () => {
     if (!initialTransaction) return;
     const restored = resetTransactionToOriginal(initialTransaction);
-    setValueDate(restored.valueDate);
+    setValueDate(restored.date || restored.valueDate || '');
     setAmount(Math.abs(restored.value));
     setReceiver(restored.receiver || restored.issuer || '');
     setSubject(restored.subject || '');
@@ -225,6 +229,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       if (mode === 'create') {
         await onSave({
           accountIban,
+          date: valueDate as ISODateString,
           valueDate: valueDate as ISODateString,
           bookingDate: valueDate as ISODateString,
           issuer: !isOutbound ? receiver : '',
@@ -275,7 +280,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         await onSave({
           ...rest,
           accountIban: accountIban || initialTransaction.accountIban,
+          date: valueDate as ISODateString,
           valueDate: valueDate as ISODateString,
+          bookingDate: valueDate as ISODateString,
           value: signedValue,
           receiver: finalReceiver,
           issuer: finalIssuer,

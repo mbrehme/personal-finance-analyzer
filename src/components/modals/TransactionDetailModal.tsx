@@ -67,8 +67,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const [subject, setSubject] = useState<string>('');
   const [partner, setPartner] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [valueDate, setValueDate] = useState<string>('');
-  const [bookingDate, setBookingDate] = useState<string>('');
+  const [date, setDate] = useState<string>('');
   const [accountId, setAccountId] = useState<string>('');
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,8 +113,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     setSubject(transaction.subject || '');
     setPartner(transaction.receiver || transaction.issuer || '');
     setCategoryId(transaction.categoryId ?? transaction.bucketId ?? null);
-    setValueDate(transaction.valueDate);
-    setBookingDate(transaction.bookingDate || transaction.valueDate);
+    setDate(transaction.date || transaction.valueDate || '');
 
     const matchingAcc = transaction.accountIban
       ? realAccounts.find(
@@ -142,15 +140,17 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   // Dynamischer Suchstring basierend auf den aktuellen Eingaben
   const compoundSearchString = useMemo(() => {
     if (!transaction) return '';
+    const previewDate = (date || transaction.date || transaction.valueDate) as ISODateString;
     const previewTx: Transaction = {
       ...transaction,
       subject: subject.trim(),
       receiver: isOutbound ? partner.trim() : transaction.receiver ? partner.trim() : '',
       issuer: !isOutbound ? partner.trim() : transaction.issuer ? partner.trim() : '',
-      valueDate: (valueDate || transaction.valueDate) as ISODateString,
+      date: previewDate,
+      valueDate: previewDate,
     };
     return buildCompoundSearchField(previewTx);
-  }, [transaction, subject, partner, isOutbound, valueDate]);
+  }, [transaction, subject, partner, isOutbound, date]);
 
   const accountInfo = useMemo(() => {
     if (!transaction) {
@@ -206,8 +206,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     const restored = resetTransactionToOriginal(tx);
     setSubject(restored.subject || '');
     setPartner(restored.receiver || restored.issuer || '');
-    setValueDate(restored.valueDate);
-    setBookingDate(restored.bookingDate || restored.valueDate);
+    setDate(restored.date || restored.valueDate || '');
     setCategoryId(null);
 
     const matchingAcc = restored.accountIban
@@ -250,12 +249,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
       const initialCategoryId = tx.categoryId ?? tx.bucketId ?? null;
       const isCategoryFieldChanged = categoryId !== initialCategoryId;
+      const finalDate = (date || tx.date || tx.valueDate) as ISODateString;
 
       const updatedTx: Transaction = {
         ...tx,
         accountIban: targetAccountIban,
-        valueDate: (valueDate || tx.valueDate) as ISODateString,
-        bookingDate: (bookingDate || tx.bookingDate || valueDate || tx.valueDate) as ISODateString,
+        date: finalDate,
+        valueDate: finalDate,
+        bookingDate: finalDate,
         subject: subject.trim(),
         receiver: finalReceiver,
         issuer: finalIssuer,
@@ -429,34 +430,18 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               />
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2">
               <label
                 htmlFor="edit-tx-valuta"
                 className="flex items-center gap-1 font-semibold text-slate-500"
               >
-                <Calendar className="h-3.5 w-3.5" /> Valuta- / Wertstellungsdatum
+                <Calendar className="h-3.5 w-3.5" /> Wertstellungsdatum (Valuta)
               </label>
               <input
                 id="edit-tx-valuta"
                 type="date"
-                value={valueDate}
-                onChange={(e) => setValueDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white p-2.5 font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label
-                htmlFor="edit-tx-booking"
-                className="flex items-center gap-1 font-semibold text-slate-500"
-              >
-                <Calendar className="h-3.5 w-3.5" /> Buchungsdatum
-              </label>
-              <input
-                id="edit-tx-booking"
-                type="date"
-                value={bookingDate}
-                onChange={(e) => setBookingDate(e.target.value)}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-white p-2.5 font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -693,9 +678,10 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                         <span className="text-slate-400">Betrag:</span> {tx.originalValue} €
                       </p>
                     )}
-                    {tx.originalValueDate !== undefined && (
+                    {(tx.originalDate !== undefined || tx.originalValueDate !== undefined) && (
                       <p>
-                        <span className="text-slate-400">Datum:</span> {tx.originalValueDate}
+                        <span className="text-slate-400">Datum (Wertstellung):</span>{' '}
+                        {tx.originalDate ?? tx.originalValueDate}
                       </p>
                     )}
                   </div>

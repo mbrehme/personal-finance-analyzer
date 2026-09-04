@@ -55,9 +55,15 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         const parsed = parseRawCsv(text);
         setParseResult(parsed);
 
+        const initialDateCol =
+          parsed.suggestedMapping.dateColumn ||
+          parsed.suggestedMapping.valueDateColumn ||
+          parsed.headers[0] ||
+          '';
         const safeMapping: CsvColumnMapping = {
           ...parsed.suggestedMapping,
-          valueDateColumn: parsed.suggestedMapping.valueDateColumn || parsed.headers[0] || '',
+          dateColumn: initialDateCol,
+          valueDateColumn: initialDateCol,
           subjectColumn:
             parsed.suggestedMapping.subjectColumn ||
             (parsed.headers.length > 1 ? parsed.headers[1] : parsed.headers[0] || ''),
@@ -248,8 +254,11 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                             Wertstellungsdatum (Valuta) *
                           </label>
                           <select
-                            value={mapping.valueDateColumn}
-                            onChange={(e) => handleMappingChange('valueDateColumn', e.target.value)}
+                            value={mapping.dateColumn || mapping.valueDateColumn}
+                            onChange={(e) => {
+                              handleMappingChange('dateColumn', e.target.value);
+                              handleMappingChange('valueDateColumn', e.target.value);
+                            }}
                             className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             {parseResult.headers.map((h) => (

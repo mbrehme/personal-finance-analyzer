@@ -21,6 +21,7 @@ describe('TransactionModal', () => {
   const mockTransaction: Transaction = {
     id: 'tx-1',
     accountIban: 'DE12345',
+    date: '2026-09-01',
     valueDate: '2026-09-01',
     bookingDate: '2026-09-01',
     issuer: '',
@@ -202,6 +203,7 @@ describe('TransactionModal', () => {
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
+        date: '2026-09-15',
         valueDate: '2026-09-15',
         receiver: 'REWE Markt GmbH',
         issuer: '',

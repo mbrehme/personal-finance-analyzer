@@ -89,7 +89,11 @@ export function calculateBalanceTimeline(
     }
   });
 
-  relevantTxsWithDeltas.sort((a, b) => a.tx.valueDate.localeCompare(b.tx.valueDate));
+  relevantTxsWithDeltas.sort((a, b) => {
+    const dateA = a.tx.date || a.tx.valueDate || '';
+    const dateB = b.tx.date || b.tx.valueDate || '';
+    return dateA.localeCompare(dateB);
+  });
 
   // Sortierte Stichtags-Salden
   const checkpoints: BalanceEntry[] = [...account.balanceEntries].sort((a, b) =>
@@ -105,7 +109,7 @@ export function calculateBalanceTimeline(
   const getBalanceAtDate = (targetDate: string): number => {
     if (checkpoints.length === 0) {
       const sum = relevantTxsWithDeltas
-        .filter((item) => item.tx.valueDate <= targetDate)
+        .filter((item) => (item.tx.date || item.tx.valueDate || '') <= targetDate)
         .reduce((acc, item) => acc + item.delta, 0);
       return roundToTwoDecimals(sum);
     }
@@ -115,7 +119,10 @@ export function calculateBalanceTimeline(
     if (checkpointsBeforeOrOn.length > 0) {
       const anchor = checkpointsBeforeOrOn[checkpointsBeforeOrOn.length - 1];
       const sumAfterAnchor = relevantTxsWithDeltas
-        .filter((item) => item.tx.valueDate > anchor.date && item.tx.valueDate <= targetDate)
+        .filter((item) => {
+          const d = item.tx.date || item.tx.valueDate || '';
+          return d > anchor.date && d <= targetDate;
+        })
         .reduce((acc, item) => acc + item.delta, 0);
       return roundToTwoDecimals(anchor.amount + sumAfterAnchor);
     }
@@ -123,7 +130,10 @@ export function calculateBalanceTimeline(
     // Stichtag liegt VOR dem allerersten Checkpoint: Rückwärts-Rechnung
     const firstCheckpoint = checkpoints[0];
     const sumBetween = relevantTxsWithDeltas
-      .filter((item) => item.tx.valueDate > targetDate && item.tx.valueDate <= firstCheckpoint.date)
+      .filter((item) => {
+        const d = item.tx.date || item.tx.valueDate || '';
+        return d > targetDate && d <= firstCheckpoint.date;
+      })
       .reduce((acc, item) => acc + item.delta, 0);
     return roundToTwoDecimals(firstCheckpoint.amount - sumBetween);
   };
@@ -145,9 +155,10 @@ export function calculateBalanceTimeline(
 
     const periodCashflow = roundToTwoDecimals(
       relevantTxsWithDeltas
-        .filter(
-          (item) => item.tx.valueDate >= range.startDate && item.tx.valueDate <= range.endDate
-        )
+        .filter((item) => {
+          const d = item.tx.date || item.tx.valueDate || '';
+          return d >= range.startDate && d <= range.endDate;
+        })
         .reduce((acc, item) => acc + item.delta, 0)
     );
 
@@ -206,7 +217,9 @@ export function calculateAllBalances(
   if (options?.startDate && options?.endDate) {
     periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
   } else {
-    const allDates: ISODateString[] = transactions.map((tx) => tx.valueDate);
+    const allDates: ISODateString[] = transactions
+      .map((tx) => (tx.date || tx.valueDate || '') as ISODateString)
+      .filter(Boolean);
     accounts.forEach((acc) => {
       acc.balanceEntries.forEach((be) => {
         if (be.date) allDates.push(be.date as ISODateString);

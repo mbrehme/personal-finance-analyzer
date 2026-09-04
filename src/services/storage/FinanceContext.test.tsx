@@ -65,6 +65,7 @@ describe('FinanceContext', () => {
         {
           id: 'tx-test-assign',
           accountId: 'acc-giro-main',
+          date: '2026-09-01',
           valueDate: '2026-09-01',
           bookingDate: '2026-09-01',
           issuer: 'Unbekannt',
@@ -154,6 +155,7 @@ describe('FinanceContext', () => {
     await act(async () => {
       newTx = await result.current.addTransaction({
         accountId: result.current.accounts[0].id,
+        date: '2026-09-01',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
         issuer: 'Bargeld',
@@ -225,6 +227,7 @@ describe('FinanceContext', () => {
     const mainTx: Transaction = {
       id: 'tx-bank-test-1',
       accountId: result.current.accounts[0].id,
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'Bank',
@@ -307,6 +310,7 @@ describe('FinanceContext', () => {
     await act(async () => {
       manualTx = await result.current.addTransaction({
         accountId: result.current.accounts[0].id,
+        date: '2026-09-01',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
         issuer: 'Bar',

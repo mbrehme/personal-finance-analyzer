@@ -316,11 +316,12 @@ export const Transactions: React.FC = () => {
         return false;
       }
 
-      // 5. Datum Filter
-      if (startDate && tx.valueDate < (startDate as ISODateString)) {
+      // 5. Datum Filter (Wertstellungsdatum)
+      const txDate = tx.date || tx.valueDate;
+      if (startDate && txDate < (startDate as ISODateString)) {
         return false;
       }
-      if (endDate && tx.valueDate > (endDate as ISODateString)) {
+      if (endDate && txDate > (endDate as ISODateString)) {
         return false;
       }
 
@@ -708,7 +709,9 @@ export const Transactions: React.FC = () => {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
-                <th className="whitespace-nowrap px-4 py-3">Datum</th>
+                <th className="whitespace-nowrap px-4 py-3" title="Wertstellungsdatum (Valuta)">
+                  Wertstellungsdatum
+                </th>
                 <th className="whitespace-nowrap px-4 py-3">Konto</th>
                 <th className="px-4 py-3">Empfänger / Sender & Text</th>
                 <th className="whitespace-nowrap px-4 py-3 text-right">Betrag</th>
@@ -749,6 +752,9 @@ export const Transactions: React.FC = () => {
                       tx.accountIban !== tx.originalAccountIban) ||
                     (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId);
 
+                  const currentDate = tx.date || tx.valueDate;
+                  const origDate = tx.originalDate ?? tx.originalValueDate;
+
                   return (
                     <tr
                       key={tx.id}
@@ -763,16 +769,15 @@ export const Transactions: React.FC = () => {
                       {/* Datum */}
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
                         <div className="flex items-center gap-1.5">
-                          <span>{formatDate(tx.valueDate)}</span>
-                          {tx.originalValueDate !== undefined &&
-                            tx.valueDate !== tx.originalValueDate && (
-                              <span
-                                className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
-                                title={`Ursprüngliches Bankdatum: ${formatDate(tx.originalValueDate)}`}
-                              >
-                                Geändert
-                              </span>
-                            )}
+                          <span>{formatDate(currentDate)}</span>
+                          {origDate !== undefined && currentDate !== origDate && (
+                            <span
+                              className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                              title={`Ursprüngliches Bankdatum (Valuta): ${formatDate(origDate)}`}
+                            >
+                              Geändert
+                            </span>
+                          )}
                         </div>
                         {isSplitParent && (
                           <div className="mt-1">

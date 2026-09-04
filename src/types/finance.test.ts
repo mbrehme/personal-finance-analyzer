@@ -22,6 +22,7 @@ describe('finance domain helpers', () => {
     const tx: Transaction = {
       id: 'tx-123',
       accountId: 'acc-ing',
+      date: '2026-09-02',
       valueDate: '2026-09-02',
       bookingDate: '2026-09-02',
       issuer: 'Arbeitgeber GmbH',
@@ -40,6 +41,7 @@ describe('finance domain helpers', () => {
     const txOutbound: Transaction = {
       id: 'tx-124',
       accountId: 'acc-ing',
+      date: '2026-09-02',
       valueDate: '2026-09-02',
       bookingDate: '2026-09-02',
       issuer: 'Max Mustermann',
@@ -60,6 +62,7 @@ describe('finance domain helpers', () => {
     const tx1: Transaction = {
       id: 'tx-1',
       accountId: 'acc-1',
+      date: '2026-08-10',
       valueDate: '2026-08-10',
       bookingDate: '2026-08-10',
       issuer: 'Rewe',
@@ -78,6 +81,7 @@ describe('finance domain helpers', () => {
     const tx2: Transaction = {
       id: 'tx-2',
       accountId: 'acc-1',
+      date: '2026-08-10',
       valueDate: '2026-08-10',
       bookingDate: '2026-08-10',
       issuer: 'Apotheke',
@@ -96,6 +100,7 @@ describe('finance domain helpers', () => {
     const tx3: Transaction = {
       id: 'tx-3',
       accountId: 'acc-1',
+      date: '2026-08-20',
       valueDate: '2026-08-20',
       bookingDate: '2026-08-20',
       issuer: 'Gehalt',
@@ -123,6 +128,7 @@ describe('finance domain helpers', () => {
     const parentTx: Transaction = {
       id: 'tx-parent',
       accountId: 'acc-1',
+      date: '2026-07-20',
       valueDate: '2026-07-20',
       bookingDate: '2026-07-20',
       issuer: 'Supermarkt',
@@ -139,6 +145,7 @@ describe('finance domain helpers', () => {
     const unrelatedTx1: Transaction = {
       id: 'tx-unrelated-1',
       accountId: 'acc-1',
+      date: '2026-07-20',
       valueDate: '2026-07-20',
       bookingDate: '2026-07-20',
       issuer: 'Café',
@@ -155,6 +162,7 @@ describe('finance domain helpers', () => {
     const unrelatedTx2: Transaction = {
       id: 'tx-unrelated-2',
       accountId: 'acc-1',
+      date: '2026-07-20',
       valueDate: '2026-07-20',
       bookingDate: '2026-07-20',
       issuer: 'Strandcafé',
@@ -172,6 +180,7 @@ describe('finance domain helpers', () => {
       id: 'tx-split-child',
       splitFromId: 'tx-parent',
       accountId: 'acc-1',
+      date: '2026-07-20',
       valueDate: '2026-07-20',
       bookingDate: '2026-07-20',
       issuer: 'Supermarkt',
@@ -195,6 +204,7 @@ describe('finance domain helpers', () => {
     const tx1: Transaction = {
       id: 'tx-1',
       accountId: 'acc-1',
+      date: '2026-09-03',
       valueDate: '2026-09-03',
       bookingDate: '2026-09-03',
       issuer: 'A',
@@ -210,6 +220,7 @@ describe('finance domain helpers', () => {
       id: 'tx-orphan',
       splitFromId: 'tx-deleted-parent',
       accountId: 'acc-1',
+      date: '2026-09-02',
       valueDate: '2026-09-02',
       bookingDate: '2026-09-02',
       issuer: 'A',
@@ -224,6 +235,7 @@ describe('finance domain helpers', () => {
     const tx3: Transaction = {
       id: 'tx-3',
       accountId: 'acc-1',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'A',
@@ -279,6 +291,8 @@ describe('finance domain helpers', () => {
       id: 'tx-override-1',
       accountId: 'acc-2',
       originalAccountId: 'acc-1',
+      date: '2026-08-15',
+      originalDate: '2026-08-10',
       valueDate: '2026-08-15',
       originalValueDate: '2026-08-10',
       bookingDate: '2026-08-15',
@@ -307,6 +321,7 @@ describe('finance domain helpers', () => {
 
     expect(restored.id).toBe('tx-override-1');
     expect(restored.accountId).toBe('acc-1');
+    expect(restored.date).toBe('2026-08-10');
     expect(restored.valueDate).toBe('2026-08-10');
     expect(restored.bookingDate).toBe('2026-08-10');
     expect(restored.issuer).toBe('Bank Sender');
@@ -359,6 +374,7 @@ describe('finance domain helpers', () => {
     const transferTx: Transaction = {
       id: 'tx-transfer',
       accountId: 'acc-giro',
+      date: '2026-08-10',
       valueDate: '2026-08-10',
       bookingDate: '2026-08-10',
       issuer: 'Martin',
@@ -384,6 +400,7 @@ describe('finance domain helpers', () => {
     const vacationTx: Transaction = {
       id: 'tx-vacation',
       accountId: 'acc-giro',
+      date: '2026-08-12',
       valueDate: '2026-08-12',
       bookingDate: '2026-08-12',
       issuer: 'Martin',
@@ -410,6 +427,7 @@ describe('finance domain helpers', () => {
     const purelyVirtualTx: Transaction = {
       id: 'tx-no-account-id',
       accountIban: 'DE1111',
+      date: '2026-08-15',
       valueDate: '2026-08-15',
       bookingDate: '2026-08-15',
       issuer: 'Martin',
@@ -484,6 +502,7 @@ describe('finance domain helpers', () => {
         id: 'tx-transfer-savings',
         accountIban: 'DE1111',
         iban: 'DE2222',
+        date: '2026-08-10',
         valueDate: '2026-08-10',
         bookingDate: '2026-08-10',
         issuer: 'Martin',
@@ -523,6 +542,7 @@ describe('finance domain helpers', () => {
         id: 'tx-cc-vacation',
         accountIban: 'DE3333',
         iban: 'DE9999',
+        date: '2026-08-11',
         valueDate: '2026-08-11',
         bookingDate: '2026-08-11',
         issuer: 'Martin',
@@ -562,6 +582,7 @@ describe('finance domain helpers', () => {
         id: 'tx-orphan-test',
         accountIban: 'DE1111',
         iban: 'DE2222',
+        date: '2026-08-10',
         valueDate: '2026-08-10',
         bookingDate: '2026-08-10',
         issuer: 'Martin',

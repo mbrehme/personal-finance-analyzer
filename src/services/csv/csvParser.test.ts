@@ -79,6 +79,7 @@ describe('csvParser', () => {
     ];
 
     const mapping = guessColumnMapping(headers);
+    expect(mapping.dateColumn).toBe('Valutadatum');
     expect(mapping.valueDateColumn).toBe('Valutadatum');
     expect(mapping.bookingDateColumn).toBe('Buchungstag');
     expect(mapping.subjectColumn).toBe('Verwendungszweck');
@@ -98,7 +99,7 @@ describe('csvParser', () => {
     const transactions = convertRowsToTransactions(
       parsed.rows,
       {
-        valueDateColumn: 'Buchungstag',
+        dateColumn: 'Buchungstag',
         receiverColumn: 'Empfänger',
         subjectColumn: 'Verwendungszweck',
         valueColumn: 'Betrag',
@@ -109,6 +110,7 @@ describe('csvParser', () => {
     expect(transactions).toHaveLength(2);
     expect(transactions[0].accountIban).toBe('DE11112222');
     expect(transactions[0].accountId).toBeUndefined();
+    expect(transactions[0].date).toBe('2026-09-01');
     expect(transactions[0].valueDate).toBe('2026-09-01');
     expect(transactions[0].receiver).toBe('Rewe Markt');
     expect(transactions[0].value).toBe(-45.5);
@@ -116,11 +118,13 @@ describe('csvParser', () => {
 
     expect(transactions[0].origin).toBe('imported');
     expect(transactions[0].rawFingerprint).toBeDefined();
+    expect(transactions[0].originalDate).toBe('2026-09-01');
     expect(transactions[0].originalValue).toBe(-45.5);
     expect(transactions[0].originalSubject).toBe('Lebensmitteleinkauf');
     expect(transactions[0].originalReceiver).toBe('Rewe Markt');
     expect(transactions[0].originalAccountIban).toBe('DE11112222');
 
+    expect(transactions[1].date).toBe('2026-09-02');
     expect(transactions[1].valueDate).toBe('2026-09-02');
     expect(transactions[1].value).toBe(3200);
     expect(transactions[1].type).toBe('inbound');

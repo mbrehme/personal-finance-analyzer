@@ -27,6 +27,7 @@ describe('balanceCalculator', () => {
     {
       id: 'tx-1',
       accountId: 'acc-giro',
+      date: '2026-08-15',
       valueDate: '2026-08-15',
       bookingDate: '2026-08-15',
       issuer: 'AG',
@@ -41,6 +42,7 @@ describe('balanceCalculator', () => {
     {
       id: 'tx-2',
       accountId: 'acc-giro',
+      date: '2026-09-05',
       valueDate: '2026-09-05',
       bookingDate: '2026-09-05',
       issuer: 'Me',
@@ -121,6 +123,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-1',
         accountId: 'acc-real-1',
+        date: '2026-08-10',
         valueDate: '2026-08-10',
         bookingDate: '2026-08-10',
         issuer: 'Employer',
@@ -134,6 +137,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-2',
         accountId: 'acc-real-1',
+        date: '2026-08-15',
         valueDate: '2026-08-15',
         bookingDate: '2026-08-15',
         issuer: 'Me',
@@ -195,6 +199,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-dynamic-1',
         accountIban: 'DE123456789',
+        date: '2026-08-05',
         valueDate: '2026-08-05',
         bookingDate: '2026-08-05',
         issuer: 'Employer',
@@ -208,6 +213,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-dynamic-2',
         accountIban: 'DE123456789',
+        date: '2026-08-10',
         valueDate: '2026-08-10',
         bookingDate: '2026-08-10',
         issuer: 'Me',
@@ -271,6 +277,7 @@ describe('balanceCalculator', () => {
         id: 'tx-transfer-1',
         accountIban: 'DE1111',
         iban: 'DE2222',
+        date: '2026-08-10',
         valueDate: '2026-08-10',
         bookingDate: '2026-08-10',
         issuer: 'Martin',
@@ -286,6 +293,7 @@ describe('balanceCalculator', () => {
         id: 'tx-cc-unrelated',
         accountIban: 'DE3333',
         iban: 'DE8888',
+        date: '2026-08-15',
         valueDate: '2026-08-15',
         bookingDate: '2026-08-15',
         issuer: 'Martin',
@@ -348,6 +356,7 @@ describe('balanceCalculator', () => {
         id: 'tx-giro-statement',
         accountIban: 'DE1111',
         iban: 'DE2222',
+        date: '2026-08-10',
         valueDate: '2026-08-10',
         bookingDate: '2026-08-10',
         issuer: 'Martin',
@@ -361,6 +370,7 @@ describe('balanceCalculator', () => {
         id: 'tx-tg-statement',
         accountIban: 'DE2222',
         iban: 'DE1111',
+        date: '2026-08-10',
         valueDate: '2026-08-10',
         bookingDate: '2026-08-10',
         issuer: 'Martin',
@@ -401,6 +411,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-2025-1',
         accountId: 'acc-main',
+        date: '2025-06-15',
         valueDate: '2025-06-15',
         bookingDate: '2025-06-15',
         issuer: 'Arbeitgeber',
@@ -415,6 +426,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-2026-1',
         accountId: 'acc-main',
+        date: '2026-02-10',
         valueDate: '2026-02-10',
         bookingDate: '2026-02-10',
         issuer: 'Ich',
@@ -464,6 +476,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-2025',
         accountId: 'acc-pure-tx',
+        date: '2025-10-01',
         valueDate: '2025-10-01',
         bookingDate: '2025-10-01',
         issuer: 'Kunde',
@@ -478,6 +491,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-2026',
         accountId: 'acc-pure-tx',
+        date: '2026-03-01',
         valueDate: '2026-03-01',
         bookingDate: '2026-03-01',
         issuer: 'Ich',
@@ -518,6 +532,7 @@ describe('balanceCalculator', () => {
       {
         id: 'tx-2026',
         accountId: 'acc-multi',
+        date: '2026-01-15',
         valueDate: '2026-01-15',
         bookingDate: '2026-01-15',
         issuer: 'Ich',

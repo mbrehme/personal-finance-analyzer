@@ -178,10 +178,12 @@ export interface Transaction {
   accountId?: string;
   /** Eigene Bank-IBAN des Kontos, auf dem die Buchung gebucht wurde */
   accountIban?: string;
-  /** Valuta- / Wertstellungsdatum */
-  valueDate: ISODateString;
-  /** Buchungsdatum */
-  bookingDate: ISODateString;
+  /** Wertstellungsdatum (Valutadatum) der Buchung */
+  date: ISODateString;
+  /** @deprecated Bitte nur noch `date` verwenden */
+  valueDate?: ISODateString;
+  /** @deprecated Bitte nur noch `date` verwenden */
+  bookingDate?: ISODateString;
   /** Auftraggeber / Absender der Zahlung */
   issuer: string;
   /** Empfänger der Zahlung */
@@ -225,7 +227,11 @@ export interface Transaction {
   /** @deprecated Verwende originalAccountIban */
   originalAccountId?: string;
   originalAccountIban?: string;
+  /** Ursprüngliches Wertstellungsdatum (Valutadatum) aus den Bank-Rohdaten */
+  originalDate?: ISODateString;
+  /** @deprecated Bitte originalDate verwenden */
   originalValueDate?: ISODateString;
+  /** @deprecated Bitte originalDate verwenden */
   originalBookingDate?: ISODateString;
   originalValue?: number;
   originalSubject?: string;
@@ -255,11 +261,15 @@ export function isTransactionOverridden(tx: Transaction): boolean {
   const isPartnerOverridden =
     hasOrigPartner && origPartner !== '' && currentPartner !== origPartner;
 
+  const originalDate = tx.originalDate ?? tx.originalValueDate;
+  const currentDate = tx.date ?? tx.valueDate;
+  const isDateOverridden = originalDate !== undefined && currentDate !== originalDate;
+
   return (
     (tx.originalValue !== undefined && tx.value !== tx.originalValue) ||
     (tx.originalSubject !== undefined && tx.subject !== tx.originalSubject) ||
     isPartnerOverridden ||
-    (tx.originalValueDate !== undefined && tx.valueDate !== tx.originalValueDate) ||
+    isDateOverridden ||
     (tx.originalAccountIban !== undefined && tx.accountIban !== tx.originalAccountIban) ||
     (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId) ||
     (tx.originalIban !== undefined && tx.iban !== tx.originalIban) ||
@@ -289,14 +299,17 @@ export function isManualTransaction(tx: Transaction): boolean {
  */
 export function resetTransactionToOriginal(tx: Transaction): Transaction {
   const { splitFromId: _splitFromId, deletedAt: _deletedAt, ...rest } = tx;
+  const restoredDate = tx.originalDate ?? tx.originalValueDate ?? tx.date ?? tx.valueDate;
   return {
     ...rest,
     value: tx.originalValue ?? tx.value,
     subject: tx.originalSubject ?? tx.subject,
     receiver: tx.originalReceiver ?? tx.receiver,
     issuer: tx.originalIssuer ?? tx.issuer,
-    valueDate: tx.originalValueDate ?? tx.valueDate,
-    bookingDate: tx.originalBookingDate ?? tx.bookingDate,
+    date: restoredDate,
+    valueDate: restoredDate,
+    bookingDate: tx.originalBookingDate ?? restoredDate,
+    originalDate: tx.originalDate ?? tx.originalValueDate,
     accountId: tx.originalAccountId ?? tx.accountId,
     accountIban: tx.originalAccountIban ?? tx.accountIban,
     iban: tx.originalIban ?? tx.iban,
@@ -369,8 +382,10 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
   }
 
   const compareBase = (a: Transaction, b: Transaction) => {
-    // 1. Primär: Valuta- / Wertstellungsdatum absteigend (neueste Tage zuerst)
-    const dateComp = b.valueDate.localeCompare(a.valueDate);
+    // 1. Primär: Wertstellungsdatum (Valutadatum) absteigend (neueste Tage zuerst)
+    const dateA = a.date || a.valueDate || '';
+    const dateB = b.date || b.valueDate || '';
+    const dateComp = dateB.localeCompare(dateA);
     if (dateComp !== 0) return dateComp;
 
     // 2. Sekundär: Import-Zeitpunkt (falls aus unterschiedlichen Import-Dateien)
@@ -383,14 +398,10 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
       return a.importIndex - b.importIndex;
     }
 
-    // 4. Buchungstag falls abweichend
-    const bookComp = (b.bookingDate || b.valueDate).localeCompare(a.bookingDate || a.valueDate);
-    if (bookComp !== 0) return bookComp;
-
-    // 5. Betrag (höhere Beträge zuerst)
+    // 4. Betrag (höhere Beträge zuerst)
     if (b.value !== a.value) return b.value - a.value;
 
-    // 6. Deterministischer Tie-Breaker: Transaktions-ID
+    // 5. Deterministischer Tie-Breaker: Transaktions-ID
     return b.id.localeCompare(a.id);
   };
 

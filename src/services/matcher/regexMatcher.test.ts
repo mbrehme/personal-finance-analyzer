@@ -54,6 +54,7 @@ describe('regexMatcher Engine', () => {
     const tx: Transaction = {
       id: 'tx-1',
       accountId: 'acc-1',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'Me',
@@ -75,6 +76,7 @@ describe('regexMatcher Engine', () => {
     const tx: Transaction = {
       id: 'tx-2',
       accountId: 'acc-ing-giro',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'Tech Corp',
@@ -96,6 +98,7 @@ describe('regexMatcher Engine', () => {
     const tx: Transaction = {
       id: 'tx-manual-special',
       accountId: 'acc-1',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'Rewe', // Wäre eigentlich b-groceries
@@ -118,6 +121,7 @@ describe('regexMatcher Engine', () => {
       {
         id: 'tx-manual-locked',
         accountId: 'acc-1',
+        date: '2026-09-01',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
         issuer: 'Me',
@@ -132,6 +136,7 @@ describe('regexMatcher Engine', () => {
       {
         id: 'tx-auto',
         accountId: 'acc-1',
+        date: '2026-09-01',
         valueDate: '2026-09-01',
         bookingDate: '2026-09-01',
         issuer: 'Me',
@@ -171,6 +176,7 @@ describe('regexMatcher Engine', () => {
     const giftTx: Transaction = {
       id: 'tx-gift',
       accountId: 'acc-1',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'Me',
@@ -186,6 +192,7 @@ describe('regexMatcher Engine', () => {
     const pocketTx: Transaction = {
       id: 'tx-pocket',
       accountId: 'acc-1',
+      date: '2026-09-01',
       valueDate: '2026-09-01',
       bookingDate: '2026-09-01',
       issuer: 'Me',

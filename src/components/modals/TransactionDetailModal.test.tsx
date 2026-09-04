@@ -43,6 +43,7 @@ describe('TransactionDetailModal', () => {
   const mockTx: Transaction = {
     id: 'tx-101',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-15',
     valueDate: '2026-08-15',
     bookingDate: '2026-08-15',
     issuer: '',
@@ -85,9 +86,10 @@ describe('TransactionDetailModal', () => {
       screen.getByText('[Ausgang] Lufthansa AG: Flugbuchung Sommerurlaub (DE991234567890)')
     ).toBeInTheDocument();
 
-    // Inline-Eingabefelder für Verwendungszweck und Partner
+    // Inline-Eingabefelder für Verwendungszweck, Partner und Wertstellungsdatum
     expect(screen.getByDisplayValue('Flugbuchung Sommerurlaub')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Lufthansa AG')).toBeInTheDocument();
+    expect(screen.getByLabelText('Wertstellungsdatum (Valuta)')).toHaveValue('2026-08-15');
 
     // Konten & Virtuelle Unterkonten
     expect(screen.getByText(/IBAN: DE44500105175407324900/)).toBeInTheDocument();
@@ -256,6 +258,7 @@ describe('TransactionDetailModal', () => {
     const transferTx: Transaction = {
       id: 'tx-transfer-99',
       accountIban: 'DE44500105175407324900',
+      date: '2026-08-10',
       valueDate: '2026-08-10',
       bookingDate: '2026-08-10',
       receiver: 'Tagesgeldkonto',

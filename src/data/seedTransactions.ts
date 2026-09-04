@@ -13,6 +13,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-01',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-01',
     valueDate: '2026-08-01',
     bookingDate: '2026-08-01',
     issuer: 'Arbeitgeber Tech AG',
@@ -26,6 +27,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-02',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-01',
     valueDate: '2026-08-01',
     bookingDate: '2026-08-01',
     issuer: 'Klinikum Mitte',
@@ -39,6 +41,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-03',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-05',
     valueDate: '2026-08-05',
     bookingDate: '2026-08-05',
     issuer: 'Familienkasse',
@@ -52,6 +55,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-04',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-02',
     valueDate: '2026-08-02',
     bookingDate: '2026-08-02',
     issuer: 'Martin',
@@ -65,6 +69,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-05',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-02',
     valueDate: '2026-08-02',
     bookingDate: '2026-08-02',
     issuer: 'Martin',
@@ -78,6 +83,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-06',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-03',
     valueDate: '2026-08-03',
     bookingDate: '2026-08-03',
     issuer: 'Martin',
@@ -91,6 +97,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-07',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-03',
     valueDate: '2026-08-03',
     bookingDate: '2026-08-03',
     issuer: 'Denise',
@@ -104,6 +111,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-08',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-04',
     valueDate: '2026-08-04',
     bookingDate: '2026-08-04',
     issuer: 'Martin',
@@ -117,6 +125,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-09',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-08',
     valueDate: '2026-08-08',
     bookingDate: '2026-08-08',
     issuer: 'Martin',
@@ -129,6 +138,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-10',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-15',
     valueDate: '2026-08-15',
     bookingDate: '2026-08-15',
     issuer: 'Denise',
@@ -141,6 +151,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-11',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-18',
     valueDate: '2026-08-18',
     bookingDate: '2026-08-18',
     issuer: 'Denise',
@@ -153,6 +164,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-12',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-20',
     valueDate: '2026-08-20',
     bookingDate: '2026-08-20',
     issuer: 'Martin',
@@ -165,6 +177,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-13',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-22',
     valueDate: '2026-08-22',
     bookingDate: '2026-08-22',
     issuer: 'Martin',
@@ -177,6 +190,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-14',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-25',
     valueDate: '2026-08-25',
     bookingDate: '2026-08-25',
     issuer: 'Martin',
@@ -189,6 +203,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-transfer-1',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-10',
     valueDate: '2026-08-10',
     bookingDate: '2026-08-10',
     issuer: 'Martin',
@@ -201,6 +216,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-transfer-2',
     accountIban: 'DE44500105175407324900',
+    date: '2026-08-28',
     valueDate: '2026-08-28',
     bookingDate: '2026-08-28',
     issuer: 'Tagesgeldkonto',
@@ -215,6 +231,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-15',
     accountIban: 'DE44500105175407324900',
+    date: '2026-09-01',
     valueDate: '2026-09-01',
     bookingDate: '2026-09-01',
     issuer: 'Arbeitgeber Tech AG',
@@ -228,6 +245,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-16',
     accountIban: 'DE44500105175407324900',
+    date: '2026-09-01',
     valueDate: '2026-09-01',
     bookingDate: '2026-09-01',
     issuer: 'Klinikum Mitte',
@@ -241,6 +259,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-17',
     accountIban: 'DE44500105175407324900',
+    date: '2026-09-02',
     valueDate: '2026-09-02',
     bookingDate: '2026-09-02',
     issuer: 'Martin',
@@ -254,6 +273,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-18',
     accountIban: 'DE44500105175407324900',
+    date: '2026-09-02',
     valueDate: '2026-09-02',
     bookingDate: '2026-09-02',
     issuer: 'Martin',
@@ -267,6 +287,7 @@ export const SEED_TRANSACTIONS: Transaction[] = [
   {
     id: 'seed-tx-19',
     accountIban: 'DE44500105175407324900',
+    date: '2026-09-03',
     valueDate: '2026-09-03',
     bookingDate: '2026-09-03',
     issuer: 'Martin',

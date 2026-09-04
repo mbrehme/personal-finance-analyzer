@@ -698,7 +698,7 @@ export const Transactions: React.FC = () => {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
                 <th className="whitespace-nowrap px-4 py-3" title="Wertstellungsdatum (Valuta)">
-                  Wertstellungsdatum
+                  Datum
                 </th>
                 <th className="whitespace-nowrap px-4 py-3">Konto</th>
                 <th className="px-4 py-3">Empfänger / Sender & Text</th>

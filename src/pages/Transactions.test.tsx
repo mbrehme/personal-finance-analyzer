@@ -480,12 +480,88 @@ describe('Transactions Page', () => {
       </FinanceProvider>
     );
 
-    // Prüfe, dass die Umbuchung beide echten Konten anzeigt (Tagesgeldkonto als Empfänger und als Gegenkonto)
+    // Prüfe, dass die Umbuchung beide echten Konten als Badges anzeigt (Tagesgeldkonto als Empfänger und als Gegenkonto)
     expect(screen.getAllByText('Tagesgeldkonto').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('Haupt-Girokonto').length).toBeGreaterThanOrEqual(1);
-
+    // In der Tabellenansicht werden keine IBANs als Text gerendert (nur im Detail-Dialog)
+    expect(screen.queryByText('DE1111')).not.toBeInTheDocument();
+    expect(screen.queryByText('DE2222')).not.toBeInTheDocument();
     // Prüfe, dass das virtuelle Unterkonto angezeigt wird
     expect(screen.getByText('Urlaubstopf')).toBeInTheDocument();
+
+    vi.restoreAllMocks();
+  });
+
+  it('opens transaction detail modal with compound search string when clicking a row', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        {
+          id: 'acc-giro',
+          name: 'Haupt-Girokonto',
+          accountType: 'real',
+          iban: 'DE44500105175407324900',
+          balanceEntries: [],
+        },
+      ] as any,
+      categories: [
+        {
+          id: 'cat-reisen',
+          name: 'Reisen & Flug',
+          parentId: null,
+        },
+      ] as any,
+      transactions: [
+        {
+          id: 'tx-flight-detail',
+          accountIban: 'DE44500105175407324900',
+          valueDate: '2026-08-20',
+          bookingDate: '2026-08-20',
+          receiver: 'Eurowings',
+          issuer: 'Martin',
+          subject: 'Flugurlaub Sommer',
+          iban: 'DE5544332211',
+          value: -280,
+          categoryId: 'cat-reisen',
+          assignmentSource: 'auto_regex',
+          origin: 'imported',
+        },
+      ] as any,
+      deletedTransactions: [],
+      deleteTransaction: vi.fn(),
+      loading: false,
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Buchung ist in der Tabelle sichtbar
+    const rowText = await screen.findByText('Flugurlaub Sommer');
+    expect(rowText).toBeInTheDocument();
+
+    // Klick auf die Buchungszeile
+    await user.click(rowText);
+
+    // Detail-Modal öffnet sich
+    expect(screen.getByText('Buchungsdetails')).toBeInTheDocument();
+    expect(screen.getByText('ID: tx-flight-detail')).toBeInTheDocument();
+
+    // Suchstring ist sichtbar
+    expect(
+      screen.getByText('[Ausgang] Eurowings: Flugurlaub Sommer (DE5544332211)')
+    ).toBeInTheDocument();
+
+    // Schließen
+    const closeButtons = screen.getAllByRole('button', { name: 'Schließen' });
+    await user.click(closeButtons[0]);
+
+    expect(screen.queryByText('Buchungsdetails')).not.toBeInTheDocument();
 
     vi.restoreAllMocks();
   });

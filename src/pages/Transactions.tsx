@@ -23,6 +23,7 @@ import { IconRenderer } from '@/components/IconRenderer';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { CsvImportModal } from '@/components/modals/CsvImportModal';
 import { TransactionModal } from '@/components/modals/TransactionModal';
+import { TransactionDetailModal } from '@/components/modals/TransactionDetailModal';
 import { CategoryFilterDropdown } from '@/components/analytics/CategoryFilterDropdown';
 import { formatDate } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
@@ -41,6 +42,7 @@ import {
   Scissors,
   ArrowRight,
   FolderTree,
+  Eye,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -154,6 +156,15 @@ export const Transactions: React.FC = () => {
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [txModalMode, setTxModalMode] = useState<'create' | 'edit' | 'split'>('create');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+
+  // Modal State für Transaktions-Detailansicht
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailTx, setDetailTx] = useState<Transaction | null>(null);
+
+  const handleOpenDetailModal = (tx: Transaction) => {
+    setDetailTx(tx);
+    setIsDetailModalOpen(true);
+  };
 
   const handleOpenCreateModal = () => {
     setSelectedTx(null);
@@ -719,11 +730,13 @@ export const Transactions: React.FC = () => {
                   return (
                     <tr
                       key={tx.id}
-                      className={`transition-colors ${
+                      onClick={() => handleOpenDetailModal(tx)}
+                      className={`cursor-pointer transition-colors ${
                         isSplitPart
                           ? 'border-l-4 border-l-amber-400 bg-amber-50/25 hover:bg-amber-50/50'
                           : 'hover:bg-slate-50/80'
                       }`}
+                      title="Klicken für alle Buchungsdetails inkl. Suchstring"
                     >
                       {/* Datum */}
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
@@ -921,7 +934,10 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Kategorie Selector */}
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td
+                        className="whitespace-nowrap px-4 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center gap-2">
                           <select
                             value={tx.categoryId || tx.bucketId || ''}
@@ -951,7 +967,10 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Aktionen */}
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <td
+                        className="whitespace-nowrap px-4 py-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center justify-end gap-1">
                           {/* Restore-Knopf: nur im Papierkorb-Modus */}
                           {appliedFilters.origin === 'deleted' ? (
@@ -967,6 +986,16 @@ export const Transactions: React.FC = () => {
                             </button>
                           ) : (
                             <>
+                              {/* Detail-Knopf */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDetailModal(tx)}
+                                className="rounded p-1 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                                title="Details & Suchstring anzeigen"
+                                aria-label="Details anzeigen"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
                               {/* Reset-Knopf: wenn Transaktion von Originaldaten abweicht */}
                               {isTransactionOverridden(tx) && tx.originalValue !== undefined && (
                                 <button
@@ -1113,6 +1142,18 @@ export const Transactions: React.FC = () => {
         categories={categories}
         onSave={handleSaveTransaction}
         onSplit={handleSplitTransaction}
+      />
+
+      {/* BUCHUNGS-DETAIL-MODAL (INKL. SUCHSTRING) */}
+      <TransactionDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        transaction={detailTx}
+        accounts={accounts}
+        categories={categories}
+        onEdit={(tx) => handleOpenEditModal(tx)}
+        onSplit={(tx) => handleOpenSplitModal(tx)}
+        onReset={(id) => resetTransaction(id)}
       />
     </div>
   );

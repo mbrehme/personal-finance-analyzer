@@ -116,7 +116,6 @@ export const Transactions: React.FC = () => {
     importTransactions,
     assignTransactionCategory,
     deleteTransaction,
-    clearTransactions,
     reMatching,
     resetTransaction,
     deletedTransactions = [],
@@ -491,21 +490,6 @@ export const Transactions: React.FC = () => {
             <UploadCloud className="h-4 w-4" />
             CSV Import
           </button>
-
-          {transactions.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm('Möchtest du wirklich alle Transaktionen löschen?')) {
-                  clearTransactions();
-                }
-              }}
-              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-              title="Alle Transaktionen leeren"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
         </div>
       </div>
 

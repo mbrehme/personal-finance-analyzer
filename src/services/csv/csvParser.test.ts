@@ -29,6 +29,45 @@ describe('csvParser', () => {
     expect(parseCurrencyValue('')).toBe(0);
   });
 
+  it('correctly parses numbers with digit groupers without decimals (e.g. 2.500 -> 2500)', () => {
+    // Exact user bug: 2.500 was wrongly parsed as 2.5
+    expect(parseCurrencyValue('2.500')).toBe(2500);
+    expect(parseCurrencyValue('-2.500')).toBe(-2500);
+    expect(parseCurrencyValue('+2.500')).toBe(2500);
+    expect(parseCurrencyValue('2.500 €')).toBe(2500);
+    expect(parseCurrencyValue('25.000')).toBe(25000);
+    expect(parseCurrencyValue('100.000')).toBe(100000);
+    expect(parseCurrencyValue('1.000.000')).toBe(1000000);
+
+    // English format thousands separator
+    expect(parseCurrencyValue('2,500')).toBe(2500);
+    expect(parseCurrencyValue('2,500.00')).toBe(2500);
+    expect(parseCurrencyValue('1,000,000')).toBe(1000000);
+
+    // Swiss apostrophe and spaces
+    expect(parseCurrencyValue("2'500")).toBe(2500);
+    expect(parseCurrencyValue("2'500.00")).toBe(2500);
+    expect(parseCurrencyValue('2 500,00')).toBe(2500);
+    expect(parseCurrencyValue('2 500')).toBe(2500);
+
+    // Trailing signs and accounting formats
+    expect(parseCurrencyValue('2.500-')).toBe(-2500);
+    expect(parseCurrencyValue('2.500,00-')).toBe(-2500);
+    expect(parseCurrencyValue('2.500 S')).toBe(-2500);
+    expect(parseCurrencyValue('2.500 H')).toBe(2500);
+    expect(parseCurrencyValue('(2.500,00)')).toBe(-2500);
+
+    // Regular decimals are preserved
+    expect(parseCurrencyValue('12,50')).toBe(12.5);
+    expect(parseCurrencyValue('12,5')).toBe(12.5);
+    expect(parseCurrencyValue('12.50')).toBe(12.5);
+    expect(parseCurrencyValue('12.5')).toBe(12.5);
+    expect(parseCurrencyValue('0,99')).toBe(0.99);
+    expect(parseCurrencyValue('0.99')).toBe(0.99);
+    expect(parseCurrencyValue('0.500')).toBe(0.5);
+    expect(parseCurrencyValue('0,500')).toBe(0.5);
+  });
+
   it('guesses column mappings for typical German bank statement headers', () => {
     const headers = [
       'Buchungstag',

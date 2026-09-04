@@ -6,44 +6,40 @@
  */
 
 import React, { useState } from 'react';
-import { Account, Transaction, normalizeIban } from '@/types/finance';
+import { Account, Transaction } from '@/types/finance';
 import {
   parseRawCsv,
   convertRowsToTransactions,
+  parseCurrencyValue,
   CsvColumnMapping,
   CsvParseResult,
 } from '@/services/csv/csvParser';
-import { X, UploadCloud, AlertCircle, FileText, CheckCircle2 } from 'lucide-react';
+import { formatMoney } from '@/utils/moneyUtils';
+import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, Landmark } from 'lucide-react';
 
 export interface CsvImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  accounts: Account[];
+  accounts?: Account[];
   onImport: (transactions: Transaction[]) => Promise<number>;
 }
 
 export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   isOpen,
   onClose,
-  accounts,
+  accounts = [],
   onImport,
 }) => {
-  const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id || '');
   const [fileName, setFileName] = useState<string>('');
   const [parseResult, setParseResult] = useState<CsvParseResult | null>(null);
   const [mapping, setMapping] = useState<CsvColumnMapping | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importedCount, setImportedCount] = useState<number | null>(null);
 
-  React.useEffect(() => {
-    if (
-      (!selectedAccountId || !accounts.some((a) => a.id === selectedAccountId)) &&
-      accounts.length > 0
-    ) {
-      setSelectedAccountId(accounts[0].id);
-    }
-  }, [accounts, selectedAccountId]);
+  // Virtuelle Konten dürfen beim CSV-Import nicht als Zielkonto gewählt werden
+  const realAccounts = accounts.filter((acc) => acc.accountType !== 'virtual');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -68,26 +64,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
           valueColumn:
             parsed.suggestedMapping.valueColumn ||
             (parsed.headers.length > 2 ? parsed.headers[2] : parsed.headers[0] || ''),
+          accountIbanColumn: parsed.suggestedMapping.accountIbanColumn,
+          ibanColumn: parsed.suggestedMapping.ibanColumn,
         };
         setMapping(safeMapping);
-
-        // Auto-Erkennung des Ziel-Kontos anhand der IBAN in den CSV-Zeilen
-        if (safeMapping.ibanColumn) {
-          const rowWithIban = parsed.rows.find((r) => r[safeMapping.ibanColumn!]);
-          const csvIban = rowWithIban ? rowWithIban[safeMapping.ibanColumn!] : '';
-          if (csvIban) {
-            const matched = accounts.find(
-              (a) => a.iban && normalizeIban(a.iban) === normalizeIban(csvIban)
-            );
-            if (matched) {
-              setSelectedAccountId(matched.id);
-            }
-          }
-        }
-
-        if (!selectedAccountId && accounts.length > 0) {
-          setSelectedAccountId(accounts[0].id);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Fehler beim Parsen der CSV-Datei.');
       }
@@ -101,34 +81,20 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
       ...mapping,
       [field]: value || undefined,
     });
-
-    if (field === 'ibanColumn' && value && parseResult) {
-      const rowWithIban = parseResult.rows.find((r) => r[value]);
-      const csvIban = rowWithIban ? rowWithIban[value] : '';
-      if (csvIban) {
-        const matched = accounts.find(
-          (a) => a.iban && normalizeIban(a.iban) === normalizeIban(csvIban)
-        );
-        if (matched) {
-          setSelectedAccountId(matched.id);
-        }
-      }
-    }
   };
 
-  const effectiveAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
-  const effectiveAccountIban = effectiveAccount?.iban || '';
-
   const handleExecuteImport = async () => {
-    if (!parseResult || !mapping || !effectiveAccount) return;
+    if (!parseResult || !mapping || !selectedAccountId) return;
 
     try {
       setImporting(true);
       setError(null);
+      const targetAccount = realAccounts.find((a) => a.id === selectedAccountId);
+      const targetIban = targetAccount?.iban || '';
       const transactions = convertRowsToTransactions(
         parseResult.rows,
         mapping,
-        effectiveAccountIban,
+        targetIban,
         fileName
       );
 
@@ -145,6 +111,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
     setFileName('');
     setParseResult(null);
     setMapping(null);
+    setSelectedAccountId('');
     setError(null);
     setImportedCount(null);
     onClose();
@@ -195,29 +162,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
             </div>
           ) : (
             <>
-              {/* 1. Konto-Auswahl */}
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  Ziel-Konto für die Buchungen
-                </label>
-                <select
-                  value={selectedAccountId || accounts[0]?.id || ''}
-                  onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.accountType === 'virtual'
-                        ? `${acc.name} (Virtuelles Unterkonto)`
-                        : acc.iban
-                          ? `${acc.name} (${acc.iban})`
-                          : acc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 2. Datei-Upload */}
+              {/* Datei-Upload */}
               {!parseResult ? (
                 <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-8 text-center transition-colors hover:border-blue-500">
                   <UploadCloud className="mx-auto mb-2 h-10 w-10 text-slate-400" />
@@ -225,7 +170,8 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                     CSV-Datei auswählen oder hierher ziehen
                   </p>
                   <p className="mb-4 text-xs text-slate-400">
-                    Unterstützt Standard-Exporte aller deutschen und internationalen Banken
+                    Unterstützt Standard-Exporte aller gängigen Banken. Das Buchungskonto wird im
+                    nächsten Schritt ausgewählt.
                   </p>
                   <label className="inline-block cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700">
                     Datei wählen
@@ -239,6 +185,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Datei-Info & Re-Upload */}
                   <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 text-xs">
                     <div className="flex items-center gap-2 font-semibold text-blue-900">
                       <FileText className="h-4 w-4 text-blue-600" />
@@ -255,6 +202,38 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                     >
                       Andere Datei
                     </button>
+                  </div>
+
+                  {/* Buchungskonto manuell auswählen (nur reale Bankkonten, keine virtuellen Konten) */}
+                  <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 text-xs">
+                    <label
+                      htmlFor="csv-booking-account"
+                      className="flex items-center gap-1.5 font-bold text-slate-800"
+                    >
+                      <Landmark className="h-4 w-4 text-blue-600" />
+                      <span>Buchungskonto *</span>
+                    </label>
+                    <select
+                      id="csv-booking-account"
+                      value={selectedAccountId}
+                      onChange={(e) => setSelectedAccountId(e.target.value)}
+                      className="shadow-xs h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-xs focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="" disabled>
+                        -- Bitte Buchungskonto auswählen --
+                      </option>
+                      {realAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} {acc.iban ? `(${acc.iban})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {realAccounts.length === 0 && (
+                      <p className="text-[11px] text-amber-700">
+                        Es wurden keine realen Bankkonten gefunden. Bitte lege zuerst unter
+                        Konfiguration ein Konto an.
+                      </p>
+                    )}
                   </div>
 
                   {/* Spalten-Mapping */}
@@ -330,6 +309,44 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                             ))}
                           </select>
                         </div>
+
+                        <div>
+                          <label className="mb-1 block font-medium text-slate-600">
+                            Auftragskonto / Eigenes Konto IBAN (optional)
+                          </label>
+                          <select
+                            value={mapping.accountIbanColumn || ''}
+                            onChange={(e) =>
+                              handleMappingChange('accountIbanColumn', e.target.value)
+                            }
+                            className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">(Nicht vorhanden)</option>
+                            {parseResult.headers.map((h) => (
+                              <option key={h} value={h}>
+                                {h}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block font-medium text-slate-600">
+                            Partner-IBAN / Gegenkonto (optional)
+                          </label>
+                          <select
+                            value={mapping.ibanColumn || ''}
+                            onChange={(e) => handleMappingChange('ibanColumn', e.target.value)}
+                            className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">(Nicht vorhanden)</option>
+                            {parseResult.headers.map((h) => (
+                              <option key={h} value={h}>
+                                {h}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -386,6 +403,22 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                                 </div>
                               </th>
                             )}
+                            {mapping?.accountIbanColumn && (
+                              <th className="px-3.5 py-2.5 text-left font-semibold">
+                                <div>Auftragskonto</div>
+                                <div className="max-w-[140px] truncate font-mono text-[10px] font-normal text-blue-600">
+                                  ↳ {mapping.accountIbanColumn}
+                                </div>
+                              </th>
+                            )}
+                            {mapping?.ibanColumn && (
+                              <th className="px-3.5 py-2.5 text-left font-semibold">
+                                <div>Partner-IBAN</div>
+                                <div className="max-w-[140px] truncate font-mono text-[10px] font-normal text-blue-600">
+                                  ↳ {mapping.ibanColumn}
+                                </div>
+                              </th>
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -400,6 +433,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                             const rawReceiver = mapping?.receiverColumn
                               ? row[mapping.receiverColumn]
                               : '';
+                            const rawAccountIban = mapping?.accountIbanColumn
+                              ? row[mapping.accountIbanColumn]
+                              : '';
+                            const rawIban = mapping?.ibanColumn ? row[mapping.ibanColumn] : '';
 
                             return (
                               <tr key={idx} className="hover:bg-slate-50/60">
@@ -407,7 +444,30 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                                   {rawDate || <span className="text-slate-300">-</span>}
                                 </td>
                                 <td className="whitespace-nowrap px-3.5 py-2 font-semibold text-slate-900">
-                                  {rawValue || <span className="text-slate-300">-</span>}
+                                  {rawValue ? (
+                                    <div className="flex items-center gap-1.5 font-mono text-xs">
+                                      <span>{rawValue}</span>
+                                      {(() => {
+                                        const parsedVal = parseCurrencyValue(rawValue);
+                                        const badgeClass =
+                                          parsedVal < 0
+                                            ? 'text-rose-600 bg-rose-50 border-rose-200'
+                                            : parsedVal > 0
+                                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                              : 'text-slate-500 bg-slate-50 border-slate-200';
+                                        return (
+                                          <span
+                                            className={`py-0.2 rounded border px-1 text-[10px] font-semibold ${badgeClass}`}
+                                            title="Erkannter Betrag"
+                                          >
+                                            ↳ {formatMoney(parsedVal)}
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300">-</span>
+                                  )}
                                 </td>
                                 <td
                                   className="max-w-[260px] truncate px-3.5 py-2 text-slate-700"
@@ -421,6 +481,22 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                                     title={rawReceiver}
                                   >
                                     {rawReceiver || <span className="text-slate-300">-</span>}
+                                  </td>
+                                )}
+                                {mapping?.accountIbanColumn && (
+                                  <td
+                                    className="max-w-[160px] truncate px-3.5 py-2 font-mono text-[11px] text-slate-600"
+                                    title={rawAccountIban}
+                                  >
+                                    {rawAccountIban || <span className="text-slate-300">-</span>}
+                                  </td>
+                                )}
+                                {mapping?.ibanColumn && (
+                                  <td
+                                    className="max-w-[160px] truncate px-3.5 py-2 font-mono text-[11px] text-slate-600"
+                                    title={rawIban}
+                                  >
+                                    {rawIban || <span className="text-slate-300">-</span>}
                                   </td>
                                 )}
                               </tr>
@@ -446,11 +522,11 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                   onClick={handleExecuteImport}
                   disabled={
                     !parseResult ||
+                    !selectedAccountId ||
                     !mapping ||
                     !mapping.valueDateColumn ||
                     !mapping.valueColumn ||
                     !mapping.subjectColumn ||
-                    !effectiveAccount ||
                     importing
                   }
                   className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"

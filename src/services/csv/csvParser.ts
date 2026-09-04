@@ -5,8 +5,9 @@
  * @module services/csv/csvParser
  */
 
-import { ISODateString, Transaction, getTransactionType } from '@/types/finance';
+import { ISODateString, Transaction, getTransactionType, normalizeIban } from '@/types/finance';
 import { toISODateString } from '@/utils/dateUtils';
+import { roundToTwoDecimals } from '@/utils/moneyUtils';
 
 export interface CsvColumnMapping {
   valueDateColumn: string;
@@ -16,6 +17,7 @@ export interface CsvColumnMapping {
   subjectColumn: string;
   valueColumn: string;
   ibanColumn?: string;
+  accountIbanColumn?: string;
   typeColumn?: string;
 }
 
@@ -185,29 +187,137 @@ export function guessColumnMapping(headers: string[]): CsvColumnMapping {
         /preis/i,
         /summe/i,
       ]) || (headers.length > 2 ? headers[2] : headers[0] || ''),
-    ibanColumn: findHeader([/iban/i, /kontonummer/i, /gegenkonto/i, /konto/i]),
+    ibanColumn: findHeader([
+      /iban.?zahlungsbeteiligter/i,
+      /gegenkonto/i,
+      /empf[aä]nger.?iban/i,
+      /partner.?iban/i,
+      /iban/i,
+      /kontonummer/i,
+      /konto/i,
+    ]),
+    accountIbanColumn: findHeader([
+      /auftragskonto/i,
+      /eigene.?iban/i,
+      /absender.?iban/i,
+      /iban.?auftragskonto/i,
+    ]),
     typeColumn: findHeader([/typ/i, /art/i, /type/i, /buchungsart/i]),
   };
 }
 
 /**
- * Wandelt einen Geldbetrag aus verschiedenen Formaten ('1.234,56 €', '-50.00', '12,50') in eine Zahl um.
+ * Wandelt einen Geldbetrag aus verschiedenen Bank- und Exportformaten in eine Zahl um.
+ * Unterstützt deutsche und internationale Formate, Tausendertrennzeichen (Punkte, Kommas,
+ * Apostrophe, Leerzeichen), Dezimalstellen sowie vor- und nachgestellte Vorzeichen
+ * oder Soll/Haben-Kennzeichnungen (S/H, DB/CR).
+ *
+ * @param {string} raw - Der rohe Währungs- oder Betragsstring (z. B. '2.500', '1.250,50 €', '-45,99', '2,500.00')
+ * @returns {number} Der geparste numerische Betrag kaufmännisch auf 2 Nachkommastellen gerundet
+ *
+ * @example
+ * parseCurrencyValue('2.500') // 2500
+ * parseCurrencyValue('1.250,50 €') // 1250.5
+ * parseCurrencyValue('-45,99') // -45.99
+ * parseCurrencyValue('2.500,00-') // -2500
+ * parseCurrencyValue('2.500 S') // -2500
+ * parseCurrencyValue('2,500.00') // 2500
+ * parseCurrencyValue('2 500,00') // 2500
  */
 export function parseCurrencyValue(raw: string): number {
   if (!raw) return 0;
 
-  // Bereinigen von Währungssymbolen, Leerzeichen, etc.
-  let cleaned = raw.replace(/[€$£\s]/g, '').trim();
+  const trimmed = raw.trim();
+  if (!trimmed) return 0;
 
-  // Prüfen auf deutsches Format: 1.234,56 oder -1.234,56
-  if (/\d+\.\d{3},\d{2}/.test(cleaned) || /,\d{2}$/.test(cleaned)) {
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-  } else if (/,\d+$/.test(cleaned) && !cleaned.includes('.')) {
-    cleaned = cleaned.replace(',', '.');
+  // 1. Vorzeichen ermitteln
+  // Buchhaltungs-Klammern: (1.234,56)
+  const isParenthesesNegative = /^\(.*\)$/.test(trimmed);
+
+  // Vor- oder nachgestelltes Minus: -2.500 oder 2.500-
+  const hasMinus = /^-/.test(trimmed) || /-$/.test(trimmed);
+
+  // Soll/Haben-Kennzeichen (S = Soll/Minus, H = Haben/Plus, DB = Debit/Minus, CR = Credit/Plus)
+  // Währungskürzel vorab ignorieren (z. B. USD enthält kein Soll-S)
+  const withoutCurrencyCodes = trimmed.replace(/\b(EUR|USD|CHF|GBP)\b/gi, '');
+  const hasDebitIndicator =
+    /(?:^|\s|\d)(s|soll|db|debit)\s*$/i.test(withoutCurrencyCodes) ||
+    /^\s*(s|soll|db|debit)\s+/i.test(withoutCurrencyCodes);
+
+  const isNegative = isParenthesesNegative || hasMinus || hasDebitIndicator;
+
+  // 2. Bereinigen von Währungssymbolen, Buchstaben, Leerzeichen und Apostrophen
+  // Schweizer Apostroph (' oder ’) sowie Tausender-Leerzeichen entfernen
+  let cleaned = trimmed
+    .replace(/[€$£¥₹\u00A4]/g, '')
+    .replace(/\b(EUR|USD|CHF|GBP|soll|haben|s|h|db|cr|debit|credit)\b/gi, '')
+    .replace(/['’\s\u00A0\u202F]/g, '')
+    .replace(/[()+\-]/g, '')
+    .trim();
+
+  // Nur noch Ziffern, Punkte und Kommas behalten
+  cleaned = cleaned.replace(/[^\d.,]/g, '');
+  if (!cleaned) return 0;
+
+  const dotCount = (cleaned.match(/\./g) || []).length;
+  const commaCount = (cleaned.match(/,/g) || []).length;
+
+  if (dotCount > 0 && commaCount > 0) {
+    // Sowohl Punkt als auch Komma vorhanden:
+    // Der letzte Separator bestimmt die Dezimaltrennstelle
+    const lastDot = cleaned.lastIndexOf('.');
+    const lastComma = cleaned.lastIndexOf(',');
+
+    if (lastDot < lastComma) {
+      // Europäisches Format: 1.234.567,89 oder 2.500,50
+      // Punkte als Tausendertrenner entfernen, Komma zu Dezimalpunkt
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US/UK Format: 1,234,567.89 oder 2,500.50
+      // Kommas als Tausendertrenner entfernen
+      cleaned = cleaned.replace(/,/g, '');
+    }
+  } else if (dotCount > 0) {
+    // Nur Punkte vorhanden (kein Komma)
+    if (dotCount > 1) {
+      // Mehrere Punkte sind immer Tausendertrennzeichen (z. B. 1.000.000 oder 1.234.567)
+      cleaned = cleaned.replace(/\./g, '');
+    } else {
+      // Genau ein Punkt: "2.500" vs. "12.50" vs. "12.5" vs. "0.500"
+      const [integerPart, fractionalPart] = cleaned.split('.');
+      // In Bank-/Währungskontexten haben Währungen 2 Dezimalstellen (Cents).
+      // Ein Punkt gefolgt von exakt 3 Ziffern (bei Vorkommateil ungleich 0)
+      // ist ein deutsches Tausendertrennzeichen (z. B. 2.500 oder 25.000)!
+      if (fractionalPart.length === 3 && integerPart !== '0' && integerPart.length > 0) {
+        cleaned = integerPart + fractionalPart;
+      } else {
+        // Regulärer Dezimalpunkt (z. B. 12.50, 12.5, 0.99, 0.500)
+        cleaned = `${integerPart}.${fractionalPart}`;
+      }
+    }
+  } else if (commaCount > 0) {
+    // Nur Kommas vorhanden (kein Punkt)
+    if (commaCount > 1) {
+      // Mehrere Kommas sind immer Tausendertrennzeichen (z. B. 1,000,000)
+      cleaned = cleaned.replace(/,/g, '');
+    } else {
+      // Genau ein Komma: "12,50" vs. "12,5" vs. "2,500" vs. "0,99"
+      const [integerPart, fractionalPart] = cleaned.split(',');
+      // Falls Komma gefolgt von exakt 3 Ziffern (bei Vorkomma != 0): Tausendertrennzeichen (z. B. 2,500)
+      if (fractionalPart.length === 3 && integerPart !== '0' && integerPart.length > 0) {
+        cleaned = integerPart + fractionalPart;
+      } else {
+        // Deutsches Dezimalkomma (z. B. 12,50 oder 12,5 oder 0,99)
+        cleaned = `${integerPart}.${fractionalPart}`;
+      }
+    }
   }
 
   const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
+  if (isNaN(num)) return 0;
+
+  const finalNum = isNegative ? -Math.abs(num) : Math.abs(num);
+  return finalNum === 0 ? 0 : roundToTwoDecimals(finalNum);
 }
 
 /**
@@ -271,7 +381,7 @@ export function computeRawFingerprint(
  *
  * @param {Record<string, string>[]} rows - Geparste CSV-Zeilen
  * @param {CsvColumnMapping} mapping - Spaltenzuordnung
- * @param {string} accountIban - Zielkonto-IBAN
+ * @param {string} [accountIban=''] - Optionale Standard-Konto-IBAN (falls in den Zeilen keine Auftragskonto-Spalte vorhanden ist)
  * @param {string} [filename] - Optionaler Dateiname der Import-CSV
  * @param {string} [importedAt] - Optionaler Zeitstempel des Imports
  * @returns {Transaction[]} Typisierte Transaktionsobjekte mit importIndex
@@ -279,13 +389,13 @@ export function computeRawFingerprint(
 export function convertRowsToTransactions(
   rows: Record<string, string>[],
   mapping: CsvColumnMapping,
-  accountIban: string,
+  accountIban: string = '',
   filename?: string,
   importedAt?: string
 ): Transaction[] {
   const timestamp = importedAt || new Date().toISOString();
   const dayOccurrences = new Map<string, number>();
-  const normAccountIban = (accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
+  const fallbackAccountIban = (accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
 
   return rows.map((row, index) => {
     const rawValDate = row[mapping.valueDateColumn] || '';
@@ -294,12 +404,39 @@ export function convertRowsToTransactions(
     const bookingDate: ISODateString = rawBookDate ? toISODateString(rawBookDate) : valueDate;
 
     const rawValue = row[mapping.valueColumn] || '0';
-    const value = parseCurrencyValue(rawValue);
+    let value = parseCurrencyValue(rawValue);
+
+    // Falls eine Typ-Spalte (z. B. "Soll/Haben", "Buchungsart") gewählt ist und der Betrag positiv ist,
+    // prüfen ob es sich um eine Belastung / Soll-Buchung handelt
+    if (mapping.typeColumn && row[mapping.typeColumn]) {
+      const rawType = row[mapping.typeColumn].trim().toLowerCase();
+      const isDebit =
+        rawType === 's' ||
+        rawType === 'soll' ||
+        rawType === 'debit' ||
+        rawType === 'lastschrift' ||
+        rawType === 'belastung' ||
+        rawType === 'ausgabe' ||
+        rawType === 'abgang';
+      if (isDebit && value > 0) {
+        value = -value;
+      }
+    }
+
+    const rowAccountIban =
+      mapping.accountIbanColumn && row[mapping.accountIbanColumn]
+        ? normalizeIban(row[mapping.accountIbanColumn])
+        : '';
+    const normAccountIban = rowAccountIban || fallbackAccountIban;
 
     const issuer = mapping.issuerColumn ? (row[mapping.issuerColumn] || '').trim() : '';
     const receiver = mapping.receiverColumn ? (row[mapping.receiverColumn] || '').trim() : '';
     const subject = (row[mapping.subjectColumn] || '').trim();
-    const iban = mapping.ibanColumn ? (row[mapping.ibanColumn] || '').trim() : '';
+    const rawIban = mapping.ibanColumn ? (row[mapping.ibanColumn] || '').trim() : '';
+    // Falls die erkannte ibanColumn dieselbe Spalte wie accountIbanColumn ist,
+    // soll die Gegenkonto-IBAN nicht das eigene Konto sein
+    const iban =
+      mapping.accountIbanColumn && mapping.accountIbanColumn === mapping.ibanColumn ? '' : rawIban;
 
     // Tag-gebundener Occurrence-Zähler
     const partner = receiver || issuer;

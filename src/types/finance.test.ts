@@ -376,7 +376,8 @@ describe('finance domain helpers', () => {
     expect(transferInfo.allAccounts).toHaveLength(2);
 
     expect(isTransactionMatchingAccount(transferTx, 'acc-giro', accounts)).toBe(true);
-    expect(isTransactionMatchingAccount(transferTx, 'acc-tagesgeld', accounts)).toBe(true);
+    // Echtes Konto matcht nur eigene Buchungen (keine Gegenkonto-Dopplungen)
+    expect(isTransactionMatchingAccount(transferTx, 'acc-tagesgeld', accounts)).toBe(false);
     expect(isTransactionMatchingAccount(transferTx, 'acc-sub-urlaub', accounts)).toBe(false);
 
     // 2. Buchung auf Girokonto, die zum virtuellen Unterkonto Urlaubstopf gehört
@@ -477,7 +478,7 @@ describe('finance domain helpers', () => {
 
     const allAccounts = [giroAcc, tagesgeldAcc, creditCardAcc, savingsPot, vacationPotOnGiro];
 
-    it('inverts sign on transfer receipt: negative on sender is positive on recipient and its virtual account', () => {
+    it('inverts sign on transfer receipt for virtual accounts while real accounts only count direct bookings', () => {
       // Überweisung von Girokonto auf Tagesgeld für Kategorie "Sparen"
       const transferTx: Transaction = {
         id: 'tx-transfer-savings',
@@ -496,10 +497,11 @@ describe('finance domain helpers', () => {
       // 1. Für Girokonto (Sender/Primär): Abgang -500 €
       expect(getTransactionEffectiveValueForAccount(transferTx, giroAcc, allAccounts)).toBe(-500);
 
-      // 2. Für Tagesgeld (Empfänger/Gegenkonto): Eingang +500 €
-      expect(getTransactionEffectiveValueForAccount(transferTx, tagesgeldAcc, allAccounts)).toBe(
-        500
-      );
+      // 2. Für Tagesgeld (Empfänger/Gegenkonto als echtes Bankkonto):
+      // Keine Phantom-Projektion auf echte Konten, um Doppelzählung bei importierten Auszügen zu vermeiden!
+      expect(
+        getTransactionEffectiveValueForAccount(transferTx, tagesgeldAcc, allAccounts)
+      ).toBeNull();
 
       // 3. Für Virtuelles Konto "Sparen Topf" unter Tagesgeld: Positiver Eingang +500 €
       expect(getTransactionEffectiveValueForAccount(transferTx, savingsPot, allAccounts)).toBe(500);

@@ -8,17 +8,20 @@
 import {
   Account,
   BalanceEntry,
+  ISODateString,
   PeriodGranularity,
   Transaction,
   getTransactionEffectiveValueForAccount,
 } from '@/types/finance';
-import { extractPeriodKeys } from './cashflowCalculator';
 import {
   getPeriodKey,
   getCurrentPeriodKey,
   fillPeriodKeyRange,
   getPeriodKeysBetween,
+  getPeriodDateRange,
+  getDayBefore,
 } from '@/utils/dateUtils';
+import { roundToTwoDecimals } from '@/utils/moneyUtils';
 
 export interface AccountPeriodBalance {
   startBalance: number;
@@ -93,56 +96,90 @@ export function calculateBalanceTimeline(
     a.date.localeCompare(b.date)
   );
 
-  // Basis-Startwert: Entweder ältester Checkpoint oder 0
-  let baseDate = '1970-01-01';
-  let baseAmount = 0;
-
-  if (checkpoints.length > 0) {
-    baseDate = checkpoints[0].date;
-    baseAmount = checkpoints[0].amount;
-
-    // Transaktionen vor dem ersten Checkpoint zurückrechnen
-    const itemsBeforeBase = relevantTxsWithDeltas.filter((item) => item.tx.valueDate < baseDate);
-    const sumBefore = itemsBeforeBase.reduce((sum, item) => sum + item.delta, 0);
-    // Wenn Checkpoint bei t0=1000€ liegt und vorher 200€ flossen, war Start bei 800€
-    baseAmount -= sumBefore;
-  }
-
-  // Für jede Periode den Netto-Cashflow berechnen
-  const periodCashflows: Record<string, number> = {};
-  periodKeys.forEach((pKey) => {
-    periodCashflows[pKey] = 0;
-  });
-
-  relevantTxsWithDeltas.forEach(({ tx, delta }) => {
-    const pKey = getPeriodKey(tx.valueDate, granularity);
-    if (periodCashflows[pKey] !== undefined) {
-      periodCashflows[pKey] += delta;
+  /**
+   * Berechnet den Saldo zu einem beliebigen Stichtag (Tagesende).
+   * Verwendet bei vorhandenen Checkpoints den zeitlich nächsten Stichtag als Anker
+   * und summiert Transaktionsdeltas vorwärts (bei Stichtag nach Checkpoint)
+   * bzw. zieht Transaktionsdeltas rückwärts ab (bei Stichtag vor erstem Checkpoint).
+   */
+  const getBalanceAtDate = (targetDate: string): number => {
+    if (checkpoints.length === 0) {
+      const sum = relevantTxsWithDeltas
+        .filter((item) => item.tx.valueDate <= targetDate)
+        .reduce((acc, item) => acc + item.delta, 0);
+      return roundToTwoDecimals(sum);
     }
-  });
 
-  // Fortlaufenden Saldo berechnen
+    const checkpointsBeforeOrOn = checkpoints.filter((c) => c.date <= targetDate);
+
+    if (checkpointsBeforeOrOn.length > 0) {
+      const anchor = checkpointsBeforeOrOn[checkpointsBeforeOrOn.length - 1];
+      const sumAfterAnchor = relevantTxsWithDeltas
+        .filter((item) => item.tx.valueDate > anchor.date && item.tx.valueDate <= targetDate)
+        .reduce((acc, item) => acc + item.delta, 0);
+      return roundToTwoDecimals(anchor.amount + sumAfterAnchor);
+    }
+
+    // Stichtag liegt VOR dem allerersten Checkpoint: Rückwärts-Rechnung
+    const firstCheckpoint = checkpoints[0];
+    const sumBetween = relevantTxsWithDeltas
+      .filter((item) => item.tx.valueDate > targetDate && item.tx.valueDate <= firstCheckpoint.date)
+      .reduce((acc, item) => acc + item.delta, 0);
+    return roundToTwoDecimals(firstCheckpoint.amount - sumBetween);
+  };
+
+  // Für jede Periode Startsaldo, Cashflow und Endsaldo berechnen
   const periods: Record<string, AccountPeriodBalance> = {};
-  let runningBalance = baseAmount;
 
-  periodKeys.forEach((pKey) => {
-    const startBalance = runningBalance;
-    const cashflow = periodCashflows[pKey] || 0;
-    const endBalance = startBalance + cashflow;
+  periodKeys.forEach((pKey, index) => {
+    const range = getPeriodDateRange(pKey, granularity);
+
+    let startBalance: number;
+    if (index === 0) {
+      const dayBefore = getDayBefore(range.startDate);
+      startBalance = getBalanceAtDate(dayBefore);
+    } else {
+      const prevKey = periodKeys[index - 1];
+      startBalance = periods[prevKey].endBalance;
+    }
+
+    const periodCashflow = roundToTwoDecimals(
+      relevantTxsWithDeltas
+        .filter(
+          (item) => item.tx.valueDate >= range.startDate && item.tx.valueDate <= range.endDate
+        )
+        .reduce((acc, item) => acc + item.delta, 0)
+    );
+
+    const checkpointsInPeriod = checkpoints.filter(
+      (c) => c.date >= range.startDate && c.date <= range.endDate
+    );
+
+    let endBalance: number;
+    if (checkpointsInPeriod.length > 0) {
+      endBalance = getBalanceAtDate(range.endDate);
+      const checkpointOnStart = checkpointsInPeriod.find((c) => c.date === range.startDate);
+      if (checkpointOnStart && index === 0) {
+        startBalance = checkpointOnStart.amount;
+        endBalance = roundToTwoDecimals(startBalance + periodCashflow);
+      }
+    } else {
+      endBalance = roundToTwoDecimals(startBalance + periodCashflow);
+    }
 
     periods[pKey] = {
       startBalance,
-      cashflow,
+      cashflow: periodCashflow,
       endBalance,
     };
-
-    runningBalance = endBalance;
   });
+
+  const latestBalance = getBalanceAtDate('9999-12-31');
 
   return {
     account,
     periods,
-    latestBalance: runningBalance,
+    latestBalance,
   };
 }
 
@@ -169,7 +206,15 @@ export function calculateAllBalances(
   if (options?.startDate && options?.endDate) {
     periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
   } else {
-    const rawPeriodKeys = extractPeriodKeys(transactions, granularity);
+    const allDates: ISODateString[] = transactions.map((tx) => tx.valueDate);
+    accounts.forEach((acc) => {
+      acc.balanceEntries.forEach((be) => {
+        if (be.date) allDates.push(be.date as ISODateString);
+      });
+    });
+    const rawPeriodKeys = Array.from(
+      new Set(allDates.map((d) => getPeriodKey(d, granularity)))
+    ).sort();
     const currentPeriodKey = getCurrentPeriodKey(granularity);
     periodKeys =
       rawPeriodKeys.length > 0

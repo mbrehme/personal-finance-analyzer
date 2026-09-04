@@ -4,8 +4,12 @@
  * @module services/analytics/cashflowCalculator.test
  */
 
-import { describe, it, expect } from 'vitest';
-import { calculateCashflowMatrix, extractPeriodKeys } from './cashflowCalculator';
+import {
+  calculateCashflowMatrix,
+  calculateAccountCashflowMatrix,
+  convertAccountResultToCashflowResult,
+  extractPeriodKeys,
+} from './cashflowCalculator';
 import { Account, Category, Transaction } from '@/types/finance';
 
 describe('cashflowCalculator', () => {
@@ -437,5 +441,174 @@ describe('cashflowCalculator', () => {
     expect(subSavingsRow?.periods['2026-09'].net).toBe(500);
     expect(subMatrix.totalRow.periods['2026-09'].inbound).toBe(500);
     expect(subMatrix.totalRow.periods['2026-09'].net).toBe(500);
+  });
+
+  describe('calculateAccountCashflowMatrix', () => {
+    const giroAcc: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      accountType: 'real',
+      iban: 'DE1111',
+      balanceEntries: [],
+    };
+
+    const tgAcc: Account = {
+      id: 'acc-tg',
+      name: 'Tagesgeld',
+      accountType: 'real',
+      iban: 'DE2222',
+      balanceEntries: [],
+    };
+
+    const savingsSub: Account = {
+      id: 'acc-sub-savings',
+      name: 'Sparen Topf',
+      accountType: 'virtual',
+      parentAccountId: 'acc-tg',
+      categoryIds: ['cat-sparen'],
+      balanceEntries: [],
+    };
+
+    const testAccounts = [giroAcc, tgAcc, savingsSub];
+
+    const testTxs: Transaction[] = [
+      // Gehalt auf Girokonto
+      {
+        id: 'tx-salary',
+        accountIban: 'DE1111',
+        iban: 'DE9999',
+        valueDate: '2026-08-01',
+        bookingDate: '2026-08-01',
+        issuer: 'Firma',
+        receiver: 'Me',
+        subject: 'Gehalt',
+        value: 3000,
+        categoryId: 'cat-salary',
+        assignmentSource: 'manual',
+      },
+      // Miete von Girokonto
+      {
+        id: 'tx-rent',
+        accountIban: 'DE1111',
+        iban: 'DE8888',
+        valueDate: '2026-08-05',
+        bookingDate: '2026-08-05',
+        issuer: 'Me',
+        receiver: 'Vermieter',
+        subject: 'Miete',
+        value: -1000,
+        categoryId: 'cat-rent',
+        assignmentSource: 'manual',
+      },
+      // Überweisung von Giro auf Tagesgeld für Sparen
+      {
+        id: 'tx-transfer-giro',
+        accountIban: 'DE1111',
+        iban: 'DE2222',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Me',
+        receiver: 'Tagesgeld',
+        subject: 'Sparen',
+        value: -500,
+        categoryId: 'cat-sparen',
+        assignmentSource: 'manual',
+      },
+      // Buchung auf Tagesgeld-Auszug (technische Gegenbuchung, ohne Kategorie)
+      {
+        id: 'tx-transfer-tg',
+        accountIban: 'DE2222',
+        iban: 'DE1111',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Me',
+        receiver: 'Tagesgeld',
+        subject: 'Sparen',
+        value: 500,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+    ];
+
+    it('calculates cashflow per account with hierarchy and prevents double-counting in totalRow', () => {
+      const result = calculateAccountCashflowMatrix(testAccounts, testTxs, 'monthly', undefined, {
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+      });
+
+      expect(result.periodKeys).toEqual(['2026-08']);
+      expect(result.rows).toHaveLength(3);
+
+      const giroRow = result.rows.find((r) => r.account.id === 'acc-giro');
+      const tgRow = result.rows.find((r) => r.account.id === 'acc-tg');
+      const savingsRow = result.rows.find((r) => r.account.id === 'acc-sub-savings');
+
+      // Girokonto: Inbound 3000, Outbound -1500 (-1000 Miete, -500 Überweisung), Net 1500
+      expect(giroRow?.depth).toBe(0);
+      expect(giroRow?.hasChildren).toBe(false);
+      expect(giroRow?.periods['2026-08'].inbound).toBe(3000);
+      expect(giroRow?.periods['2026-08'].outbound).toBe(-1500);
+      expect(giroRow?.periods['2026-08'].net).toBe(1500);
+
+      // Tagesgeld: Inbound 500, Outbound 0, Net 500
+      expect(tgRow?.depth).toBe(0);
+      expect(tgRow?.hasChildren).toBe(true);
+      expect(tgRow?.periods['2026-08'].inbound).toBe(500);
+      expect(tgRow?.periods['2026-08'].outbound).toBe(0);
+      expect(tgRow?.periods['2026-08'].net).toBe(500);
+
+      // Virtuelles Unterkonto "Sparen Topf": Einnahme 500 (zugeordnet über Kategorie 'cat-sparen')
+      expect(savingsRow?.depth).toBe(1);
+      expect(savingsRow?.parent?.id).toBe('acc-tg');
+      expect(savingsRow?.periods['2026-08'].inbound).toBe(500);
+      expect(savingsRow?.periods['2026-08'].net).toBe(500);
+
+      // Gesamtsumme: Summiert nur echte Konten (Giro 1500 + Tagesgeld 500 = 2000), kein Doppelzählen des virtuellen Topfs
+      expect(result.totalRow.periods['2026-08'].inbound).toBe(3500);
+      expect(result.totalRow.periods['2026-08'].outbound).toBe(-1500);
+      expect(result.totalRow.periods['2026-08'].net).toBe(2000);
+    });
+
+    it('filters account cashflow by selectedCategoryIds', () => {
+      // Nur Kategorie 'cat-sparen' auswählen
+      const result = calculateAccountCashflowMatrix(testAccounts, testTxs, 'monthly', undefined, {
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+        selectedCategoryIds: ['cat-sparen'],
+      });
+
+      const giroRow = result.rows.find((r) => r.account.id === 'acc-giro');
+
+      // Girokonto zeigt nur die -500 € Umbuchung
+      expect(giroRow?.periods['2026-08'].inbound).toBe(0);
+      expect(giroRow?.periods['2026-08'].outbound).toBe(-500);
+      expect(giroRow?.periods['2026-08'].net).toBe(-500);
+
+      // Virtueller Spartopf unter Tagesgeld zeigt den +500 € Eingang
+      const savingsRow = result.rows.find((r) => r.account.id === 'acc-sub-savings');
+      expect(savingsRow?.periods['2026-08'].inbound).toBe(500);
+      expect(savingsRow?.periods['2026-08'].net).toBe(500);
+
+      // Netto-Gesamtsumme für reale Konten bei Kategorie 'cat-sparen' (-500 Abgang auf Giro)
+      expect(result.totalRow.periods['2026-08'].net).toBe(-500);
+    });
+
+    it('converts account result to cashflow result format for chart compatibility', () => {
+      const accountResult = calculateAccountCashflowMatrix(
+        testAccounts,
+        testTxs,
+        'monthly',
+        undefined,
+        {
+          startDate: '2026-08-01',
+          endDate: '2026-08-31',
+        }
+      );
+
+      const chartResult = convertAccountResultToCashflowResult(accountResult);
+      expect(chartResult.rows).toHaveLength(3);
+      expect(chartResult.rows[0].category.name).toBe('Girokonto');
+      expect(chartResult.totalRow.periods['2026-08'].net).toBe(2000);
+    });
   });
 });

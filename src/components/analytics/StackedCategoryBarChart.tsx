@@ -23,6 +23,8 @@ export interface StackedCategoryBarChartProps {
   granularity: PeriodGranularity;
   /** Optionale CSS-Klassen für den Container */
   className?: string;
+  /** Anzeigemodus: Nach Kategorien oder Konten gruppiert (Standard: 'categories') */
+  mode?: 'categories' | 'accounts';
 }
 
 interface CategorySliceInfo {
@@ -145,6 +147,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
   result,
   granularity,
   className = '',
+  mode = 'categories',
 }) => {
   // Ein-/Ausklapp-Zustand (gemerkt in localStorage)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -473,7 +476,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
           </div>
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-              Cashflow & Ø Ausgaben nach Kategorien
+              Cashflow & Ø Ausgaben nach {mode === 'accounts' ? 'Konten' : 'Kategorien'}
             </h2>
             <p className="text-xs text-slate-400">
               Gestapelter Verlauf über/unter der Nulllinie und durchschnittliche Ausgabenverteilung

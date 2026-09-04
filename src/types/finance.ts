@@ -558,12 +558,9 @@ export function getTransactionEffectiveValueForAccount(
     return tx.value;
   }
 
-  // Echtes Bankkonto
+  // Echtes Bankkonto: Rein transaktionsbasiert ohne Kategoriefilterung und ohne Gegenkonto-Projektion
   if (info.primaryAccount && info.primaryAccount.id === targetAccount.id) {
     return tx.value;
-  }
-  if (info.counterAccount && info.counterAccount.id === targetAccount.id) {
-    return -tx.value;
   }
 
   return null;

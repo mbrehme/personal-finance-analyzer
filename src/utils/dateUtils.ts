@@ -504,6 +504,72 @@ function formatIso(year: number, month: number, day: number): string {
 }
 
 /**
+ * Ermittelt den Vortag eines ISO-Datums (YYYY-MM-DD) als ISO-Datumsstring.
+ *
+ * @param {string} isoDate - Ausgangsdatum YYYY-MM-DD
+ * @returns {string} Datum des Vortags YYYY-MM-DD
+ * @example
+ * getDayBefore('2026-01-01'); // '2025-12-31'
+ */
+export function getDayBefore(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Ermittelt Start- und Enddatum für einen beliebigen Periodenschlüssel.
+ *
+ * @param {string} periodKey - Periodenschlüssel (z. B. '2026-03', '2026-Q1', '2026-H1', '2026')
+ * @param {PeriodGranularity} granularity - Zeit-Granularität
+ * @returns {DateRange} Start- und Enddatum im ISO-Format (YYYY-MM-DD)
+ * @example
+ * getPeriodDateRange('2026-03', 'monthly'); // { startDate: '2026-03-01', endDate: '2026-03-31' }
+ * getPeriodDateRange('2026', 'yearly'); // { startDate: '2026-01-01', endDate: '2026-12-31' }
+ */
+export function getPeriodDateRange(periodKey: string, granularity: PeriodGranularity): DateRange {
+  if (granularity === 'yearly') {
+    const year = parseInt(periodKey, 10);
+    return {
+      startDate: formatIso(year, 1, 1),
+      endDate: formatIso(year, 12, 31),
+    };
+  }
+
+  if (granularity === 'halfYearly') {
+    const [yearStr, hStr] = periodKey.split('-');
+    const year = parseInt(yearStr, 10);
+    const isH1 = hStr === 'H1';
+    return {
+      startDate: isH1 ? formatIso(year, 1, 1) : formatIso(year, 7, 1),
+      endDate: isH1 ? formatIso(year, 6, 30) : formatIso(year, 12, 31),
+    };
+  }
+
+  if (granularity === 'quarterly') {
+    const [yearStr, qStr] = periodKey.split('-');
+    const year = parseInt(yearStr, 10);
+    const q = parseInt(qStr.replace('Q', ''), 10);
+    const startM = (q - 1) * 3 + 1;
+    const endM = q * 3;
+    return {
+      startDate: formatIso(year, startM, 1),
+      endDate: formatIso(year, endM, getLastDayOfMonth(year, endM)),
+    };
+  }
+
+  // monthly
+  const [yearStr, monthStr] = periodKey.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  return {
+    startDate: formatIso(year, month, 1),
+    endDate: formatIso(year, month, getLastDayOfMonth(year, month)),
+  };
+}
+
+/**
  * Berechnet Start- und Enddatum für ein vorgegebenes DateRangePreset bezogen auf ein Referenzdatum.
  *
  * @param {DateRangePreset} preset - Das gewählte Preset

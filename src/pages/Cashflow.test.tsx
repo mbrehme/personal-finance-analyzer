@@ -516,4 +516,92 @@ describe('Cashflow Page', () => {
     // "Lebensmittel" bleibt sichtbar
     expect(within(table).getByText('Lebensmittel')).toBeInTheDocument();
   });
+
+  it('allows switching between Kategorien and Konten view modes', async () => {
+    const user = userEvent.setup();
+    localStorage.clear();
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        { id: 'acc-1', name: 'Girokonto Hauptkonto', accountType: 'bank', color: '#3b82f6' },
+        { id: 'acc-2', name: 'Tagesgeldkonto', accountType: 'bank', color: '#10b981' },
+      ] as any,
+      categories: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
+      buckets: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
+      transactions: [
+        {
+          id: 'tx-1',
+          accountIban: 'DE1111',
+          iban: 'DE1111',
+          accountId: 'acc-1',
+          valueDate: '2026-01-05',
+          bookingDate: '2026-01-05',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Einkauf',
+          type: 'outbound',
+          value: -50,
+          categoryId: 'cat-1',
+          assignmentSource: 'manual',
+        },
+      ] as any,
+      loading: false,
+      error: null,
+      reMatchStatus: 'has_progressed',
+      setReMatchStatus: vi.fn(),
+      needsReMatch: false,
+      reMatching: false,
+      setNeedsReMatch: vi.fn(),
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+      addAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+      reorderAccounts: vi.fn(),
+      addBalanceEntry: vi.fn(),
+      deleteBalanceEntry: vi.fn(),
+      addTransaction: vi.fn(),
+      updateTransaction: vi.fn(),
+      deleteTransaction: vi.fn(),
+      importCsv: vi.fn(),
+      reMatchAllTransactions: vi.fn(),
+      exportConfiguration: vi.fn(),
+      importConfiguration: vi.fn(),
+      resetWorkspace: vi.fn(),
+    } as any);
+
+    renderInAnalytics();
+
+    // Standardmäßig ist 'Kategorien' aktiv
+    expect(screen.getByRole('button', { name: 'Kategorien' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Konten' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Kategorie/i })).toBeInTheDocument();
+
+    const initialTable = screen.getByRole('table');
+    expect(within(initialTable).getByText('Lebensmittel')).toBeInTheDocument();
+    expect(within(initialTable).queryByText('Girokonto Hauptkonto')).not.toBeInTheDocument();
+
+    // Zu 'Konten' wechseln
+    const accountsToggle = screen.getByRole('button', { name: 'Konten' });
+    await user.click(accountsToggle);
+
+    // Header wechselt zu 'Konto'
+    expect(screen.getByRole('columnheader', { name: /Konto/i })).toBeInTheDocument();
+
+    // Konten werden in der Tabelle angezeigt
+    const accountTable = screen.getByRole('table');
+    expect(within(accountTable).getByText('Girokonto Hauptkonto')).toBeInTheDocument();
+    expect(within(accountTable).getByText('Tagesgeldkonto')).toBeInTheDocument();
+    expect(within(accountTable).queryByText('Lebensmittel')).not.toBeInTheDocument();
+
+    // Zurück zu 'Kategorien' wechseln
+    const categoriesToggle = screen.getByRole('button', { name: 'Kategorien' });
+    await user.click(categoriesToggle);
+
+    expect(screen.getByRole('columnheader', { name: /Kategorie/i })).toBeInTheDocument();
+    const categoriesTable = screen.getByRole('table');
+    expect(within(categoriesTable).getByText('Lebensmittel')).toBeInTheDocument();
+  });
 });

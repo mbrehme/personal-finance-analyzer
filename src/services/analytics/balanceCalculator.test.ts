@@ -312,9 +312,9 @@ describe('balanceCalculator', () => {
     expect(giroRow?.periods['2026-08'].cashflow).toBe(-500);
     expect(giroRow?.periods['2026-08'].endBalance).toBe(1500);
 
-    // Tagesgeld: 1000 + 500 = 1500
-    expect(tgRow?.periods['2026-08'].cashflow).toBe(500);
-    expect(tgRow?.periods['2026-08'].endBalance).toBe(1500);
+    // Tagesgeld als echtes Bankkonto: Berechnet sich rein auf eigenen Transaktionen (keine Phantom-Umbuchung)
+    expect(tgRow?.periods['2026-08'].cashflow).toBe(0);
+    expect(tgRow?.periods['2026-08'].endBalance).toBe(1000);
 
     // Virtuelles Unterkonto unter Tagesgeld: Start 500 + 500 = 1000 (die -200 der Kreditkarte werden ignoriert!)
     expect(savingsRow?.periods['2026-08'].cashflow).toBe(500);
@@ -323,5 +323,223 @@ describe('balanceCalculator', () => {
     // Kreditkarte: 0 - 200 = -200
     expect(ccRow?.periods['2026-08'].cashflow).toBe(-200);
     expect(ccRow?.periods['2026-08'].endBalance).toBe(-200);
+  });
+
+  it('handles transfers between real accounts when both bank statements are imported without double-counting', () => {
+    const giroAcc: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      accountType: 'real',
+      iban: 'DE1111',
+      balanceEntries: [{ id: 'b1', date: '2026-08-01', amount: 2000 }],
+    };
+
+    const tagesgeldAcc: Account = {
+      id: 'acc-tg',
+      name: 'Tagesgeld',
+      accountType: 'real',
+      iban: 'DE2222',
+      balanceEntries: [{ id: 'b2', date: '2026-08-01', amount: 1000 }],
+    };
+
+    const txs: Transaction[] = [
+      // Auszug Girokonto: -500 € an Tagesgeld
+      {
+        id: 'tx-giro-statement',
+        accountIban: 'DE1111',
+        iban: 'DE2222',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Martin',
+        receiver: 'Tagesgeld',
+        subject: 'Umbuchung Sparen',
+        value: -500,
+        assignmentSource: 'unassigned',
+      },
+      // Auszug Tagesgeldkonto: +500 € von Girokonto
+      {
+        id: 'tx-tg-statement',
+        accountIban: 'DE2222',
+        iban: 'DE1111',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Martin',
+        receiver: 'Tagesgeld',
+        subject: 'Umbuchung Sparen',
+        value: 500,
+        assignmentSource: 'unassigned',
+      },
+    ];
+
+    const result = calculateAllBalances([giroAcc, tagesgeldAcc], txs, 'monthly');
+
+    const giroRow = result.rows.find((r) => r.account.id === 'acc-giro');
+    const tgRow = result.rows.find((r) => r.account.id === 'acc-tg');
+
+    // Girokonto darf die Gegenbuchung von Tagesgeld NICHT invertiert abziehen (-500 statt -1000!)
+    expect(giroRow?.periods['2026-08'].cashflow).toBe(-500);
+    expect(giroRow?.periods['2026-08'].endBalance).toBe(1500);
+
+    // Tagesgeld darf die Buchung von Girokonto NICHT noch einmal addieren (+500 statt +1000!)
+    expect(tgRow?.periods['2026-08'].cashflow).toBe(500);
+    expect(tgRow?.periods['2026-08'].endBalance).toBe(1500);
+
+    // Gesamtsaldo bleibt unverändert bei 3000 € (keine Phantom-Verluste)
+    expect(result.totalRow.periods['2026-08'].endBalance).toBe(3000);
+  });
+
+  it('carries forward historic balances from prior years into a filtered current year with only outflows', () => {
+    const mainAccount: Account = {
+      id: 'acc-main',
+      name: 'Hauptkonto',
+      accountType: 'real',
+      balanceEntries: [{ id: 'b-2025', date: '2025-12-31', amount: 5000 }],
+    };
+
+    const txs: Transaction[] = [
+      // 2025 Inflow vor dem Stichtag
+      {
+        id: 'tx-2025-1',
+        accountId: 'acc-main',
+        valueDate: '2025-06-15',
+        bookingDate: '2025-06-15',
+        issuer: 'Arbeitgeber',
+        receiver: 'Ich',
+        subject: 'Gehalt 2025',
+        iban: 'DE00',
+        value: 5000,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+      // 2026 Nur Ausgänge
+      {
+        id: 'tx-2026-1',
+        accountId: 'acc-main',
+        valueDate: '2026-02-10',
+        bookingDate: '2026-02-10',
+        issuer: 'Ich',
+        receiver: 'Vermieter',
+        subject: 'Miete Februar',
+        iban: 'DE00',
+        value: -1200,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+    ];
+
+    // Filter auf das aktuelle Jahr 2026
+    const result = calculateAllBalances([mainAccount], txs, 'monthly', null, {
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+    });
+
+    const row = result.rows[0];
+    expect(row).toBeDefined();
+
+    // Januar 2026: Startsaldo muss 5000 sein (aus 2025 übernommen!), Cashflow 0 => Endsaldo 5000
+    expect(row.periods['2026-01'].startBalance).toBe(5000);
+    expect(row.periods['2026-01'].cashflow).toBe(0);
+    expect(row.periods['2026-01'].endBalance).toBe(5000);
+
+    // Februar 2026: Startsaldo 5000, Cashflow -1200 => Endsaldo 3800 (POSITIV!)
+    expect(row.periods['2026-02'].startBalance).toBe(5000);
+    expect(row.periods['2026-02'].cashflow).toBe(-1200);
+    expect(row.periods['2026-02'].endBalance).toBe(3800);
+
+    // Aktueller Stand muss positiv (3800 €) sein, nicht negativ (-1200 €)
+    expect(row.latestBalance).toBe(3800);
+    expect(result.totalRow.latestBalance).toBe(3800);
+  });
+
+  it('carries forward historic transaction balance when no checkpoints are configured', () => {
+    const accountWithoutCheckpoints: Account = {
+      id: 'acc-pure-tx',
+      name: 'Reines Transaktionskonto',
+      accountType: 'real',
+      balanceEntries: [],
+    };
+
+    const txs: Transaction[] = [
+      // 2025 Inflow
+      {
+        id: 'tx-2025',
+        accountId: 'acc-pure-tx',
+        valueDate: '2025-10-01',
+        bookingDate: '2025-10-01',
+        issuer: 'Kunde',
+        receiver: 'Ich',
+        subject: 'Honorar',
+        iban: 'DE00',
+        value: 10000,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+      // 2026 Outflow
+      {
+        id: 'tx-2026',
+        accountId: 'acc-pure-tx',
+        valueDate: '2026-03-01',
+        bookingDate: '2026-03-01',
+        issuer: 'Ich',
+        receiver: 'Shop',
+        subject: 'Kauf',
+        iban: 'DE00',
+        value: -2000,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+    ];
+
+    // Filter auf das aktuelle Jahr 2026
+    const result = calculateAllBalances([accountWithoutCheckpoints], txs, 'yearly', null, {
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+    });
+
+    const row = result.rows[0];
+    expect(row.periods['2026'].startBalance).toBe(10000);
+    expect(row.periods['2026'].cashflow).toBe(-2000);
+    expect(row.periods['2026'].endBalance).toBe(8000);
+    expect(row.latestBalance).toBe(8000);
+  });
+
+  it('correctly anchors multiple checkpoints across multiple years', () => {
+    const multiCheckpointAcc: Account = {
+      id: 'acc-multi',
+      name: 'Mehrere Stichtage',
+      accountType: 'real',
+      balanceEntries: [
+        { id: 'cp-2024', date: '2024-12-31', amount: 2000 },
+        { id: 'cp-2025', date: '2025-12-31', amount: 8000 },
+      ],
+    };
+
+    const txs: Transaction[] = [
+      {
+        id: 'tx-2026',
+        accountId: 'acc-multi',
+        valueDate: '2026-01-15',
+        bookingDate: '2026-01-15',
+        issuer: 'Ich',
+        receiver: 'Abo',
+        subject: 'Jahresbeitrag',
+        iban: 'DE00',
+        value: -500,
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+    ];
+
+    const result = calculateAllBalances([multiCheckpointAcc], txs, 'monthly', null, {
+      startDate: '2026-01-01',
+      endDate: '2026-01-31',
+    });
+
+    const row = result.rows[0];
+    // Startet am 2025-12-31 Checkpoint (8000 €)
+    expect(row.periods['2026-01'].startBalance).toBe(8000);
+    expect(row.periods['2026-01'].cashflow).toBe(-500);
+    expect(row.periods['2026-01'].endBalance).toBe(7500);
+    expect(row.latestBalance).toBe(7500);
   });
 });

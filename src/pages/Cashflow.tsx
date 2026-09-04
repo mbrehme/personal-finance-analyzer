@@ -9,7 +9,10 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useFinance } from '@/services/storage/FinanceContext';
 import {
   calculateCashflowMatrix,
+  calculateAccountCashflowMatrix,
+  convertAccountResultToCashflowResult,
   CategoryCashflowRow,
+  AccountCashflowRow,
 } from '@/services/analytics/cashflowCalculator';
 import { StackedCategoryBarChart } from '@/components/analytics/StackedCategoryBarChart';
 import { IconRenderer } from '@/components/IconRenderer';
@@ -35,7 +38,12 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   HelpCircle,
+  FolderTree,
+  Landmark,
 } from 'lucide-react';
+
+export const CASHFLOW_VIEW_MODE_KEY = 'cashflow_view_mode';
+export type CashflowViewMode = 'categories' | 'accounts';
 
 export {
   CASHFLOW_ACCOUNT_FILTER_KEY,
@@ -71,7 +79,18 @@ export const Cashflow: React.FC = () => {
   const { granularity, selectedAccountId, startDate, endDate, selectedCategoryIds } =
     useAnalyticsFilter();
 
+  const [viewMode, setViewModeState] = useState<CashflowViewMode>(() => {
+    const saved = localStorage.getItem(CASHFLOW_VIEW_MODE_KEY);
+    return saved === 'accounts' ? 'accounts' : 'categories';
+  });
+
+  const setViewMode = (mode: CashflowViewMode) => {
+    setViewModeState(mode);
+    localStorage.setItem(CASHFLOW_VIEW_MODE_KEY, mode);
+  };
+
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(new Set());
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const currentPeriodHeaderRef = useRef<HTMLTableCellElement>(null);
@@ -88,6 +107,18 @@ export const Cashflow: React.FC = () => {
     });
   };
 
+  const toggleAccountCollapse = (accountId: string) => {
+    setCollapsedAccounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountId)) {
+        next.delete(accountId);
+      } else {
+        next.add(accountId);
+      }
+      return next;
+    });
+  };
+
   const isCurrentPeriodInRange = useMemo(() => {
     const todayIso = new Date().toISOString().substring(0, 10);
     if (startDate && todayIso < startDate) return false;
@@ -95,7 +126,7 @@ export const Cashflow: React.FC = () => {
     return true;
   }, [startDate, endDate]);
 
-  const matrix = useMemo(() => {
+  const categoryMatrix = useMemo(() => {
     return calculateCashflowMatrix(
       categories,
       transactions,
@@ -121,13 +152,52 @@ export const Cashflow: React.FC = () => {
     accounts,
   ]);
 
+  const accountMatrix = useMemo(() => {
+    return calculateAccountCashflowMatrix(
+      accounts,
+      transactions,
+      granularity,
+      selectedAccountId && selectedAccountId !== 'all' ? selectedAccountId : undefined,
+      {
+        includeCurrentPeriod: isCurrentPeriodInRange,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        selectedCategoryIds: selectedCategoryIds || undefined,
+      }
+    );
+  }, [
+    accounts,
+    transactions,
+    granularity,
+    selectedAccountId,
+    isCurrentPeriodInRange,
+    startDate,
+    endDate,
+    selectedCategoryIds,
+  ]);
+
+  const activePeriodKeys = useMemo(() => {
+    return viewMode === 'categories' ? categoryMatrix.periodKeys : accountMatrix.periodKeys;
+  }, [viewMode, categoryMatrix.periodKeys, accountMatrix.periodKeys]);
+
+  const activeTotalRow = useMemo(() => {
+    return viewMode === 'categories' ? categoryMatrix.totalRow : accountMatrix.totalRow;
+  }, [viewMode, categoryMatrix.totalRow, accountMatrix.totalRow]);
+
+  const chartResult = useMemo(() => {
+    if (viewMode === 'categories') {
+      return categoryMatrix;
+    }
+    return convertAccountResultToCashflowResult(accountMatrix);
+  }, [viewMode, categoryMatrix, accountMatrix]);
+
   const currentPeriodKey = useMemo(() => getCurrentPeriodKey(granularity), [granularity]);
   const currentYear = useMemo(() => getYearFromPeriodKey(currentPeriodKey), [currentPeriodKey]);
 
   // Status für eingeklappte Jahre (vergangene Jahre vor aktuellem Jahr standardmäßig eingeklappt)
   const [collapsedYears, setCollapsedYears] = useState<Set<string>>(() => {
     const initial = new Set<string>();
-    matrix.periodKeys.forEach((pKey) => {
+    activePeriodKeys.forEach((pKey) => {
       const y = getYearFromPeriodKey(pKey);
       if (y < currentYear) {
         initial.add(y);
@@ -141,7 +211,7 @@ export const Cashflow: React.FC = () => {
     setCollapsedYears((prev) => {
       let changed = false;
       const next = new Set(prev);
-      matrix.periodKeys.forEach((pKey) => {
+      activePeriodKeys.forEach((pKey) => {
         const y = getYearFromPeriodKey(pKey);
         if (y < currentYear && !prev.has(y)) {
           next.add(y);
@@ -150,7 +220,7 @@ export const Cashflow: React.FC = () => {
       });
       return changed ? next : prev;
     });
-  }, [matrix.periodKeys, currentYear]);
+  }, [activePeriodKeys, currentYear]);
 
   const toggleYearCollapse = (year: string) => {
     setCollapsedYears((prev) => {
@@ -167,7 +237,7 @@ export const Cashflow: React.FC = () => {
   // Gruppierung nach Kalenderjahren
   const yearGroups = useMemo(() => {
     const map = new Map<string, string[]>();
-    matrix.periodKeys.forEach((pKey) => {
+    activePeriodKeys.forEach((pKey) => {
       const y = getYearFromPeriodKey(pKey);
       const list = map.get(y) || [];
       list.push(pKey);
@@ -185,7 +255,7 @@ export const Cashflow: React.FC = () => {
       });
     });
     return groups;
-  }, [matrix.periodKeys, collapsedYears, granularity]);
+  }, [activePeriodKeys, collapsedYears, granularity]);
 
   // Aufgelöste Liste aller anzuzeigenden Spalten (Einzelperioden oder komprimierte Jahresspalten)
   const displayColumns = useMemo(() => {
@@ -241,8 +311,8 @@ export const Cashflow: React.FC = () => {
 
     // Fallback: Wenn heutiger Zeitraum jünger als alle Daten ist, zum neuesten Zeitraum scrollen
     if (
-      matrix.periodKeys.length > 0 &&
-      currentPeriodKey > matrix.periodKeys[matrix.periodKeys.length - 1]
+      activePeriodKeys.length > 0 &&
+      currentPeriodKey > activePeriodKeys[activePeriodKeys.length - 1]
     ) {
       const scrollLeft = container.scrollWidth;
       if (typeof container.scrollTo === 'function') {
@@ -251,7 +321,7 @@ export const Cashflow: React.FC = () => {
         container.scrollLeft = scrollLeft;
       }
     }
-  }, [currentPeriodKey, matrix.periodKeys]);
+  }, [currentPeriodKey, activePeriodKeys]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -260,11 +330,11 @@ export const Cashflow: React.FC = () => {
     return () => cancelAnimationFrame(frameId);
   }, [scrollToCurrentPeriod]);
 
-  // Rekursives Rendern der Zeilen unter Beachtung des Collapse-States
-  const renderRows = (): React.ReactNode => {
+  // Rekursives Rendern der Zeilen unter Beachtung des Collapse-States für Kategorien
+  const renderCategoryRows = (): React.ReactNode => {
     // Map der Kinder
     const childrenMap = new Map<string | null, CategoryCashflowRow[]>();
-    matrix.rows.forEach((r) => {
+    categoryMatrix.rows.forEach((r) => {
       const pId = r.category.parentId;
       const list = childrenMap.get(pId) || [];
       list.push(r);
@@ -276,7 +346,7 @@ export const Cashflow: React.FC = () => {
       const children = childrenMap.get(row.category.id) || [];
       const targetBudget =
         row.effectiveBudget ??
-        row.periods[matrix.periodKeys[0]]?.budget ??
+        row.periods[categoryMatrix.periodKeys[0]]?.budget ??
         (row.category.targetBudget
           ? normalizeBudgetToGranularity(
               row.category.targetBudget.amount,
@@ -285,7 +355,7 @@ export const Cashflow: React.FC = () => {
             )
           : undefined);
 
-      const periodCount = matrix.periodKeys.length;
+      const periodCount = categoryMatrix.periodKeys.length;
       const avgNet = periodCount > 0 ? row.totalNet / periodCount : 0;
       const avgDiff =
         targetBudget !== undefined && avgNet !== 0 ? Math.abs(avgNet) - targetBudget : undefined;
@@ -303,7 +373,10 @@ export const Cashflow: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => toggleCollapse(row.category.id)}
-                    className="flex-shrink-0 rounded p-0.5 text-slate-500 hover:bg-slate-200"
+                    className="flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                    aria-label={
+                      isCollapsed ? 'Unterkategorien aufklappen' : 'Unterkategorien einklappen'
+                    }
                   >
                     {isCollapsed ? (
                       <ChevronRight className="h-3.5 w-3.5" />
@@ -312,22 +385,30 @@ export const Cashflow: React.FC = () => {
                     )}
                   </button>
                 ) : (
-                  <div className="w-4 flex-shrink-0" />
+                  <span className="w-4 flex-shrink-0" />
                 )}
+
+                {/* Kategorie-Icon mit Hintergrundfarbe */}
                 <div
-                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-white"
-                  style={{ backgroundColor: row.category.color || '#64748b' }}
+                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md"
+                  style={{
+                    backgroundColor: `${row.category.color || '#3b82f6'}20`,
+                    color: row.category.color || '#3b82f6',
+                  }}
                 >
                   <IconRenderer name={row.category.icon} className="h-3.5 w-3.5" />
                 </div>
+
                 <div className="flex min-w-0 flex-col truncate">
                   <span
-                    className={`truncate font-semibold ${row.depth === 0 ? 'font-bold text-slate-900' : 'text-slate-700'}`}
+                    className={`truncate ${row.depth === 0 ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}
+                    title={row.category.name}
                   >
                     {row.category.name}
                   </span>
-                  {targetBudget !== undefined && targetBudget > 0 && (
-                    <span className="truncate font-mono text-[10px] font-medium text-slate-500">
+                  {/* Soll-Budget Kennzeichnung */}
+                  {targetBudget !== undefined && (
+                    <span className="text-[10px] text-slate-500">
                       Soll: {formatMoney(targetBudget)}
                     </span>
                   )}
@@ -338,15 +419,17 @@ export const Cashflow: React.FC = () => {
             {/* Perioden Spalten (einzeln oder komprimiert) */}
             {displayColumns.map((col, cIdx) => {
               let net = 0;
+              let budget = 0;
               let diffToBudget: number | undefined = undefined;
 
               if (col.type === 'period') {
-                const pData = row.periods[col.id] || { inbound: 0, outbound: 0, net: 0 };
-                net = pData.net;
-                diffToBudget = pData.diffToBudget;
+                const p = row.periods[col.id];
+                if (p) {
+                  net = p.net;
+                  budget = p.budget || 0;
+                  diffToBudget = p.diffToBudget;
+                }
               } else {
-                // Aggregierte Jahressumme für das eingeklappte Jahr
-                let budget = 0;
                 col.periodKeys.forEach((k) => {
                   const p = row.periods[k];
                   if (p) {
@@ -441,10 +524,162 @@ export const Cashflow: React.FC = () => {
     return rootRows.map((r) => renderTreeRow(r));
   };
 
-  // Vorletzte Zeile: Unkategorisierte Buchungen
+  // Rekursives Rendern der Zeilen für Konten
+  const renderAccountRows = (): React.ReactNode => {
+    const periodCount = activePeriodKeys.length;
+
+    // Map von Parent-Account-ID zu Kindern
+    const childrenMap = new Map<string | null, AccountCashflowRow[]>();
+    accountMatrix.rows.forEach((r) => {
+      const pId = r.parent ? r.parent.id : null;
+      const list = childrenMap.get(pId) || [];
+      list.push(r);
+      childrenMap.set(pId, list);
+    });
+
+    const renderAccountTreeRow = (row: AccountCashflowRow): React.ReactNode => {
+      const isCollapsed = collapsedAccounts.has(row.account.id);
+      const children = childrenMap.get(row.account.id) || [];
+      const hasChildren = row.hasChildren && children.length > 0;
+      const isVirtual = row.account.accountType === 'virtual';
+
+      const avgNet = periodCount > 0 ? row.totalNet / periodCount : 0;
+
+      return (
+        <React.Fragment key={row.account.id}>
+          <tr className="group text-xs transition-colors hover:bg-slate-50">
+            {/* Konto Name & Hierarchie (sticky Spalte links) */}
+            <td className="sticky left-0 z-20 w-[240px] min-w-[240px] max-w-[240px] whitespace-nowrap border-b border-r-2 border-b-slate-200 border-r-slate-300 bg-slate-100 px-4 py-2.5 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors group-hover:bg-slate-200">
+              <div
+                className="flex items-center gap-2 truncate"
+                style={{ paddingLeft: `${row.depth * 20}px` }}
+              >
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleAccountCollapse(row.account.id)}
+                    className="flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                    aria-label={isCollapsed ? 'Unterkonten aufklappen' : 'Unterkonten einklappen'}
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                ) : (
+                  <span className="w-4 flex-shrink-0" />
+                )}
+
+                <div
+                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md"
+                  style={{
+                    backgroundColor: `${row.account.color || '#3b82f6'}20`,
+                    color: row.account.color || '#3b82f6',
+                  }}
+                >
+                  <IconRenderer name={row.account.icon} className="h-3.5 w-3.5" />
+                </div>
+
+                <div className="flex min-w-0 flex-col truncate">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span
+                      className={`truncate ${row.depth === 0 ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}
+                      title={row.account.name}
+                    >
+                      {row.account.name}
+                    </span>
+                    {isVirtual && (
+                      <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-purple-700">
+                        Virtuell
+                      </span>
+                    )}
+                  </div>
+                  {row.account.iban && (
+                    <span className="truncate font-mono text-[10px] text-slate-400">
+                      {row.account.iban}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </td>
+
+            {/* Perioden Spalten */}
+            {displayColumns.map((col, cIdx) => {
+              let net = 0;
+
+              if (col.type === 'period') {
+                net = row.periods[col.id]?.net || 0;
+              } else {
+                col.periodKeys.forEach((k) => {
+                  const p = row.periods[k];
+                  if (p) net += p.net;
+                });
+              }
+
+              const isLastCol = cIdx === displayColumns.length - 1;
+              const borderRight = isLastCol
+                ? ''
+                : col.isLastInYear
+                  ? 'border-r-2 border-slate-300'
+                  : 'border-r border-slate-100';
+              const bgHighlight = col.isCurrent
+                ? 'bg-blue-50/50 border-x-2 border-blue-200/80 font-semibold'
+                : col.type === 'collapsed_year'
+                  ? 'bg-slate-50 font-medium'
+                  : '';
+
+              return (
+                <td
+                  key={col.id}
+                  className={`whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors ${borderRight} ${bgHighlight}`}
+                >
+                  {net !== 0 ? (
+                    <span
+                      className={`font-bold ${net < 0 ? 'text-slate-900' : 'text-emerald-600'}`}
+                    >
+                      {formatMoney(net)}
+                    </span>
+                  ) : (
+                    <span className={col.isCurrent ? 'text-slate-400' : 'text-slate-300'}>-</span>
+                  )}
+                </td>
+              );
+            })}
+
+            {/* Sticky Durchschnitts-Spalte rechts */}
+            <td className="sticky right-0 z-20 w-[110px] min-w-[110px] max-w-[110px] whitespace-nowrap border-b border-l-2 border-b-slate-200 border-l-slate-300 bg-slate-100 px-3 py-2.5 text-right font-mono shadow-[-4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors group-hover:bg-slate-200">
+              {avgNet !== 0 ? (
+                <span className={`font-bold ${avgNet < 0 ? 'text-slate-900' : 'text-emerald-600'}`}>
+                  {formatMoney(avgNet)}
+                </span>
+              ) : (
+                <span className="text-slate-300">-</span>
+              )}
+            </td>
+          </tr>
+
+          {!isCollapsed && children.map((c) => renderAccountTreeRow(c))}
+        </React.Fragment>
+      );
+    };
+
+    const rootRows = childrenMap.get(null) || [];
+    return rootRows.map((r) => renderAccountTreeRow(r));
+  };
+
+  // Dispatcher für die Tabellenzeilen
+  const renderRows = (): React.ReactNode => {
+    if (viewMode === 'categories') {
+      return renderCategoryRows();
+    }
+    return renderAccountRows();
+  };
+
+  // Vorletzte Zeile: Unkategorisierte Buchungen (nur in der Kategorienansicht)
   const renderUncategorizedRow = (): React.ReactNode => {
-    const periodCount = matrix.periodKeys.length;
-    const avgNet = periodCount > 0 ? matrix.uncategorizedRow.totalNet / periodCount : 0;
+    const periodCount = categoryMatrix.periodKeys.length;
+    const avgNet = periodCount > 0 ? categoryMatrix.uncategorizedRow.totalNet / periodCount : 0;
 
     return (
       <tr
@@ -469,11 +704,11 @@ export const Cashflow: React.FC = () => {
         {displayColumns.map((col, cIdx) => {
           let net = 0;
           if (col.type === 'period') {
-            const pData = matrix.uncategorizedRow.periods[col.id];
+            const pData = categoryMatrix.uncategorizedRow.periods[col.id];
             if (pData) net = pData.net;
           } else {
             col.periodKeys.forEach((k) => {
-              const p = matrix.uncategorizedRow.periods[k];
+              const p = categoryMatrix.uncategorizedRow.periods[k];
               if (p) net += p.net;
             });
           }
@@ -521,8 +756,8 @@ export const Cashflow: React.FC = () => {
   };
 
   const totalAvgNet = useMemo(() => {
-    return matrix.periodKeys.length > 0 ? matrix.totalRow.totalNet / matrix.periodKeys.length : 0;
-  }, [matrix.periodKeys.length, matrix.totalRow.totalNet]);
+    return activePeriodKeys.length > 0 ? activeTotalRow.totalNet / activePeriodKeys.length : 0;
+  }, [activePeriodKeys.length, activeTotalRow.totalNet]);
 
   return (
     <div className="space-y-6">
@@ -534,7 +769,7 @@ export const Cashflow: React.FC = () => {
             <ArrowUpRight className="h-4 w-4 text-emerald-500" />
           </div>
           <div className="font-mono text-2xl font-bold text-emerald-600">
-            {formatMoney(matrix.totalRow.totalInbound)}
+            {formatMoney(activeTotalRow.totalInbound)}
           </div>
         </div>
 
@@ -544,7 +779,7 @@ export const Cashflow: React.FC = () => {
             <ArrowDownRight className="h-4 w-4 text-rose-500" />
           </div>
           <div className="font-mono text-2xl font-bold text-slate-900">
-            {formatMoney(matrix.totalRow.totalOutbound)}
+            {formatMoney(activeTotalRow.totalOutbound)}
           </div>
         </div>
 
@@ -555,16 +790,57 @@ export const Cashflow: React.FC = () => {
           </div>
           <div
             className={`font-mono text-2xl font-bold ${
-              matrix.totalRow.totalNet >= 0 ? 'text-emerald-600' : 'text-rose-600'
+              activeTotalRow.totalNet >= 0 ? 'text-emerald-600' : 'text-rose-600'
             }`}
           >
-            {formatMoney(matrix.totalRow.totalNet, { signDisplay: 'always' })}
+            {formatMoney(activeTotalRow.totalNet, { signDisplay: 'always' })}
           </div>
         </div>
       </div>
 
-      {/* Gestapeltes Kategorie-Balkendiagramm */}
-      <StackedCategoryBarChart result={matrix} granularity={granularity} />
+      {/* Ansichts-Umschalter: Kategorien vs. Konten */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div
+          className="shadow-xs inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 text-sm font-medium"
+          role="group"
+          aria-label="Cashflow-Ansichtsmodus"
+        >
+          <button
+            type="button"
+            data-testid="cashflow-view-categories-btn"
+            onClick={() => setViewMode('categories')}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+              viewMode === 'categories'
+                ? 'shadow-xs bg-white text-blue-700'
+                : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
+            }`}
+          >
+            <FolderTree className="h-3.5 w-3.5" />
+            <span>Kategorien</span>
+          </button>
+          <button
+            type="button"
+            data-testid="cashflow-view-accounts-btn"
+            onClick={() => setViewMode('accounts')}
+            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+              viewMode === 'accounts'
+                ? 'shadow-xs bg-white text-blue-700'
+                : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
+            }`}
+          >
+            <Landmark className="h-3.5 w-3.5" />
+            <span>Konten</span>
+          </button>
+        </div>
+        <div className="text-xs font-medium text-slate-500">
+          {viewMode === 'categories'
+            ? 'Aufschlüsselung nach Budget-Kategorien'
+            : 'Aufschlüsselung nach Bank- und virtuellen Unterkonten'}
+        </div>
+      </div>
+
+      {/* Gestapeltes Balkendiagramm */}
+      <StackedCategoryBarChart result={chartResult} granularity={granularity} mode={viewMode} />
 
       {/* Matrix Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -590,7 +866,7 @@ export const Cashflow: React.FC = () => {
                   rowSpan={2}
                   className="sticky left-0 z-30 w-[240px] min-w-[240px] max-w-[240px] border-b-2 border-r-2 border-slate-300 bg-slate-200 px-4 py-3 text-left text-slate-900 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]"
                 >
-                  Kategorie
+                  {viewMode === 'categories' ? 'Kategorie' : 'Konto'}
                 </th>
                 {yearGroups.map((group, gIdx) => {
                   const isCurrentYear = group.year === currentYear;
@@ -702,7 +978,20 @@ export const Cashflow: React.FC = () => {
                 </tr>
               ) : (
                 <>
-                  {matrix.rows.length > 0 ? (
+                  {viewMode === 'categories' ? (
+                    categoryMatrix.rows.length > 0 ? (
+                      renderRows()
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={displayColumns.length + 2}
+                          className="py-12 text-center text-sm text-slate-400"
+                        >
+                          Noch keine Kategorien konfiguriert.
+                        </td>
+                      </tr>
+                    )
+                  ) : accountMatrix.rows.length > 0 ? (
                     renderRows()
                   ) : (
                     <tr>
@@ -710,11 +999,12 @@ export const Cashflow: React.FC = () => {
                         colSpan={displayColumns.length + 2}
                         className="py-12 text-center text-sm text-slate-400"
                       >
-                        Noch keine Kategorien konfiguriert.
+                        Noch keine Konten konfiguriert.
                       </td>
                     </tr>
                   )}
-                  {(!selectedCategoryIds || selectedCategoryIds.includes('__uncategorized__')) &&
+                  {viewMode === 'categories' &&
+                    (!selectedCategoryIds || selectedCategoryIds.includes('__uncategorized__')) &&
                     renderUncategorizedRow()}
                 </>
               )}
@@ -729,10 +1019,10 @@ export const Cashflow: React.FC = () => {
                   {displayColumns.map((col, cIdx) => {
                     let net = 0;
                     if (col.type === 'period') {
-                      net = matrix.totalRow.periods[col.id]?.net || 0;
+                      net = activeTotalRow.periods[col.id]?.net || 0;
                     } else {
                       net = col.periodKeys.reduce(
-                        (sum, k) => sum + (matrix.totalRow.periods[k]?.net || 0),
+                        (sum, k) => sum + (activeTotalRow.periods[k]?.net || 0),
                         0
                       );
                     }

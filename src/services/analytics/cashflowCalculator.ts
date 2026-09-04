@@ -12,6 +12,7 @@ import {
   Transaction,
   isTransactionMatchingAccount,
   getTransactionEffectiveValueForAccount,
+  getTransactionAccountInfo,
 } from '@/types/finance';
 import {
   fillPeriodKeyRange,
@@ -20,6 +21,7 @@ import {
   getPeriodKeysBetween,
   normalizeBudgetToGranularity,
 } from '@/utils/dateUtils';
+import { roundToTwoDecimals } from '@/utils/moneyUtils';
 
 export interface CategoryPeriodCashflow {
   inbound: number;
@@ -27,6 +29,28 @@ export interface CategoryPeriodCashflow {
   net: number;
   budget?: number;
   diffToBudget?: number;
+}
+
+export interface AccountCashflowRow {
+  account: Account;
+  parent?: Account;
+  depth: number;
+  hasChildren: boolean;
+  periods: Record<string, CategoryPeriodCashflow>;
+  totalInbound: number;
+  totalOutbound: number;
+  totalNet: number;
+}
+
+export interface AccountCashflowAnalysisResult {
+  periodKeys: string[];
+  rows: AccountCashflowRow[];
+  totalRow: {
+    periods: Record<string, CategoryPeriodCashflow>;
+    totalInbound: number;
+    totalOutbound: number;
+    totalNet: number;
+  };
 }
 
 /** @deprecated Verwende CategoryPeriodCashflow */
@@ -437,5 +461,289 @@ export function calculateCashflowMatrix(
       totalOutbound: grandOutbound,
       totalNet: grandInbound + grandOutbound,
     },
+  };
+}
+
+/**
+ * Berechnet die Cashflow-Matrix aufgeschlüsselt nach Konten (echte Bankkonten und deren virtuelle Unterkonten).
+ *
+ * @param {Account[]} accounts - Alle konfigurierten Konten
+ * @param {Transaction[]} transactions - Alle Transaktionen
+ * @param {PeriodGranularity} granularity - Zeit-Granularität (monthly, quarterly, halfYearly, yearly)
+ * @param {string} [selectedAccountId] - Optionale Filterung auf ein bestimmtes Konto
+ * @param {object} [options] - Filteroptionen (Datumsbereich, Kategorien, etc.)
+ * @returns {AccountCashflowAnalysisResult} Ergebnis mit hierarchischen Kontenzeilen und Gesamtsumme
+ *
+ * @example
+ * const result = calculateAccountCashflowMatrix(accounts, transactions, 'monthly');
+ * console.log(result.rows[0].account.name, result.rows[0].totalNet);
+ */
+export function calculateAccountCashflowMatrix(
+  accounts: Account[],
+  transactions: Transaction[],
+  granularity: PeriodGranularity,
+  selectedAccountId?: string,
+  options?: {
+    includeCurrentPeriod?: boolean;
+    referenceDate?: Date | string | number;
+    startDate?: string;
+    endDate?: string;
+    selectedCategoryIds?: string[];
+  }
+): AccountCashflowAnalysisResult {
+  // 1. Transaktionen filtern (nach Konto, Datumsbereich und/oder Kategorien)
+  let filteredTx = transactions;
+
+  if (selectedAccountId) {
+    filteredTx = filteredTx.filter((t) =>
+      isTransactionMatchingAccount(t, selectedAccountId, accounts)
+    );
+  }
+
+  if (options?.startDate || options?.endDate) {
+    filteredTx = filteredTx.filter((tx) => {
+      if (options.startDate && tx.valueDate < options.startDate) return false;
+      if (options.endDate && tx.valueDate > options.endDate) return false;
+      return true;
+    });
+  }
+
+  if (options?.selectedCategoryIds !== undefined) {
+    const allowed = new Set(options.selectedCategoryIds);
+    const allowUncategorized = allowed.has('__uncategorized__');
+
+    filteredTx = filteredTx.filter((tx) => {
+      const catId = tx.categoryId ?? tx.bucketId;
+      if (!catId) {
+        return allowUncategorized;
+      }
+      return allowed.has(catId);
+    });
+  }
+
+  // 2. Periodenschlüssel ermitteln
+  let periodKeys: string[] = [];
+
+  if (options?.startDate && options?.endDate) {
+    periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
+  } else {
+    const rawPeriodKeys = extractPeriodKeys(filteredTx, granularity);
+    const includeCurrent = options?.includeCurrentPeriod ?? false;
+    const currentKey = includeCurrent
+      ? getCurrentPeriodKey(granularity, options?.referenceDate)
+      : undefined;
+
+    if (rawPeriodKeys.length > 0) {
+      periodKeys = includeCurrent
+        ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentKey)
+        : rawPeriodKeys;
+    } else if (currentKey) {
+      periodKeys = [currentKey];
+    }
+  }
+
+  // 3. Konten-Hierarchie aufbauen: Echte Konten mit ihren virtuellen Unterkonten
+  const accountsToProcess = selectedAccountId
+    ? accounts.filter((a) => a.id === selectedAccountId || a.parentAccountId === selectedAccountId)
+    : accounts;
+
+  const realAccounts = accountsToProcess
+    .filter((a) => a.accountType !== 'virtual')
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  const virtualAccounts = accountsToProcess
+    .filter((a) => a.accountType === 'virtual')
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  const rows: AccountCashflowRow[] = [];
+  const assignedVirtualIds = new Set<string>();
+
+  realAccounts.forEach((realAcc) => {
+    const subs = virtualAccounts.filter((va) => va.parentAccountId === realAcc.id);
+    const realRow: AccountCashflowRow = {
+      account: realAcc,
+      depth: 0,
+      hasChildren: subs.length > 0,
+      periods: {},
+      totalInbound: 0,
+      totalOutbound: 0,
+      totalNet: 0,
+    };
+    periodKeys.forEach((k) => {
+      realRow.periods[k] = { inbound: 0, outbound: 0, net: 0 };
+    });
+    rows.push(realRow);
+
+    subs.forEach((sub) => {
+      assignedVirtualIds.add(sub.id);
+      const subRow: AccountCashflowRow = {
+        account: sub,
+        parent: realAcc,
+        depth: 1,
+        hasChildren: false,
+        periods: {},
+        totalInbound: 0,
+        totalOutbound: 0,
+        totalNet: 0,
+      };
+      periodKeys.forEach((k) => {
+        subRow.periods[k] = { inbound: 0, outbound: 0, net: 0 };
+      });
+      rows.push(subRow);
+    });
+  });
+
+  // Verwaiste virtuelle Konten anhängen
+  virtualAccounts
+    .filter((va) => !assignedVirtualIds.has(va.id))
+    .forEach((sub) => {
+      const subRow: AccountCashflowRow = {
+        account: sub,
+        depth: 0,
+        hasChildren: false,
+        periods: {},
+        totalInbound: 0,
+        totalOutbound: 0,
+        totalNet: 0,
+      };
+      periodKeys.forEach((k) => {
+        subRow.periods[k] = { inbound: 0, outbound: 0, net: 0 };
+      });
+      rows.push(subRow);
+    });
+
+  // 4. Cashflow für jede Zeile berechnen
+  rows.forEach((row) => {
+    const isVirtual = row.account.accountType === 'virtual';
+
+    filteredTx.forEach((tx) => {
+      const pKey = getPeriodKey(tx.valueDate, granularity);
+      const p = row.periods[pKey];
+      if (!p) return;
+
+      if (!isVirtual) {
+        // Echtes Bankkonto: Transaktion direkt auf diesem Konto
+        const info = getTransactionAccountInfo(tx, accounts);
+        if (info.primaryAccount?.id === row.account.id) {
+          if (tx.value >= 0) {
+            p.inbound += tx.value;
+            row.totalInbound += tx.value;
+          } else {
+            p.outbound += tx.value;
+            row.totalOutbound += tx.value;
+          }
+        }
+      } else {
+        // Virtuelles Unterkonto: Auswertung via getTransactionEffectiveValueForAccount
+        const eff = getTransactionEffectiveValueForAccount(tx, row.account, accounts);
+        if (eff !== null) {
+          if (eff >= 0) {
+            p.inbound += eff;
+            row.totalInbound += eff;
+          } else {
+            p.outbound += eff;
+            row.totalOutbound += eff;
+          }
+        }
+      }
+    });
+
+    // Runden für jede Periode der Zeile
+    periodKeys.forEach((k) => {
+      const p = row.periods[k];
+      p.inbound = roundToTwoDecimals(p.inbound);
+      p.outbound = roundToTwoDecimals(p.outbound);
+      p.net = roundToTwoDecimals(p.inbound + p.outbound);
+    });
+
+    row.totalInbound = roundToTwoDecimals(row.totalInbound);
+    row.totalOutbound = roundToTwoDecimals(row.totalOutbound);
+    row.totalNet = roundToTwoDecimals(row.totalInbound + row.totalOutbound);
+  });
+
+  // 5. Gesamtergebnis-Zeile (nur echte Bankkonten summieren zur Vermeidung von Doppelzählungen)
+  const totalRowPeriods: Record<string, CategoryPeriodCashflow> = {};
+  let grandInbound = 0;
+  let grandOutbound = 0;
+
+  const realRows = rows.filter((r) => r.account.accountType !== 'virtual');
+  const rowsToSumForTotal = realRows.length > 0 ? realRows : rows;
+
+  periodKeys.forEach((pKey) => {
+    const periodInbound = roundToTwoDecimals(
+      rowsToSumForTotal.reduce((sum, r) => sum + (r.periods[pKey]?.inbound || 0), 0)
+    );
+    const periodOutbound = roundToTwoDecimals(
+      rowsToSumForTotal.reduce((sum, r) => sum + (r.periods[pKey]?.outbound || 0), 0)
+    );
+
+    grandInbound += periodInbound;
+    grandOutbound += periodOutbound;
+
+    totalRowPeriods[pKey] = {
+      inbound: periodInbound,
+      outbound: periodOutbound,
+      net: roundToTwoDecimals(periodInbound + periodOutbound),
+    };
+  });
+
+  grandInbound = roundToTwoDecimals(grandInbound);
+  grandOutbound = roundToTwoDecimals(grandOutbound);
+
+  return {
+    periodKeys,
+    rows,
+    totalRow: {
+      periods: totalRowPeriods,
+      totalInbound: grandInbound,
+      totalOutbound: grandOutbound,
+      totalNet: roundToTwoDecimals(grandInbound + grandOutbound),
+    },
+  };
+}
+
+/**
+ * Konvertiert ein AccountCashflowAnalysisResult in das CashflowAnalysisResult-Format,
+ * damit Diagramme (wie StackedCategoryBarChart) die Konten direkt visualisieren können.
+ *
+ * @param {AccountCashflowAnalysisResult} accountResult - Das Konten-Cashflow-Ergebnis
+ * @returns {CashflowAnalysisResult} Konvertiertes Ergebnis mit Konten als Zeilen
+ */
+export function convertAccountResultToCashflowResult(
+  accountResult: AccountCashflowAnalysisResult
+): CashflowAnalysisResult {
+  const rows: CategoryCashflowRow[] = accountResult.rows.map((ar) => ({
+    category: {
+      id: ar.account.id,
+      name: ar.account.name,
+      color: ar.account.color || '#3b82f6',
+      icon: ar.account.icon || 'Landmark',
+      parentId: ar.parent?.id ?? null,
+    },
+    bucket: {
+      id: ar.account.id,
+      name: ar.account.name,
+      color: ar.account.color || '#3b82f6',
+      icon: ar.account.icon || 'Landmark',
+      parentId: ar.parent?.id ?? null,
+    },
+    depth: ar.depth,
+    hasChildren: ar.hasChildren,
+    periods: ar.periods,
+    totalInbound: ar.totalInbound,
+    totalOutbound: ar.totalOutbound,
+    totalNet: ar.totalNet,
+  }));
+
+  return {
+    periodKeys: accountResult.periodKeys,
+    rows,
+    uncategorizedRow: {
+      periods: {},
+      totalInbound: 0,
+      totalOutbound: 0,
+      totalNet: 0,
+    },
+    totalRow: accountResult.totalRow,
   };
 }

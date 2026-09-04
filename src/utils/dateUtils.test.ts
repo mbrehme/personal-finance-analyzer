@@ -21,6 +21,8 @@ import {
   getMonthDateRange,
   detectPresetForRange,
   formatDateRangeDisplay,
+  getDayBefore,
+  getPeriodDateRange,
 } from './dateUtils';
 import { ISODateString } from '@/types/finance';
 
@@ -354,6 +356,56 @@ describe('dateUtils', () => {
       expect(getPeriodKeysBetween('', '', 'monthly')).toEqual([]);
       expect(getPeriodKeysBetween('2026-09-01', '', 'monthly')).toEqual([]);
       expect(getPeriodKeysBetween('2027-01-01', '2026-01-01', 'monthly')).toEqual([]);
+    });
+  });
+
+  describe('getDayBefore', () => {
+    it('calculates the previous day correctly across month and year boundaries', () => {
+      expect(getDayBefore('2026-01-01')).toBe('2025-12-31');
+      expect(getDayBefore('2026-03-01')).toBe('2026-02-28');
+      // Schaltjahr
+      expect(getDayBefore('2024-03-01')).toBe('2024-02-29');
+      expect(getDayBefore('2026-09-15')).toBe('2026-09-14');
+    });
+  });
+
+  describe('getPeriodDateRange', () => {
+    it('returns start and end date for monthly granularity', () => {
+      expect(getPeriodDateRange('2026-02', 'monthly')).toEqual({
+        startDate: '2026-02-01',
+        endDate: '2026-02-28',
+      });
+      expect(getPeriodDateRange('2024-02', 'monthly')).toEqual({
+        startDate: '2024-02-01',
+        endDate: '2024-02-29',
+      });
+      expect(getPeriodDateRange('2026-09', 'monthly')).toEqual({
+        startDate: '2026-09-01',
+        endDate: '2026-09-30',
+      });
+    });
+
+    it('returns start and end date for quarterly, halfYearly, and yearly', () => {
+      expect(getPeriodDateRange('2026-Q1', 'quarterly')).toEqual({
+        startDate: '2026-01-01',
+        endDate: '2026-03-31',
+      });
+      expect(getPeriodDateRange('2026-Q4', 'quarterly')).toEqual({
+        startDate: '2026-10-01',
+        endDate: '2026-12-31',
+      });
+      expect(getPeriodDateRange('2026-H1', 'halfYearly')).toEqual({
+        startDate: '2026-01-01',
+        endDate: '2026-06-30',
+      });
+      expect(getPeriodDateRange('2026-H2', 'halfYearly')).toEqual({
+        startDate: '2026-07-01',
+        endDate: '2026-12-31',
+      });
+      expect(getPeriodDateRange('2026', 'yearly')).toEqual({
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+      });
     });
   });
 });

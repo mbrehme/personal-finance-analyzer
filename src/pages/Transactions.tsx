@@ -35,6 +35,7 @@ import {
   Trash2,
   RotateCcw,
   ChevronDown,
+  ChevronRight,
   Layers,
   Loader2,
   Plus,
@@ -726,6 +727,30 @@ export const Transactions: React.FC = () => {
                   const isSplitParent = splitParentIds.has(tx.id);
                   const isSplitChild = Boolean(tx.splitFromId);
                   const isSplitPart = isSplitParent || isSplitChild;
+                  const isTransfer = Boolean(accountInfo.counterAccount);
+                  const fromAccount = isTransfer
+                    ? isOutbound
+                      ? accountInfo.primaryAccount
+                      : accountInfo.counterAccount
+                    : accountInfo.primaryAccount;
+                  const toAccount = isTransfer
+                    ? isOutbound
+                      ? accountInfo.counterAccount
+                      : accountInfo.primaryAccount
+                    : undefined;
+
+                  const fromVirtualAccounts = fromAccount
+                    ? accountInfo.virtualAccounts.filter(
+                        (v) => v.parentAccountId === fromAccount.id
+                      )
+                    : [];
+                  const toVirtualAccounts = toAccount
+                    ? accountInfo.virtualAccounts.filter((v) => v.parentAccountId === toAccount.id)
+                    : [];
+                  const hasModifiedAccount =
+                    (tx.originalAccountIban !== undefined &&
+                      tx.accountIban !== tx.originalAccountIban) ||
+                    (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId);
 
                   return (
                     <tr
@@ -786,89 +811,77 @@ export const Transactions: React.FC = () => {
 
                       {/* Konto */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 whitespace-nowrap">
-                            {accountInfo.counterAccount ? (
-                              isOutbound ? (
-                                <>
-                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
-                                    <IconRenderer
-                                      name={accountInfo.primaryAccount?.icon}
-                                      style={{ color: accountInfo.primaryAccount?.color }}
-                                      className="h-3.5 w-3.5 shrink-0"
-                                    />
-                                    <span>{accountInfo.primaryAccount?.name || 'Unbekannt'}</span>
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          {fromAccount ? (
+                            <span
+                              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 font-medium ${
+                                !isTransfer || isOutbound
+                                  ? 'bg-slate-100 text-slate-800'
+                                  : 'border border-blue-200 bg-blue-50 text-blue-900'
+                              }`}
+                            >
+                              <IconRenderer
+                                name={fromAccount.icon}
+                                style={{ color: fromAccount.color }}
+                                className="h-3.5 w-3.5 shrink-0"
+                              />
+                              <span>{fromAccount.name}</span>
+                              {fromVirtualAccounts.map((v) => (
+                                <React.Fragment key={v.id}>
+                                  <ChevronRight className="h-3 w-3 shrink-0 text-slate-400" />
+                                  <span
+                                    className="inline-flex items-center gap-1 font-semibold text-purple-700"
+                                    title={`Virtuelles Unterkonto von ${fromAccount.name}: ${v.name}`}
+                                  >
+                                    <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
+                                    <span>{v.name}</span>
                                   </span>
-                                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-900">
-                                    <IconRenderer
-                                      name={accountInfo.counterAccount.icon}
-                                      style={{ color: accountInfo.counterAccount.color }}
-                                      className="h-3.5 w-3.5 shrink-0"
-                                    />
-                                    <span>{accountInfo.counterAccount.name}</span>
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-900">
-                                    <IconRenderer
-                                      name={accountInfo.counterAccount.icon}
-                                      style={{ color: accountInfo.counterAccount.color }}
-                                      className="h-3.5 w-3.5 shrink-0"
-                                    />
-                                    <span>{accountInfo.counterAccount.name}</span>
-                                  </span>
-                                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                                  <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
-                                    <IconRenderer
-                                      name={accountInfo.primaryAccount?.icon}
-                                      style={{ color: accountInfo.primaryAccount?.color }}
-                                      className="h-3.5 w-3.5 shrink-0"
-                                    />
-                                    <span>{accountInfo.primaryAccount?.name || 'Unbekannt'}</span>
-                                  </span>
-                                </>
-                              )
-                            ) : accountInfo.primaryAccount ? (
-                              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-800">
+                                </React.Fragment>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+
+                          {isTransfer && toAccount && (
+                            <>
+                              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                              <span
+                                className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 font-medium ${
+                                  isOutbound
+                                    ? 'border border-blue-200 bg-blue-50 text-blue-900'
+                                    : 'bg-slate-100 text-slate-800'
+                                }`}
+                              >
                                 <IconRenderer
-                                  name={accountInfo.primaryAccount.icon}
-                                  style={{ color: accountInfo.primaryAccount.color }}
+                                  name={toAccount.icon}
+                                  style={{ color: toAccount.color }}
                                   className="h-3.5 w-3.5 shrink-0"
                                 />
-                                <span>{accountInfo.primaryAccount.name}</span>
+                                <span>{toAccount.name}</span>
+                                {toVirtualAccounts.map((v) => (
+                                  <React.Fragment key={v.id}>
+                                    <ChevronRight className="h-3 w-3 shrink-0 text-blue-400" />
+                                    <span
+                                      className="inline-flex items-center gap-1 font-semibold text-purple-700"
+                                      title={`Virtuelles Unterkonto von ${toAccount.name}: ${v.name}`}
+                                    >
+                                      <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
+                                      <span>{v.name}</span>
+                                    </span>
+                                  </React.Fragment>
+                                ))}
                               </span>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
+                            </>
+                          )}
 
-                            {((tx.originalAccountIban !== undefined &&
-                              tx.accountIban !== tx.originalAccountIban) ||
-                              (tx.originalAccountId !== undefined &&
-                                tx.accountId !== tx.originalAccountId)) && (
-                              <span
-                                className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
-                                title="Konto manuell angepasst"
-                              >
-                                Geändert
-                              </span>
-                            )}
-                          </div>
-
-                          {accountInfo.virtualAccounts.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1 pl-1">
-                              {accountInfo.virtualAccounts.map((v) => (
-                                <span
-                                  key={v.id}
-                                  className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700"
-                                  title={`Zugeordnetes virtuelles Unterkonto: ${v.name}`}
-                                >
-                                  <FolderTree className="h-3 w-3 text-purple-600" />
-                                  {v.name}
-                                </span>
-                              ))}
-                            </div>
+                          {hasModifiedAccount && (
+                            <span
+                              className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                              title="Konto manuell angepasst"
+                            >
+                              Geändert
+                            </span>
                           )}
                         </div>
                       </td>

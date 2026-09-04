@@ -230,4 +230,98 @@ describe('balanceCalculator', () => {
     // Total sum ignores virtual
     expect(result.totalRow.periods['2026-08'].endBalance).toBe(3350);
   });
+
+  it('inverts cashflow on recipient account and its virtual subaccount when transfer occurs', () => {
+    const giroAcc: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      accountType: 'real',
+      iban: 'DE1111',
+      balanceEntries: [{ id: 'b1', date: '2026-08-01', amount: 2000 }],
+    };
+
+    const tagesgeldAcc: Account = {
+      id: 'acc-tg',
+      name: 'Tagesgeld',
+      accountType: 'real',
+      iban: 'DE2222',
+      balanceEntries: [{ id: 'b2', date: '2026-08-01', amount: 1000 }],
+    };
+
+    const savingsSub: Account = {
+      id: 'acc-sub-savings',
+      name: 'Sparen Topf',
+      accountType: 'virtual',
+      parentAccountId: 'acc-tg',
+      categoryIds: ['cat-sparen'],
+      balanceEntries: [{ id: 'b3', date: '2026-08-01', amount: 500 }],
+    };
+
+    const creditCardAcc: Account = {
+      id: 'acc-cc',
+      name: 'Kreditkarte',
+      accountType: 'real',
+      iban: 'DE3333',
+      balanceEntries: [{ id: 'b4', date: '2026-08-01', amount: 0 }],
+    };
+
+    const txs: Transaction[] = [
+      // 1. Umbuchung von Girokonto auf Tagesgeld für Topf 'Sparen' (Abgang Giro, Eingang Tagesgeld)
+      {
+        id: 'tx-transfer-1',
+        accountIban: 'DE1111',
+        iban: 'DE2222',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Martin',
+        receiver: 'Tagesgeld',
+        subject: 'Sparen August',
+        value: -500,
+        categoryId: 'cat-sparen',
+        assignmentSource: 'manual',
+      },
+      // 2. Buchung auf unbeteiligter Kreditkarte mit gleicher Kategorie 'cat-sparen'
+      // Darf das virtuelle Unterkonto unter Tagesgeld NICHT berühren!
+      {
+        id: 'tx-cc-unrelated',
+        accountIban: 'DE3333',
+        iban: 'DE8888',
+        valueDate: '2026-08-15',
+        bookingDate: '2026-08-15',
+        issuer: 'Martin',
+        receiver: 'Sparplan extern',
+        subject: 'Fremdes Konto',
+        value: -200,
+        categoryId: 'cat-sparen',
+        assignmentSource: 'manual',
+      },
+    ];
+
+    const result = calculateAllBalances(
+      [giroAcc, tagesgeldAcc, savingsSub, creditCardAcc],
+      txs,
+      'monthly'
+    );
+
+    const giroRow = result.rows.find((r) => r.account.id === 'acc-giro');
+    const tgRow = result.rows.find((r) => r.account.id === 'acc-tg');
+    const savingsRow = result.rows.find((r) => r.account.id === 'acc-sub-savings');
+    const ccRow = result.rows.find((r) => r.account.id === 'acc-cc');
+
+    // Girokonto: 2000 - 500 = 1500
+    expect(giroRow?.periods['2026-08'].cashflow).toBe(-500);
+    expect(giroRow?.periods['2026-08'].endBalance).toBe(1500);
+
+    // Tagesgeld: 1000 + 500 = 1500
+    expect(tgRow?.periods['2026-08'].cashflow).toBe(500);
+    expect(tgRow?.periods['2026-08'].endBalance).toBe(1500);
+
+    // Virtuelles Unterkonto unter Tagesgeld: Start 500 + 500 = 1000 (die -200 der Kreditkarte werden ignoriert!)
+    expect(savingsRow?.periods['2026-08'].cashflow).toBe(500);
+    expect(savingsRow?.periods['2026-08'].endBalance).toBe(1000);
+
+    // Kreditkarte: 0 - 200 = -200
+    expect(ccRow?.periods['2026-08'].cashflow).toBe(-200);
+    expect(ccRow?.periods['2026-08'].endBalance).toBe(-200);
+  });
 });

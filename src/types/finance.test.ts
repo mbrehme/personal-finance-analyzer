@@ -9,6 +9,11 @@ import {
   buildCompoundSearchField,
   sortTransactionsDesc,
   getTransactionType,
+  getTransactionAccountInfo,
+  isTransactionMatchingAccount,
+  getTransactionEffectiveValueForAccount,
+  normalizeIban,
+  Account,
   Transaction,
 } from './finance';
 
@@ -317,18 +322,14 @@ describe('finance domain helpers', () => {
     expect(isTransactionOverridden(restored)).toBe(false);
   });
 
-  it('normalizes IBAN by removing spaces and capitalizing', async () => {
-    const { normalizeIban } = await import('./finance');
-
+  it('normalizes IBAN by removing spaces and capitalizing', () => {
     expect(normalizeIban('de89 3704 0044 0532 0130 00')).toBe('DE89370400440532013000');
     expect(normalizeIban('DE12345')).toBe('DE12345');
     expect(normalizeIban('')).toBe('');
     expect(normalizeIban(undefined)).toBe('');
   });
 
-  it('determines all accounts for a transaction (primary, counter-account and virtual subaccounts)', async () => {
-    const { getTransactionAccountInfo, isTransactionMatchingAccount } = await import('./finance');
-
+  it('determines all accounts for a transaction (primary, counter-account and virtual subaccounts)', () => {
     const accounts = [
       {
         id: 'acc-giro',
@@ -429,5 +430,149 @@ describe('finance domain helpers', () => {
     expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-giro', accounts)).toBe(true);
     expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-sub-urlaub', accounts)).toBe(true);
     expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-tagesgeld', accounts)).toBe(false);
+  });
+
+  describe('getTransactionEffectiveValueForAccount', () => {
+    const giroAcc: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      accountType: 'real',
+      iban: 'DE1111',
+      balanceEntries: [],
+    };
+
+    const tagesgeldAcc: Account = {
+      id: 'acc-tg',
+      name: 'Tagesgeld',
+      accountType: 'real',
+      iban: 'DE2222',
+      balanceEntries: [],
+    };
+
+    const creditCardAcc: Account = {
+      id: 'acc-cc',
+      name: 'Kreditkarte',
+      accountType: 'real',
+      iban: 'DE3333',
+      balanceEntries: [],
+    };
+
+    const savingsPot: Account = {
+      id: 'acc-sub-savings',
+      name: 'Sparen Topf',
+      accountType: 'virtual',
+      parentAccountId: 'acc-tg',
+      categoryIds: ['cat-sparen'],
+      balanceEntries: [],
+    };
+
+    const vacationPotOnGiro: Account = {
+      id: 'acc-sub-urlaub-giro',
+      name: 'Urlaub Giro',
+      accountType: 'virtual',
+      parentAccountId: 'acc-giro',
+      categoryIds: ['cat-urlaub'],
+      balanceEntries: [],
+    };
+
+    const allAccounts = [giroAcc, tagesgeldAcc, creditCardAcc, savingsPot, vacationPotOnGiro];
+
+    it('inverts sign on transfer receipt: negative on sender is positive on recipient and its virtual account', () => {
+      // Überweisung von Girokonto auf Tagesgeld für Kategorie "Sparen"
+      const transferTx: Transaction = {
+        id: 'tx-transfer-savings',
+        accountIban: 'DE1111',
+        iban: 'DE2222',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Martin',
+        receiver: 'Tagesgeldkonto',
+        subject: 'Monatliches Sparen',
+        value: -500,
+        categoryId: 'cat-sparen',
+        assignmentSource: 'manual',
+      };
+
+      // 1. Für Girokonto (Sender/Primär): Abgang -500 €
+      expect(getTransactionEffectiveValueForAccount(transferTx, giroAcc, allAccounts)).toBe(-500);
+
+      // 2. Für Tagesgeld (Empfänger/Gegenkonto): Eingang +500 €
+      expect(getTransactionEffectiveValueForAccount(transferTx, tagesgeldAcc, allAccounts)).toBe(
+        500
+      );
+
+      // 3. Für Virtuelles Konto "Sparen Topf" unter Tagesgeld: Positiver Eingang +500 €
+      expect(getTransactionEffectiveValueForAccount(transferTx, savingsPot, allAccounts)).toBe(500);
+
+      // 4. Für anderes virtuelles Konto "Urlaub Giro": Betrifft es nicht (Kategorie falsch + falsches Elternkonto)
+      expect(
+        getTransactionEffectiveValueForAccount(transferTx, vacationPotOnGiro, allAccounts)
+      ).toBeNull();
+
+      // 5. Für unbeteiligte Kreditkarte: Betrifft sie nicht
+      expect(
+        getTransactionEffectiveValueForAccount(transferTx, creditCardAcc, allAccounts)
+      ).toBeNull();
+    });
+
+    it('excludes transactions from virtual account if category was used on an unrelated account', () => {
+      // Buchung auf Kreditkarte mit Kategorie 'cat-urlaub'
+      const ccVacationTx: Transaction = {
+        id: 'tx-cc-vacation',
+        accountIban: 'DE3333',
+        iban: 'DE9999',
+        valueDate: '2026-08-11',
+        bookingDate: '2026-08-11',
+        issuer: 'Martin',
+        receiver: 'Hotel Roma',
+        subject: 'Hotel',
+        value: -200,
+        categoryId: 'cat-urlaub',
+        assignmentSource: 'manual',
+      };
+
+      // Kreditkarte ist das primäre Konto: -200
+      expect(getTransactionEffectiveValueForAccount(ccVacationTx, creditCardAcc, allAccounts)).toBe(
+        -200
+      );
+
+      // Virtuelles Konto "Urlaub Giro" gehört zu Girokonto (DE1111), NICHT zur Kreditkarte (DE3333)!
+      // Darf NICHT einbezogen werden:
+      expect(
+        getTransactionEffectiveValueForAccount(ccVacationTx, vacationPotOnGiro, allAccounts)
+      ).toBeNull();
+
+      // Girokonto selbst wird ebenfalls nicht berührt:
+      expect(getTransactionEffectiveValueForAccount(ccVacationTx, giroAcc, allAccounts)).toBeNull();
+    });
+
+    it('returns null for virtual account without parentAccountId', () => {
+      const orphanVirtual: Account = {
+        id: 'acc-orphan',
+        name: 'Verwaist',
+        accountType: 'virtual',
+        parentAccountId: null,
+        categoryIds: ['cat-sparen'],
+        balanceEntries: [],
+      };
+
+      const tx: Transaction = {
+        id: 'tx-orphan-test',
+        accountIban: 'DE1111',
+        iban: 'DE2222',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        issuer: 'Martin',
+        receiver: 'Tagesgeld',
+        subject: 'Sparen',
+        value: -500,
+        categoryId: 'cat-sparen',
+        assignmentSource: 'manual',
+      };
+
+      expect(
+        getTransactionEffectiveValueForAccount(tx, orphanVirtual, [...allAccounts, orphanVirtual])
+      ).toBeNull();
+    });
   });
 });

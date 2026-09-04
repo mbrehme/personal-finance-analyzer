@@ -10,7 +10,7 @@ import {
   BalanceEntry,
   PeriodGranularity,
   Transaction,
-  normalizeIban,
+  getTransactionEffectiveValueForAccount,
 } from '@/types/finance';
 import { extractPeriodKeys } from './cashflowCalculator';
 import {
@@ -46,44 +46,47 @@ export interface BalanceAnalysisResult {
  * auf Stichtags-Salden und summierten Transaktionen.
  * Berücksichtigt für echte Konten die IBAN und für virtuelle Unterkonten
  * die Transaktionen des übergeordneten echten Kontos gefiltert nach Kategorien.
+ *
+ * @param {Account} account - Das zu berechnende Konto
+ * @param {Transaction[]} transactions - Alle Transaktionen
+ * @param {string[]} periodKeys - Alle relevanten Perioden-Schlüssel
+ * @param {PeriodGranularity} granularity - Perioden-Granularität
+ * @param {Account} [parentAccount] - Übergeordnetes Hauptkonto (bei virtuellen Konten)
+ * @param {Account[]} [accounts] - Alle Konten im Workspace zur Beziehungsauflösung
+ * @returns {AccountBalanceRow} Zeile mit Ständen und Cashflow pro Periode
  */
 export function calculateBalanceTimeline(
   account: Account,
   transactions: Transaction[],
   periodKeys: string[],
   granularity: PeriodGranularity,
-  parentAccount?: Account
+  parentAccount?: Account,
+  accounts?: Account[]
 ): AccountBalanceRow {
-  const normAccIban = normalizeIban(account.iban);
-  const normParentIban = parentAccount ? normalizeIban(parentAccount.iban) : '';
+  let contextAccounts = accounts;
+  if (!contextAccounts || contextAccounts.length === 0) {
+    const list: Account[] = [account];
+    if (parentAccount && parentAccount.id !== account.id) {
+      list.push(parentAccount);
+    }
+    contextAccounts = list;
+  }
 
-  const accountTxs = transactions
-    .filter((t) => {
-      const normAccountIban = normalizeIban(t.accountIban);
-      const normTxIban = normalizeIban(t.iban);
+  const targetAcc: Account =
+    account.accountType === 'virtual' && !account.parentAccountId && parentAccount
+      ? { ...account, parentAccountId: parentAccount.id }
+      : account;
 
-      if (account.accountType === 'virtual') {
-        // Virtuelles Unterkonto: Buchungen des Elternkontos, die den Filter-Kategorien entsprechen
-        const belongsToParent =
-          (account.parentAccountId && t.accountId === account.parentAccountId) ||
-          (normParentIban !== '' &&
-            (normAccountIban === normParentIban || normTxIban === normParentIban));
+  const relevantTxsWithDeltas: { tx: Transaction; delta: number }[] = [];
 
-        if (!belongsToParent) return false;
+  transactions.forEach((tx) => {
+    const delta = getTransactionEffectiveValueForAccount(tx, targetAcc, contextAccounts!);
+    if (delta !== null) {
+      relevantTxsWithDeltas.push({ tx, delta });
+    }
+  });
 
-        const catId = t.categoryId || t.bucketId || null;
-        const catIds = account.categoryIds || account.bucketIds || [];
-        if (catIds.length === 0) return true;
-        return Boolean(catId && catIds.includes(catId));
-      }
-
-      // Echtes Bankkonto: Buchungen dieses Kontos via accountIban, IBAN oder legacy accountId
-      return (
-        (normAccIban !== '' && (normAccountIban === normAccIban || normTxIban === normAccIban)) ||
-        (t.accountId !== undefined && t.accountId === account.id)
-      );
-    })
-    .sort((a, b) => a.valueDate.localeCompare(b.valueDate));
+  relevantTxsWithDeltas.sort((a, b) => a.tx.valueDate.localeCompare(b.tx.valueDate));
 
   // Sortierte Stichtags-Salden
   const checkpoints: BalanceEntry[] = [...account.balanceEntries].sort((a, b) =>
@@ -99,8 +102,8 @@ export function calculateBalanceTimeline(
     baseAmount = checkpoints[0].amount;
 
     // Transaktionen vor dem ersten Checkpoint zurückrechnen
-    const txsBeforeBase = accountTxs.filter((t) => t.valueDate < baseDate);
-    const sumBefore = txsBeforeBase.reduce((sum, t) => sum + t.value, 0);
+    const itemsBeforeBase = relevantTxsWithDeltas.filter((item) => item.tx.valueDate < baseDate);
+    const sumBefore = itemsBeforeBase.reduce((sum, item) => sum + item.delta, 0);
     // Wenn Checkpoint bei t0=1000€ liegt und vorher 200€ flossen, war Start bei 800€
     baseAmount -= sumBefore;
   }
@@ -111,10 +114,10 @@ export function calculateBalanceTimeline(
     periodCashflows[pKey] = 0;
   });
 
-  accountTxs.forEach((tx) => {
+  relevantTxsWithDeltas.forEach(({ tx, delta }) => {
     const pKey = getPeriodKey(tx.valueDate, granularity);
     if (periodCashflows[pKey] !== undefined) {
-      periodCashflows[pKey] += tx.value;
+      periodCashflows[pKey] += delta;
     }
   });
 
@@ -208,11 +211,13 @@ export function calculateAllBalances(
   });
 
   const rows: AccountBalanceRow[] = hierarchicalAccounts.map(({ account, parent }) =>
-    calculateBalanceTimeline(account, transactions, periodKeys, granularity, parent)
+    calculateBalanceTimeline(account, transactions, periodKeys, granularity, parent, accounts)
   );
 
-  // Gesamtsummenzeile: Summiert nur echte Konten, um Doppelzählungen zu verhindern
+  // Gesamtsummenzeile: Summiert primär echte Konten, um Doppelzählungen zu verhindern.
+  // Falls durch Kontofilterung nur ein virtuelles Unterkonto dargestellt wird, summiert sie dieses.
   const realRows = rows.filter((r) => r.account.accountType !== 'virtual');
+  const rowsToSum = realRows.length > 0 ? realRows : rows;
   const totalRowPeriods: Record<string, AccountPeriodBalance> = {};
   let totalLatest = 0;
 
@@ -221,7 +226,7 @@ export function calculateAllBalances(
     let cf = 0;
     let end = 0;
 
-    realRows.forEach((r) => {
+    rowsToSum.forEach((r) => {
       const p = r.periods[pKey];
       if (p) {
         start += p.startBalance;
@@ -237,7 +242,7 @@ export function calculateAllBalances(
     };
   });
 
-  realRows.forEach((r) => {
+  rowsToSum.forEach((r) => {
     totalLatest += r.latestBalance;
   });
 

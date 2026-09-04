@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { calculateCashflowMatrix, extractPeriodKeys } from './cashflowCalculator';
-import { Category, Transaction } from '@/types/finance';
+import { Account, Category, Transaction } from '@/types/finance';
 
 describe('cashflowCalculator', () => {
   const categories: Category[] = [
@@ -364,5 +364,78 @@ describe('cashflowCalculator', () => {
 
     // Gesamtsumme = Kategorisiert (-50) + Unkategorisiert (+70) = +20
     expect(matrix.totalRow.periods['2026-09'].net).toBe(20);
+  });
+
+  it('treats transfer receipt as positive inbound cashflow when filtering by recipient account or virtual subaccount', () => {
+    const giroAcc: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      accountType: 'real',
+      iban: 'DE1111',
+      balanceEntries: [],
+    };
+
+    const tgAcc: Account = {
+      id: 'acc-tg',
+      name: 'Tagesgeld',
+      accountType: 'real',
+      iban: 'DE2222',
+      balanceEntries: [],
+    };
+
+    const savingsPot: Account = {
+      id: 'acc-sub-savings',
+      name: 'Sparen Topf',
+      accountType: 'virtual',
+      parentAccountId: 'acc-tg',
+      categoryIds: ['cat-sparen'],
+      balanceEntries: [],
+    };
+
+    const cats: Category[] = [
+      {
+        id: 'cat-sparen',
+        name: 'Sparen',
+        parentId: null,
+      },
+    ];
+
+    const transferTx: Transaction = {
+      id: 'tx-transfer-cf',
+      accountIban: 'DE1111',
+      iban: 'DE2222',
+      valueDate: '2026-09-05',
+      bookingDate: '2026-09-05',
+      issuer: 'Martin',
+      receiver: 'Tagesgeld',
+      subject: 'Sparen September',
+      value: -500,
+      categoryId: 'cat-sparen',
+      assignmentSource: 'manual',
+    };
+
+    // 1. Aus Sicht von Girokonto (Sender): Outbound = -500
+    const giroMatrix = calculateCashflowMatrix(cats, [transferTx], 'monthly', 'acc-giro', {
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+      accounts: [giroAcc, tgAcc, savingsPot],
+    });
+    const giroSavingsRow = giroMatrix.rows.find((r) => r.category.id === 'cat-sparen');
+    expect(giroSavingsRow?.periods['2026-09'].outbound).toBe(-500);
+    expect(giroSavingsRow?.periods['2026-09'].inbound).toBe(0);
+    expect(giroSavingsRow?.periods['2026-09'].net).toBe(-500);
+
+    // 2. Aus Sicht des virtuellen Unterkontos "Sparen Topf" (Empfänger): Inbound = +500
+    const subMatrix = calculateCashflowMatrix(cats, [transferTx], 'monthly', 'acc-sub-savings', {
+      startDate: '2026-09-01',
+      endDate: '2026-09-30',
+      accounts: [giroAcc, tgAcc, savingsPot],
+    });
+    const subSavingsRow = subMatrix.rows.find((r) => r.category.id === 'cat-sparen');
+    expect(subSavingsRow?.periods['2026-09'].inbound).toBe(500);
+    expect(subSavingsRow?.periods['2026-09'].outbound).toBe(0);
+    expect(subSavingsRow?.periods['2026-09'].net).toBe(500);
+    expect(subMatrix.totalRow.periods['2026-09'].inbound).toBe(500);
+    expect(subMatrix.totalRow.periods['2026-09'].net).toBe(500);
   });
 });

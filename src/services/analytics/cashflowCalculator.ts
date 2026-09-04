@@ -11,6 +11,7 @@ import {
   PeriodGranularity,
   Transaction,
   isTransactionMatchingAccount,
+  getTransactionEffectiveValueForAccount,
 } from '@/types/finance';
 import {
   fillPeriodKeyRange,
@@ -175,6 +176,19 @@ export function calculateCashflowMatrix(
 
   const categoryIdsSet = new Set(categories.map((c) => c.id));
 
+  const targetAccount =
+    selectedAccountId && options?.accounts
+      ? options.accounts.find((a) => a.id === selectedAccountId)
+      : undefined;
+
+  const getEffectiveValue = (tx: Transaction): number => {
+    if (targetAccount && options?.accounts) {
+      const eff = getTransactionEffectiveValueForAccount(tx, targetAccount, options.accounts);
+      if (eff !== null) return eff;
+    }
+    return tx.value;
+  };
+
   filteredTx.forEach((tx) => {
     const pKey = getPeriodKey(tx.valueDate, granularity);
     const rawCatId = tx.categoryId ?? tx.bucketId ?? null;
@@ -182,10 +196,11 @@ export function calculateCashflowMatrix(
     const catPeriods = directSums.get(catId);
 
     if (catPeriods && catPeriods[pKey]) {
-      if (tx.value >= 0) {
-        catPeriods[pKey].inbound += tx.value;
+      const val = getEffectiveValue(tx);
+      if (val >= 0) {
+        catPeriods[pKey].inbound += val;
       } else {
-        catPeriods[pKey].outbound += tx.value;
+        catPeriods[pKey].outbound += val;
       }
     }
   });
@@ -370,10 +385,11 @@ export function calculateCashflowMatrix(
 
     filteredTx.forEach((tx) => {
       if (getPeriodKey(tx.valueDate, granularity) === pKey) {
-        if (tx.value >= 0) {
-          inbound += tx.value;
+        const val = getEffectiveValue(tx);
+        if (val >= 0) {
+          inbound += val;
         } else {
-          outbound += tx.value;
+          outbound += val;
         }
       }
     });

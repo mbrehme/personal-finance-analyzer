@@ -485,16 +485,16 @@ export function getTransactionAccountInfo(
   // 3. Virtuelle Unterkonten (Category Match)
   const txCatId = tx.categoryId ?? tx.bucketId ?? null;
   const virtualAccounts = accounts.filter((a) => {
-    if (a.accountType !== 'virtual' || !txCatId) return false;
+    if (a.accountType !== 'virtual') return false;
     const catIds = a.categoryIds || a.bucketIds || [];
-    if (!catIds.includes(txCatId)) return false;
+    if (catIds.length > 0 && (!txCatId || !catIds.includes(txCatId))) return false;
 
     if (a.parentAccountId) {
       const isUnderPrimary = primaryAccount ? a.parentAccountId === primaryAccount.id : false;
       const isUnderCounter = counterAccount ? a.parentAccountId === counterAccount.id : false;
       return isUnderPrimary || isUnderCounter;
     }
-    return true;
+    return false;
   });
 
   // 4. Alle eindeutigen Konten
@@ -509,6 +509,64 @@ export function getTransactionAccountInfo(
     virtualAccounts,
     allAccounts: Array.from(accountMap.values()),
   };
+}
+
+/**
+ * Ermittelt den effektiven Betrag einer Transaktion aus der Perspektive eines bestimmten Kontos
+ * (egal ob echtes Bankkonto oder virtuelles Unterkonto).
+ *
+ * Regeln:
+ * 1. Virtuelles Unterkonto:
+ *    - Muss ein übergeordnetes Hauptkonto besitzen (`parentAccountId`).
+ *    - Die Transaktion muss das übergeordnete Hauptkonto tangieren (entweder als primäres Buchungskonto
+ *      oder als Gegenkonto/Empfänger bei einer Umbuchung).
+ *    - Die Transaktion muss der konfigurierten Kategorie des virtuellen Unterkontos entsprechen (`categoryIds`).
+ *    - Falls die Kategorie auf einem fremden Konto gebucht wurde, wird sie NICHT einbezogen (`null`).
+ * 2. Vorzeichen-Logik (Geldfluss-Richtung):
+ *    - Wenn das Konto (bzw. dessen Hauptkonto) das primäre Buchungskonto ist:
+ *      Der Betrag entspricht `tx.value` (z. B. -500 bei Ausgabe / Überweisung).
+ *    - Wenn das Konto (bzw. dessen Hauptkonto) das Gegenkonto (Empfänger) ist:
+ *      Eine negative Buchung auf dem sendenden Konto ist ein positiver Eingang auf dem empfangenden Konto!
+ *      Der Betrag ist `-tx.value` (z. B. -(-500) = +500).
+ *
+ * @param {Transaction} tx - Die zu prüfende Transaktion
+ * @param {Account} targetAccount - Das Zielkonto (real oder virtual)
+ * @param {Account[]} accounts - Alle im Workspace konfigurierten Konten zur Beziehungsauflösung
+ * @returns {number | null} Effektiver Betrag aus Sicht des Kontos, oder null wenn die Buchung das Konto nicht betrifft
+ * @example
+ * const delta = getTransactionEffectiveValueForAccount(tx, targetAccount, accounts);
+ * if (delta !== null) {
+ *   console.log(`Effektiver Betrag für ${targetAccount.name}: ${delta} €`);
+ * }
+ */
+export function getTransactionEffectiveValueForAccount(
+  tx: Transaction,
+  targetAccount: Account,
+  accounts: Account[]
+): number | null {
+  const info = getTransactionAccountInfo(tx, accounts);
+
+  if (targetAccount.accountType === 'virtual') {
+    if (!info.virtualAccounts.some((v) => v.id === targetAccount.id)) {
+      return null;
+    }
+    // Falls das übergeordnete Konto das Gegenkonto (Empfänger der Umbuchung) ist:
+    // Eine negative Buchung auf dem Sendekonto ist ein positiver Eingang auf dem Zielkonto!
+    if (info.counterAccount && targetAccount.parentAccountId === info.counterAccount.id) {
+      return -tx.value;
+    }
+    return tx.value;
+  }
+
+  // Echtes Bankkonto
+  if (info.primaryAccount && info.primaryAccount.id === targetAccount.id) {
+    return tx.value;
+  }
+  if (info.counterAccount && info.counterAccount.id === targetAccount.id) {
+    return -tx.value;
+  }
+
+  return null;
 }
 
 /**
@@ -530,6 +588,10 @@ export function isTransactionMatchingAccount(
   accounts: Account[]
 ): boolean {
   if (accountId === 'all') return true;
+  const targetAcc = accounts.find((a) => a.id === accountId);
+  if (targetAcc) {
+    return getTransactionEffectiveValueForAccount(tx, targetAcc, accounts) !== null;
+  }
   const info = getTransactionAccountInfo(tx, accounts);
   return info.allAccounts.some((a) => a.id === accountId);
 }

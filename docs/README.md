@@ -10,7 +10,9 @@ Dieses Verzeichnis dient der transparenten Verwaltung von Architekturentscheidun
 docs/
 ├── architecture/          # Langfristige Architekturentscheidungen (ADRs)
 │   ├── template.md        # Vorlage für neue ADRs
-│   └── 0001-frontend-architecture-and-stack.md
+│   ├── 0001-frontend-architecture-and-stack.md
+│   ├── 0002-local-first-data-model-and-matching.md
+│   └── 0003-strict-layered-clean-architecture.md
 └── plans/                 # Konkrete Feature- und Umsetzungspläne
     ├── template.md        # Vorlage für neue Feature-Pläne
     ├── active/            # Aktuell in Bearbeitung befindliche Pläne

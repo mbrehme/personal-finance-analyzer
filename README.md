@@ -55,7 +55,9 @@ pnpm preview
 
 ---
 
-## 📁 Projektstruktur
+## 📁 Projektstruktur & Schichtenarchitektur
+
+Das Projekt folgt einer strikten **Schichtenarchitektur (Clean / Hexagonal Architecture)** mit einwärtiger Abhängigkeitsregel (`types/` ◄── `domain/` & `repository/contracts/` ◄── `ui/` & Speicheradapter):
 
 ```text
 personal-finance-analyzer/
@@ -70,21 +72,40 @@ personal-finance-analyzer/
 │   └── plans/                 # Konkrete Feature-Pläne (active/ & archive/)
 ├── public/                    # Statische Assets
 ├── src/
-│   ├── components/            # Wiederverwendbare UI-Komponenten
-│   │   ├── Button.tsx
-│   │   ├── Button.test.tsx    # Co-located Unit-Test
-│   │   └── Header.tsx
-│   ├── pages/                 # Seitenkomponenten (Home, Dashboard)
-│   │   ├── Home.tsx
-│   │   └── Dashboard.tsx
-│   ├── services/              # API- & Fetch-Funktionen
-│   │   ├── api.ts
-│   │   └── api.test.ts        # Co-located Service-Test
+│   ├── types/                 # Schicht 1: Reine Datenmodelle & Verträge (Zero Dependencies)
+│   │   ├── account.types.ts
+│   │   ├── category.types.ts
+│   │   ├── transaction.types.ts
+│   │   ├── operations.types.ts
+│   │   ├── common.types.ts
+│   │   └── index.ts
+│   ├── repository/            # Schicht 2: Persistenz & Entkopplung (Ports & Adapters)
+│   │   ├── contracts/         # Abstrakte async Interfaces (Ports)
+│   │   ├── local/             # LocalStorage Adapter (Safe Quota Handling)
+│   │   ├── indexeddb/         # IndexedDB Adapter (High Performance)
+│   │   └── index.ts           # Factory & Standard-Singletons
+│   ├── domain/                # Schicht 3: Reine Fachlogik & State Orchestrierung
+│   │   ├── modules/
+│   │   │   ├── accounts/      # Konten-Logik & Store-Hook
+│   │   │   ├── categories/    # Kategorie-Hierarchien & Regex-Sanitizing
+│   │   │   ├── transactions/  # Transaktions-Operationen & Filter
+│   │   │   ├── matcher/       # Intelligente Matching-Engine
+│   │   │   ├── analytics/     # Salden- & Cashflow-Berechnungen
+│   │   │   ├── csv/           # Parser & Validierung
+│   │   │   └── finance/       # Central FinanceProvider & useFinance
+│   │   └── index.ts
+│   ├── ui/                    # Schicht 4: Präsentationsschicht (Consumes Domain)
+│   │   ├── components/        # UI-Komponenten & Modals mit Co-Located Tests
+│   │   ├── pages/             # Seitenansichten & Layouts (Home, Cashflow, Balances, etc.)
+│   │   ├── styles/            # CSS & Theme-Definitionen (index.css)
+│   │   └── App.tsx            # UI Root Shell
+│   ├── utils/                 # Übergreifende Hilfsfunktionen (Date, Money)
+│   ├── data/                  # Standard-Konfigurationen & Seed-Transaktionen
 │   ├── test/                  # Globale Test-Konfiguration & Mocks
 │   │   └── setup.ts           # Vitest DOM-Setup (jest-dom Matchers)
-│   ├── App.tsx                # Haupt-App mit Layout & Routen
+│   ├── App.tsx                # Haupt-App Re-Export
 │   ├── main.tsx               # React Entry Point
-│   ├── index.css              # Tailwind CSS Direktiven
+│   ├── index.css              # Globale Tailwind CSS Direktiven
 │   └── vite-env.d.ts          # Vite TypeScript Deklarationen
 ├── .versionrc.json            # Konfiguration für Changelog & Release-Kategorien
 ├── AGENTS.md                  # Anweisungen & Entwicklungs-Workflow für AI-Coding-Agenten
@@ -106,8 +127,9 @@ Der Alias `@/*` verweist direkt auf das Verzeichnis `src/` (konfiguriert in `tsc
 **Beispiel:**
 
 ```tsx
-import { Button } from '@/components/Button';
-import { financeService } from '@/services/api';
+import { Button } from '@/ui/components/Button';
+import { useFinance } from '@/domain';
+import { Account, Category, Transaction } from '@/types';
 ```
 
 ---

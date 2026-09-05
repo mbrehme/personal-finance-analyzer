@@ -17,11 +17,12 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 
 - **Tech-Stack:** React 18, TypeScript (strikter Modus), Vite, Tailwind CSS.
 - **Terminologie:** Verwende in der UI ausschließlich den Begriff **"Kategorie" bzw. "Kategorien"** (niemals "Bucket" oder "Buckets"). Im englischen TypeScript-Code wird **`Category` bzw. `Categories`** verwendet.
-- **Path-Alias:** Verwende für alle relativen Modulimporte den konfigurierten Alias `@/*` (z. B. `import { Button } from '@/components/Button'`).
-- **Struktur:**
-  - `src/components/`: Wiederverwendbare UI-Komponenten.
-  - `src/pages/`: Routen- und Seitenansichten.
-  - `src/services/`: Typisierter Daten- und API-Layer.
+- **Path-Alias:** Verwende für alle relativen Modulimporte den konfigurierten Alias `@/*` (z. B. `import { Button } from '@/ui/components/Button'`, `import { useFinance } from '@/domain'`).
+- **Schichten-Struktur (Clean Architecture):**
+  - `src/types/`: Schicht 1 – Reine Typen, Interfaces und DTOs (Zero Dependencies).
+  - `src/repository/`: Schicht 2 – Persistenzverträge (`contracts/`) und Adapter (`local/`, `indexeddb/`).
+  - `src/domain/`: Schicht 3 – Reine Geschäftslogik, Services und State-Module (`modules/`).
+  - `src/ui/`: Schicht 4 – Präsentationsschicht (`components/`, `pages/`, `styles/`).
 - **Dokumentation:** Schreibe für alle exportierten Komponenten, Hilfsfunktionen, Interfaces und Service-Methoden vollständige **JSDoc/TSDoc-Kommentare** (inkl. `@param`, `@returns`, `@example`).
 
 ### 3. Testing-Phase (Co-Location)

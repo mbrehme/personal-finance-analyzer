@@ -1,6 +1,7 @@
 /**
  * @file ResetModal.test.tsx
- * @description Unit-Tests für den ResetModal Dialog.
+ * @description Unit-Tests für den ResetModal Dialog mit gruppierter Bereichswahl (Konfiguration & Buchungen)
+ * und differenzierter Einzelauswahl von Themen (Kategorien, Konten, Transaktionen, Overrides, Splits, Papierkorb).
  * @module components/modals/ResetModal.test
  */
 
@@ -22,26 +23,40 @@ describe('ResetModal', () => {
         { id: 'cat1', name: 'Miete' },
         { id: 'cat2', name: 'Gehalt' },
       ] as any,
-      transactions: [{ id: 'tx1', value: -50 }] as any,
+      transactions: [
+        { id: 'tx1', value: -50 },
+        { id: 'tx2', value: -20, splitFromId: 'tx1' },
+        { id: 'tx3', value: -100, isOverridden: true },
+      ] as any,
       deletedTransactions: [{ id: 'del1', value: -10 }] as any,
       resetWorkspace: mockResetWorkspace,
     } as any);
   });
 
-  it('renders modal with all checkboxes selected by default', () => {
+  it('renders modal with all 6 individual checkboxes grouped under Konfiguration and Buchungen', () => {
     render(<ResetModal isOpen={true} onClose={mockOnClose} />);
 
     expect(screen.getByRole('heading', { name: 'Workspace zurücksetzen' })).toBeInTheDocument();
+    expect(screen.getByText('Konfiguration')).toBeInTheDocument();
+    expect(screen.getByText('Buchungen')).toBeInTheDocument();
 
-    const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
-    expect(checkboxes).toHaveLength(4);
-    checkboxes.forEach((cb) => {
-      expect(cb.checked).toBe(true);
-    });
+    const catCheckbox = screen.getByTestId('reset-option-categories') as HTMLInputElement;
+    const accCheckbox = screen.getByTestId('reset-option-accounts') as HTMLInputElement;
+    const txCheckbox = screen.getByTestId('reset-option-transactions') as HTMLInputElement;
+    const overridesCheckbox = screen.getByTestId('reset-option-overrides') as HTMLInputElement;
+    const splitsCheckbox = screen.getByTestId('reset-option-splits') as HTMLInputElement;
+    const deletedCheckbox = screen.getByTestId('reset-option-deleted') as HTMLInputElement;
 
-    expect(screen.getByText('2 Kategorien')).toBeInTheDocument();
-    expect(screen.getByText('1 Konto')).toBeInTheDocument();
-    expect(screen.getAllByText('1 Buchung')).toHaveLength(2);
+    expect(catCheckbox.checked).toBe(true);
+    expect(accCheckbox.checked).toBe(true);
+    expect(txCheckbox.checked).toBe(true);
+    expect(overridesCheckbox.checked).toBe(false);
+    expect(splitsCheckbox.checked).toBe(false);
+    expect(deletedCheckbox.checked).toBe(true);
+
+    expect(screen.getByText(/2 Kategorien/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 Konto/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 Buchungen/i)).toBeInTheDocument();
   });
 
   it('does not render when isOpen is false', () => {
@@ -51,35 +66,104 @@ describe('ResetModal', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('allows choosing presets (Nur Kategorien vs Nur Buchungen)', async () => {
+  it('allows quick preset selection using the Bereichswähler (Nur Konfiguration, Nur Buchungen, Alles)', async () => {
     const user = userEvent.setup();
     render(<ResetModal isOpen={true} onClose={mockOnClose} />);
 
-    const categoriesOnlyBtn = screen.getByRole('button', { name: 'Nur Kategorien' });
-    await user.click(categoriesOnlyBtn);
+    const catCheckbox = screen.getByTestId('reset-option-categories') as HTMLInputElement;
+    const accCheckbox = screen.getByTestId('reset-option-accounts') as HTMLInputElement;
+    const txCheckbox = screen.getByTestId('reset-option-transactions') as HTMLInputElement;
+    const overridesCheckbox = screen.getByTestId('reset-option-overrides') as HTMLInputElement;
+    const splitsCheckbox = screen.getByTestId('reset-option-splits') as HTMLInputElement;
+    const deletedCheckbox = screen.getByTestId('reset-option-deleted') as HTMLInputElement;
 
-    const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
-    // Order: Categories, Accounts, Transactions, Deleted
-    expect(checkboxes[0].checked).toBe(true); // Categories
-    expect(checkboxes[1].checked).toBe(false); // Accounts
-    expect(checkboxes[2].checked).toBe(false); // Transactions
-    expect(checkboxes[3].checked).toBe(false); // Deleted
+    // 1. Nur Konfiguration
+    const configOnlyBtn = screen.getByTestId('reset-select-config');
+    await user.click(configOnlyBtn);
 
-    const transactionsOnlyBtn = screen.getByRole('button', { name: 'Nur Buchungen' });
+    expect(catCheckbox.checked).toBe(true);
+    expect(accCheckbox.checked).toBe(true);
+    expect(txCheckbox.checked).toBe(false);
+    expect(overridesCheckbox.checked).toBe(false);
+    expect(splitsCheckbox.checked).toBe(false);
+    expect(deletedCheckbox.checked).toBe(false);
+
+    // 2. Nur Buchungen
+    const transactionsOnlyBtn = screen.getByTestId('reset-select-transactions');
     await user.click(transactionsOnlyBtn);
 
-    expect(checkboxes[0].checked).toBe(false);
-    expect(checkboxes[1].checked).toBe(false);
-    expect(checkboxes[2].checked).toBe(true);
-    expect(checkboxes[3].checked).toBe(true);
+    expect(catCheckbox.checked).toBe(false);
+    expect(accCheckbox.checked).toBe(false);
+    expect(txCheckbox.checked).toBe(true);
+    expect(overridesCheckbox.checked).toBe(true);
+    expect(splitsCheckbox.checked).toBe(true);
+    expect(deletedCheckbox.checked).toBe(true);
+
+    // 3. Alles
+    const allBtn = screen.getByTestId('reset-select-all');
+    await user.click(allBtn);
+
+    expect(catCheckbox.checked).toBe(true);
+    expect(accCheckbox.checked).toBe(true);
+    expect(txCheckbox.checked).toBe(true);
+    expect(deletedCheckbox.checked).toBe(true);
+  });
+
+  it('allows group header toggle ("Alle" / "Keine") for Konfiguration and Buchungen', async () => {
+    const user = userEvent.setup();
+    render(<ResetModal isOpen={true} onClose={mockOnClose} />);
+
+    const catCheckbox = screen.getByTestId('reset-option-categories') as HTMLInputElement;
+    const accCheckbox = screen.getByTestId('reset-option-accounts') as HTMLInputElement;
+    const txCheckbox = screen.getByTestId('reset-option-transactions') as HTMLInputElement;
+    const overridesCheckbox = screen.getByTestId('reset-option-overrides') as HTMLInputElement;
+    const splitsCheckbox = screen.getByTestId('reset-option-splits') as HTMLInputElement;
+    const deletedCheckbox = screen.getByTestId('reset-option-deleted') as HTMLInputElement;
+
+    // Both config items are checked by default -> button says "Keine"
+    const configToggle = screen.getByTestId('reset-group-toggle-config');
+    expect(configToggle).toHaveTextContent('Keine');
+
+    await user.click(configToggle);
+    expect(catCheckbox.checked).toBe(false);
+    expect(accCheckbox.checked).toBe(false);
+    expect(configToggle).toHaveTextContent('Alle');
+
+    // For Buchungen, not all are checked by default -> button says "Alle"
+    const buchungenToggle = screen.getByTestId('reset-group-toggle-transactions');
+    expect(buchungenToggle).toHaveTextContent('Alle');
+
+    await user.click(buchungenToggle);
+    expect(txCheckbox.checked).toBe(true);
+    expect(overridesCheckbox.checked).toBe(true);
+    expect(splitsCheckbox.checked).toBe(true);
+    expect(deletedCheckbox.checked).toBe(true);
+    expect(buchungenToggle).toHaveTextContent('Keine');
+  });
+
+  it('allows individually toggling checkboxes within groups', async () => {
+    const user = userEvent.setup();
+    render(<ResetModal isOpen={true} onClose={mockOnClose} />);
+
+    const catCheckbox = screen.getByTestId('reset-option-categories') as HTMLInputElement;
+    const splitsCheckbox = screen.getByTestId('reset-option-splits') as HTMLInputElement;
+
+    expect(catCheckbox.checked).toBe(true);
+    expect(splitsCheckbox.checked).toBe(false);
+
+    await user.click(catCheckbox);
+    expect(catCheckbox.checked).toBe(false);
+
+    await user.click(splitsCheckbox);
+    expect(splitsCheckbox.checked).toBe(true);
   });
 
   it('calls resetWorkspace with selected options and default target seed', async () => {
     const user = userEvent.setup();
     render(<ResetModal isOpen={true} onClose={mockOnClose} />);
 
-    // Choose "Nur Kategorien"
-    await user.click(screen.getByRole('button', { name: 'Nur Kategorien' }));
+    // Choose "Nur Konfiguration"
+    await user.click(screen.getByTestId('reset-select-config'));
 
     const confirmBtn = screen.getByRole('button', {
       name: /Auf Beispieldaten zurücksetzen/i,
@@ -88,7 +172,7 @@ describe('ResetModal', () => {
 
     expect(mockResetWorkspace).toHaveBeenCalledWith({
       target: 'seed',
-      resetAccounts: false,
+      resetAccounts: true,
       resetCategories: true,
       resetTransactions: false,
       resetOverrides: false,
@@ -99,7 +183,7 @@ describe('ResetModal', () => {
     expect(mockOnClose).toHaveBeenCalled();
   });
 
-  it('allows switching target to empty/delete mode and calls resetWorkspace with target empty', async () => {
+  it('allows switching target to empty mode and calling resetWorkspace', async () => {
     const user = userEvent.setup();
     render(<ResetModal isOpen={true} onClose={mockOnClose} />);
 
@@ -107,63 +191,12 @@ describe('ResetModal', () => {
     const emptyBtn = screen.getByTestId('reset-target-empty');
     await user.click(emptyBtn);
 
-    // Button label changes to "Ausgewählte Bereiche zurücksetzen"
-    const confirmBtn = screen.getByRole('button', {
-      name: /Ausgewählte Bereiche zurücksetzen/i,
-    });
-    await user.click(confirmBtn);
+    // In empty mode, overrides and splits default to true
+    const overridesCheckbox = screen.getByTestId('reset-option-overrides') as HTMLInputElement;
+    expect(overridesCheckbox.checked).toBe(true);
 
-    expect(mockResetWorkspace).toHaveBeenCalledWith({
-      target: 'empty',
-      resetAccounts: true,
-      resetCategories: true,
-      resetTransactions: true,
-      resetOverrides: false,
-      resetSplits: false,
-      resetDeletedTransactions: true,
-      includeSampleTransactions: false,
-    });
-    expect(mockOnClose).toHaveBeenCalled();
-  });
-
-  it('provides independent checkboxes for importierte Transaktionen, Overrides, and Splits in clear mode', async () => {
-    const user = userEvent.setup();
-    render(<ResetModal isOpen={true} onClose={mockOnClose} />);
-
-    // Switch to empty / clear mode
-    await user.click(screen.getByTestId('reset-target-empty'));
-
-    const allTxCheckbox = screen.getByTestId('reset-option-transactions');
-    const overridesCheckbox = screen.getByTestId('reset-option-overrides');
-    const splitsCheckbox = screen.getByTestId('reset-option-splits');
-
-    // Default in empty mode: all transactions checked, overrides unchecked, splits unchecked
-    expect(allTxCheckbox).toBeChecked();
-    expect(overridesCheckbox).not.toBeChecked();
-    expect(splitsCheckbox).not.toBeChecked();
-
-    // Checkboxes are independent, NOT either-or! Checking overrides does NOT uncheck transactions
-    await user.click(overridesCheckbox);
-    expect(overridesCheckbox).toBeChecked();
-    expect(allTxCheckbox).toBeChecked();
-
-    // Checking splits is also independent
-    await user.click(splitsCheckbox);
-    expect(splitsCheckbox).toBeChecked();
-    expect(overridesCheckbox).toBeChecked();
-    expect(allTxCheckbox).toBeChecked();
-
-    // Use "Nur Overrides" quick selection
-    await user.click(screen.getByRole('button', { name: 'Nur Overrides' }));
-    expect(overridesCheckbox).toBeChecked();
-    expect(splitsCheckbox).not.toBeChecked();
-    expect(allTxCheckbox).not.toBeChecked();
-
-    // Use "Nur Splits" quick selection
-    await user.click(screen.getByRole('button', { name: 'Nur Splits' }));
-    expect(splitsCheckbox).toBeChecked();
-    expect(overridesCheckbox).not.toBeChecked();
-    expect(allTxCheckbox).not.toBeChecked();
+    // Choose "Nur Buchungen"
+    await user.click(screen.getByTestId('reset-select-transactions'));
 
     const confirmBtn = screen.getByRole('button', {
       name: /Ausgewählte Bereiche zurücksetzen/i,
@@ -174,11 +207,25 @@ describe('ResetModal', () => {
       target: 'empty',
       resetAccounts: false,
       resetCategories: false,
-      resetTransactions: false,
-      resetOverrides: false,
+      resetTransactions: true,
+      resetOverrides: true,
       resetSplits: true,
-      resetDeletedTransactions: false,
+      resetDeletedTransactions: true,
       includeSampleTransactions: false,
     });
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('closes when clicking close or cancel buttons', async () => {
+    const user = userEvent.setup();
+    render(<ResetModal isOpen={true} onClose={mockOnClose} />);
+
+    const cancelBtn = screen.getByRole('button', { name: 'Abbrechen' });
+    await user.click(cancelBtn);
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+
+    const closeBtn = screen.getByRole('button', { name: 'Schließen' });
+    await user.click(closeBtn);
+    expect(mockOnClose).toHaveBeenCalledTimes(2);
   });
 });

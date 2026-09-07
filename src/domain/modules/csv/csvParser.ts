@@ -418,7 +418,7 @@ export function parseCurrencyValue(raw: string): number {
 }
 
 /**
- * Erzeugt einen deterministischen Hash/ID für eine Transaktion zur Duplikatsvermeidung.
+ * Erzeugt einen deterministischen Hash/ID für eine Transaktion zur Duplikatsvermeidung (Legacy).
  */
 export function generateTransactionId(
   accountIban: string,
@@ -439,17 +439,35 @@ export function generateTransactionId(
 }
 
 /**
+ * Erzeugt eine symmetrische deterministische ID für eine gerichtete Transaktion.
+ * Sichert ab, dass ein Übertrag von Konto A nach Konto B sowohl im Auszug von A
+ * als auch im Auszug von B dieselbe ID erzeugt.
+ */
+export function generateDirectedTransactionId(
+  date: string,
+  amount: number,
+  senderIban: string = '',
+  receiverIban: string = '',
+  subject: string = '',
+  partnerName: string = ''
+): string {
+  const normSubject = (subject || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normPartner = (partnerName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normSenderIban = (senderIban || '').trim().toUpperCase().replace(/\s+/g, '');
+  const normReceiverIban = (receiverIban || '').trim().toUpperCase().replace(/\s+/g, '');
+  const rawKey = `${date}|${amount.toFixed(2)}|${normSenderIban}|${normReceiverIban}|${normSubject}|${normPartner}`;
+
+  let hash = 0;
+  for (let i = 0; i < rawKey.length; i++) {
+    hash = (hash << 5) - hash + rawKey.charCodeAt(i);
+    hash |= 0;
+  }
+  return `tx-${Math.abs(hash).toString(36)}`;
+}
+
+/**
  * Berechnet einen deterministischen, tagesgenauen Fingerabdruck (FNV-1a 32-Bit Hash)
- * für eine importierte Bank-Rohbuchung basierend auf dem Wertstellungsdatum.
- *
- * @param {string} accountIban - Bankkonto-IBAN (oder Konto-Identifikator)
- * @param {string} date - Wertstellungsdatum / Valutadatum (YYYY-MM-DD)
- * @param {number} value - Exakter Betrag
- * @param {string} subject - Verwendungszweck der Bank
- * @param {string} [partner=''] - Zahlungspartner (Empfänger oder Auftraggeber)
- * @param {string} [iban=''] - Gegenkonto-IBAN
- * @param {number} [occurrenceIndex=0] - Zähler für Mehrfachbuchungen am exakt selben Tag
- * @returns {string} Einzigartiger Fingerprint-String mit Präfix 'fp-'
+ * für eine importierte Bank-Rohbuchung basierend auf dem Wertstellungsdatum (Legacy).
  */
 export function computeRawFingerprint(
   accountIban: string,
@@ -474,7 +492,35 @@ export function computeRawFingerprint(
 }
 
 /**
- * Konvertiert die geparsten CSV-Zeilen anhand des Mappings in typisierte `Transaction`-Objekte.
+ * Berechnet einen symmetrischen, gerichteten Fingerabdruck für eine Transaktion.
+ * Garantiert identische Fingerabdrücke unabhängig davon, welcher Kontoauszug zuerst importiert wurde.
+ */
+export function computeDirectedFingerprint(
+  date: string,
+  amount: number,
+  senderIban: string = '',
+  receiverIban: string = '',
+  subject: string = '',
+  partnerName: string = '',
+  occurrenceIndex: number = 0
+): string {
+  const normSubject = (subject || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normPartner = (partnerName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normSenderIban = (senderIban || '').trim().toUpperCase().replace(/\s+/g, '');
+  const normReceiverIban = (receiverIban || '').trim().toUpperCase().replace(/\s+/g, '');
+  const rawKey = `${date}|${amount.toFixed(2)}|${normSenderIban}|${normReceiverIban}|${normSubject}|${normPartner}|${occurrenceIndex}`;
+
+  let hash = 2166136261;
+  for (let i = 0; i < rawKey.length; i++) {
+    hash ^= rawKey.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fp-${(hash >>> 0).toString(36)}`;
+}
+
+/**
+ * Konvertiert die geparsten CSV-Zeilen anhand des Mappings in typisierte `Transaction`-Objekte
+ * nach dem gerichteten Geldfluss-Modell.
  *
  * @param {Record<string, string>[]} rows - Geparste CSV-Zeilen
  * @param {CsvColumnMapping} mapping - Spaltenzuordnung
@@ -491,12 +537,13 @@ export function convertRowsToTransactions(
   importedAt?: string
 ): Transaction[] {
   const timestamp = importedAt || new Date().toISOString();
+  const fallbackAccountIban = normalizeIban(accountIban);
+
   const dayOccurrences = new Map<string, number>();
   const dayIndices = new Map<string, number>();
-  const fallbackAccountIban = (accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
 
-  return rows.map((row, index) => {
-    const rawValDate = (mapping.dateColumn ? row[mapping.dateColumn] : '') || '';
+  return rows.map((row) => {
+    const rawValDate = row[mapping.dateColumn] || '';
     const date: ISODateString = toISODateString(rawValDate);
 
     const rawValue = row[mapping.valueColumn] || '0';
@@ -530,28 +577,38 @@ export function convertRowsToTransactions(
     const receiver = mapping.receiverColumn ? (row[mapping.receiverColumn] || '').trim() : '';
     const subject = (row[mapping.subjectColumn] || '').trim();
     const rawIban = mapping.ibanColumn ? (row[mapping.ibanColumn] || '').trim() : '';
-    // Falls die erkannte ibanColumn dieselbe Spalte wie accountIbanColumn ist,
-    // soll die Gegenkonto-IBAN nicht das eigene Konto sein
     const iban =
       mapping.accountIbanColumn && mapping.accountIbanColumn === mapping.ibanColumn ? '' : rawIban;
 
-    // Tag-gebundener Occurrence-Zähler
+    // --- Gerichtetes Geldfluss-Modell ---
+    const isOutflow = value < 0;
+    const amount = roundToTwoDecimals(Math.abs(value));
+
+    const normPartnerIban = normalizeIban(iban);
+    const senderIban = isOutflow ? normAccountIban : normPartnerIban;
+    const receiverIban = isOutflow ? normPartnerIban : normAccountIban;
+
+    const senderName = isOutflow ? issuer : issuer || receiver;
+    const receiverName = isOutflow ? receiver || issuer : receiver;
+
     const partner = receiver || issuer;
-    const normSubject = subject.trim().toLowerCase().replace(/\s+/g, ' ');
     const normPartner = partner.trim().toLowerCase().replace(/\s+/g, ' ');
-    const normIban = iban.trim().toUpperCase().replace(/\s+/g, '');
-    const dayKey = `${normAccountIban}|${date}|${value.toFixed(2)}|${normSubject}|${normPartner}|${normIban}`;
+    const normSubject = subject.trim().toLowerCase().replace(/\s+/g, ' ');
+    const normSenderIban = (senderIban || '').toUpperCase().replace(/\s+/g, '');
+    const normReceiverIban = (receiverIban || '').toUpperCase().replace(/\s+/g, '');
 
-    const occurrenceIndex = dayOccurrences.get(dayKey) || 0;
-    dayOccurrences.set(dayKey, occurrenceIndex + 1);
+    const directedDayKey = `${normSenderIban}|${normReceiverIban}|${date}|${amount.toFixed(2)}|${normSubject}|${normPartner}`;
 
-    const rawFingerprint = computeRawFingerprint(
-      normAccountIban,
+    const occurrenceIndex = dayOccurrences.get(directedDayKey) || 0;
+    dayOccurrences.set(directedDayKey, occurrenceIndex + 1);
+
+    const rawFingerprint = computeDirectedFingerprint(
       date,
-      value,
-      subject,
-      partner,
-      iban,
+      amount,
+      normSenderIban,
+      normReceiverIban,
+      normSubject,
+      normPartner,
       occurrenceIndex
     );
 
@@ -560,30 +617,36 @@ export function convertRowsToTransactions(
     const dayIndex = dayIndices.get(dateAccountKey) || 0;
     dayIndices.set(dateAccountKey, dayIndex + 1);
 
-    const baseId = generateTransactionId(
-      normAccountIban,
+    const baseId = generateDirectedTransactionId(
       date,
-      value,
-      subject,
-      iban,
-      issuer,
-      receiver
+      amount,
+      normSenderIban,
+      normReceiverIban,
+      normSubject,
+      normPartner
     );
 
-    const id = `${baseId}-${index}`;
+    const id = occurrenceIndex > 0 ? `${baseId}-${occurrenceIndex}` : baseId;
 
     return {
       id,
-      accountIban: normAccountIban,
       date,
-      issuer,
-      receiver,
+      amount,
+      senderIban,
+      receiverIban,
+      sender: senderName,
+      receiver: receiverName,
       subject,
+
+      // Abwärtskompatible Felder
+      accountIban: normAccountIban,
+      issuer,
+      iban,
+      value,
       get type() {
         return getTransactionType(value);
       },
-      iban,
-      value,
+
       categoryId: null,
       assignmentSource: 'unassigned',
       origin: 'imported',
@@ -596,8 +659,12 @@ export function convertRowsToTransactions(
       originalAccountIban: normAccountIban,
       originalDate: date,
       originalValue: value,
+      originalAmount: amount,
+      originalSenderIban: senderIban,
+      originalReceiverIban: receiverIban,
+      originalSender: senderName,
       originalSubject: subject,
-      originalReceiver: receiver,
+      originalReceiver: receiverName,
       originalIssuer: issuer,
       originalIban: iban,
     };

@@ -282,4 +282,41 @@ describe('csvParser', () => {
     expect(txs[2].value).toBe(-1500);
     expect(txs[2].type).toBe('outbound');
   });
+
+  it('generates identical fingerprint and ID for transfer imported from both accounts (directed flow)', () => {
+    const giroIban = 'DE89120300001083850147';
+    const tagesgeldIban = 'DE80120300001027106861';
+
+    // 1. Auszug von Girokonto: Ausgang 960 € an Tagesgeld
+    const giroCsv = `Buchungstag;Begünstigter / Auftraggeber;IBAN;Verwendungszweck;Betrag (€)
+01.03.2026;Martin Brehme;${tagesgeldIban};Sparübertrag Rücklagen;-960,00`;
+    const giroParsed = parseRawCsv(giroCsv);
+    const [giroTx] = convertRowsToTransactions(
+      giroParsed.rows,
+      giroParsed.suggestedMapping,
+      giroIban
+    );
+
+    // 2. Auszug von Tagesgeld: Eingang 960 € von Girokonto
+    const tgCsv = `Buchungstag;Begünstigter / Auftraggeber;IBAN;Verwendungszweck;Betrag (€)
+01.03.2026;Martin Brehme;${giroIban};Sparübertrag Rücklagen;960,00`;
+    const tgParsed = parseRawCsv(tgCsv);
+    const [tgTx] = convertRowsToTransactions(
+      tgParsed.rows,
+      tgParsed.suggestedMapping,
+      tagesgeldIban
+    );
+
+    // Beide müssen exakt dieselben gerichteten Eigenschaften besitzen
+    expect(giroTx.amount).toBe(960);
+    expect(tgTx.amount).toBe(960);
+    expect(giroTx.senderIban).toBe(giroIban);
+    expect(tgTx.senderIban).toBe(giroIban);
+    expect(giroTx.receiverIban).toBe(tagesgeldIban);
+    expect(tgTx.receiverIban).toBe(tagesgeldIban);
+
+    // Fingerprint und deterministische ID sind 100% identisch
+    expect(giroTx.rawFingerprint).toBe(tgTx.rawFingerprint);
+    expect(giroTx.id).toBe(tgTx.id);
+  });
 });

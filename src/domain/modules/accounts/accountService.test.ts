@@ -293,4 +293,88 @@ describe('accountService', () => {
       expect(isTransactionMatchingAccount(transferTx, 'acc-cash', allAccounts)).toBe(false);
     });
   });
+
+  describe('Directed Money Flow helpers', () => {
+    const giroAccount: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      iban: 'DE11112222',
+      accountType: 'real',
+      balanceEntries: [],
+    };
+
+    const tgAccount: Account = {
+      id: 'acc-tg',
+      name: 'Tagesgeld',
+      iban: 'DE33334444',
+      accountType: 'real',
+      balanceEntries: [],
+    };
+
+    const directedTx: Transaction = {
+      id: 'tx-directed-1',
+      date: '2026-09-01',
+      amount: 960,
+      senderIban: 'DE11112222',
+      receiverIban: 'DE33334444',
+      sender: 'Martin Brehme',
+      receiver: 'Martin Brehme Tagesgeld',
+      subject: 'Sparübertrag',
+      assignmentSource: 'unassigned',
+      issuer: 'Martin Brehme',
+      iban: 'DE33334444',
+      value: -960,
+    };
+
+    it('identifies internal transfers between user accounts correctly', async () => {
+      const { isInternalTransfer } = await import('./accountService');
+      expect(isInternalTransfer(directedTx, [giroAccount, tgAccount])).toBe(true);
+
+      const externalTx: Transaction = {
+        id: 'tx-ext',
+        date: '2026-09-01',
+        amount: 50,
+        senderIban: 'DE11112222',
+        receiverIban: 'DE99999999',
+        sender: 'Martin',
+        receiver: 'Rewe',
+        subject: 'Einkauf',
+        assignmentSource: 'unassigned',
+        issuer: 'Martin',
+        iban: 'DE99999999',
+        value: -50,
+      };
+      expect(isInternalTransfer(externalTx, [giroAccount, tgAccount])).toBe(false);
+    });
+
+    it('derives correct perspective value (-amount for sender, +amount for receiver)', () => {
+      // Girokonto ist Sender -> -960 €
+      expect(
+        getTransactionEffectiveValueForAccount(directedTx, giroAccount, [giroAccount, tgAccount])
+      ).toBe(-960);
+
+      // Tagesgeld ist Empfänger -> +960 €
+      expect(
+        getTransactionEffectiveValueForAccount(directedTx, tgAccount, [giroAccount, tgAccount])
+      ).toBe(960);
+    });
+
+    it('provides effective partner name based on account perspective', async () => {
+      const { getEffectiveTransactionPartner } = await import('./accountService');
+
+      // Aus Sicht des Girokontos: Partner ist der Empfänger (Tagesgeld)
+      const partnerGiro = getEffectiveTransactionPartner(directedTx, giroAccount);
+      expect(partnerGiro.name).toBe('Martin Brehme Tagesgeld');
+      expect(partnerGiro.iban).toBe('DE33334444');
+
+      // Aus Sicht des Tagesgeldkontos: Partner ist der Absender (Girokonto)
+      const partnerTg = getEffectiveTransactionPartner(directedTx, tgAccount);
+      expect(partnerTg.name).toBe('Martin Brehme');
+      expect(partnerTg.iban).toBe('DE11112222');
+
+      // Gesamtansicht: Zeigt von -> zu
+      const partnerAll = getEffectiveTransactionPartner(directedTx);
+      expect(partnerAll.name).toBe('Martin Brehme → Martin Brehme Tagesgeld');
+    });
+  });
 });

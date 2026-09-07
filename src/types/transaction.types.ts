@@ -13,6 +13,11 @@ import { CategoryAssignmentSource } from './category.types';
 export type TransactionType = 'inbound' | 'outbound';
 
 /**
+ * Gerichteter Geldfluss-Typ: Einnahme, Ausgabe oder interne Umbuchung zwischen eigenen Konten.
+ */
+export type TransactionFlowType = 'inbound' | 'outbound' | 'transfer';
+
+/**
  * Herkunft einer Transaktion:
  * - 'imported': Unveränderte Original-Bankbuchung
  * - 'split': Aus einer Aufteilung hervorgegangene Teilbuchung
@@ -22,29 +27,44 @@ export type TransactionOrigin = 'imported' | 'split' | 'override';
 
 /**
  * Eine einzelne Finanzbuchung / Transaktion.
+ * Unterstützt sowohl das gerichtete Geldfluss-Modell (sender -> receiver) als auch
+ * abwärtskompatible Auszugsfelder.
  */
 export interface Transaction {
-  /** Eindeutige, deterministische ID (generiert aus Datum, Betrag, IBAN, Text) */
+  /** Eindeutige, deterministische ID (generiert aus Datum, Betrag, sender/receiver-IBAN, Text) */
   id: string;
-  /** Eigene Bank-IBAN des Kontos, auf dem die Buchung gebucht wurde */
-  accountIban?: string;
   /** Wertstellungsdatum (Valutadatum) der Buchung */
   date: ISODateString;
-  /** Auftraggeber / Absender der Zahlung */
-  issuer: string;
-  /** Empfänger der Zahlung */
+
+  /* --- Gerichtetes Geldfluss-Modell (Directed Money Flow) --- */
+  /** Vorzeichenloser Betrag der Transaktion (stets >= 0) */
+  amount?: number;
+  /** IBAN des absendenden Kontos (Zahlungspflichtiger) */
+  senderIban?: string;
+  /** Name / Bezeichnung des Absenders */
+  sender?: string;
+  /** IBAN des empfangenden Kontos (Zahlungsempfänger) */
+  receiverIban?: string;
+  /** Name / Bezeichnung des Empfängers */
   receiver: string;
   /** Verwendungszweck / Buchungstext */
   subject: string;
+
+  /* --- Abwärtskompatible / Auszugsbezogene Felder --- */
+  /** Eigene Bank-IBAN des Kontos, auf dem die Buchung importiert wurde */
+  accountIban?: string;
+  /** Auftraggeber / Absender der Zahlung (äquivalent zu sender) */
+  issuer: string;
   /**
    * Virtueller Typ der Transaktion (Inbound = Einnahme bei value >= 0, Outbound = Ausgabe bei value < 0).
    * Wird nicht in der Datenbank persistiert, sondern dynamisch aus dem Vorzeichen von `value` abgeleitet.
    */
   type?: TransactionType;
-  /** Zugehörige IBAN des Kontos oder Gegenkontos */
+  /** Zugehörige Gegenkonto-IBAN */
   iban: string;
   /** Betrag der Transaktion (positiv für Inbound, negativ für Outbound) */
   value: number;
+
   /** ID der zugeordneten Kategorie oder null */
   categoryId?: string | null;
   /**
@@ -75,6 +95,10 @@ export interface Transaction {
   /** Ursprüngliches Wertstellungsdatum (Valutadatum) aus den Bank-Rohdaten */
   originalDate?: ISODateString;
   originalValue?: number;
+  originalAmount?: number;
+  originalSenderIban?: string;
+  originalReceiverIban?: string;
+  originalSender?: string;
   originalSubject?: string;
   originalReceiver?: string;
   originalIssuer?: string;

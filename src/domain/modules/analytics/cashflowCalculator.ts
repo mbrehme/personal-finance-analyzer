@@ -12,6 +12,7 @@ import {
   Transaction,
   isTransactionMatchingAccount,
   getTransactionEffectiveValueForAccount,
+  isInternalTransfer,
 } from '@/types/finance';
 import {
   fillPeriodKeyRange,
@@ -208,6 +209,11 @@ export function calculateCashflowMatrix(
         options.accounts,
         filteredTx
       );
+    }
+    // In der Gesamtsicht ohne Kontofilter: Interne Umbuchungen zwischen eigenen Konten
+    // heben sich gegenseitig auf und sind kein externes Haushaltseinkommen bzw. keine Ausgabe
+    if (options?.accounts && isInternalTransfer(tx, options.accounts)) {
+      return null;
     }
     return tx.value;
   };

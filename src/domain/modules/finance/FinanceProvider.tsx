@@ -294,9 +294,74 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         loadedAccounts = seededAccounts;
       }
 
+      // Migration und Deduplizierung für gerichteten Geldfluss
+      let transactionsToUse = loadedTransactions;
+      let needsTxMigrationSave = false;
+
+      // 1. Sicherstellen, dass gerichtete Felder befüllt sind
+      const migrated = transactionsToUse.map((tx) => {
+        if (tx.amount === undefined || (!tx.senderIban && !tx.receiverIban)) {
+          needsTxMigrationSave = true;
+          return financeDB.normalizeTransaction(tx);
+        }
+        return tx;
+      });
+
+      // 2. Bestehende historische Duplikate (Gegenbuchungen aus früheren getrennten CSV-Imports) zusammenführen
+      const uniqueTxMap = new Map<string, Transaction>();
+      const idsToDelete: string[] = [];
+
+      for (const tx of migrated) {
+        const counterpartEntry = Array.from(uniqueTxMap.values()).find((existing) => {
+          if (existing.amount !== tx.amount) return false;
+          const diffDays =
+            Math.abs(new Date(existing.date).getTime() - new Date(tx.date).getTime()) /
+            (24 * 3600 * 1000);
+          if (diffDays > 4) return false;
+
+          const matchSameDirected = Boolean(
+            existing.senderIban &&
+            tx.senderIban &&
+            existing.receiverIban &&
+            tx.receiverIban &&
+            existing.senderIban === tx.senderIban &&
+            existing.receiverIban === tx.receiverIban
+          );
+
+          const matchOppositeSigned = Boolean(
+            existing.value === -tx.value &&
+            ((existing.accountIban && tx.iban && existing.accountIban === tx.iban) ||
+              (existing.iban && tx.accountIban && existing.iban === tx.accountIban))
+          );
+
+          return matchSameDirected || matchOppositeSigned;
+        });
+
+        if (counterpartEntry) {
+          if (!counterpartEntry.categoryId && tx.categoryId) {
+            counterpartEntry.categoryId = tx.categoryId;
+            counterpartEntry.assignmentSource = tx.assignmentSource;
+          }
+          idsToDelete.push(tx.id);
+          needsTxMigrationSave = true;
+          continue;
+        }
+
+        uniqueTxMap.set(tx.rawFingerprint || tx.id, tx);
+      }
+
+      if (needsTxMigrationSave) {
+        const cleanedList = Array.from(uniqueTxMap.values());
+        await financeDB.saveTransactions(cleanedList);
+        for (const delId of idsToDelete) {
+          await financeDB.deleteTransaction(delId);
+        }
+        transactionsToUse = cleanedList;
+      }
+
       setAccounts(loadedAccounts);
       setCategories(loadedCategories);
-      setTransactions(sortTransactionsDesc(loadedTransactions));
+      setTransactions(sortTransactionsDesc(transactionsToUse));
       setDeletedTransactions(sortTransactionsDesc(validDeleted));
       setError(null);
     } catch (err) {

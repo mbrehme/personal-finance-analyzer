@@ -14,6 +14,8 @@ export {
   getTransactionEffectiveValueForAccount,
   hasDirectCounterpart,
   isTransactionMatchingAccount,
+  isInternalTransfer,
+  getEffectiveTransactionPartner,
 } from '@/domain/modules/accounts/accountService';
 
 export {

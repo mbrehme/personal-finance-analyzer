@@ -20,7 +20,7 @@ import {
 } from '@/types/finance';
 
 const DB_NAME = 'personal_finance_analyzer_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORES = {
   ACCOUNTS: 'accounts',
   CATEGORIES: 'categories',
@@ -55,9 +55,9 @@ function isIndexedDBAvailable(): boolean {
 }
 
 /**
- * Initialisiert das saubere IndexedDB-Schema (Version 1).
+ * Initialisiert das saubere IndexedDB-Schema (Version 2 mit gerichteten Indizes).
  */
-function applyMigrations(db: IDBDatabase): void {
+function applyMigrations(db: IDBDatabase, idbTx: IDBTransaction | null): void {
   if (!db.objectStoreNames.contains(STORES.ACCOUNTS)) {
     db.createObjectStore(STORES.ACCOUNTS, { keyPath: 'id' });
   }
@@ -66,11 +66,22 @@ function applyMigrations(db: IDBDatabase): void {
     db.createObjectStore(STORES.CATEGORIES, { keyPath: 'id' });
   }
 
+  let txStore: IDBObjectStore;
   if (!db.objectStoreNames.contains(STORES.TRANSACTIONS)) {
-    const txStore = db.createObjectStore(STORES.TRANSACTIONS, { keyPath: 'id' });
+    txStore = db.createObjectStore(STORES.TRANSACTIONS, { keyPath: 'id' });
     txStore.createIndex('date', 'date', { unique: false });
     txStore.createIndex('categoryId', 'categoryId', { unique: false });
     txStore.createIndex('accountIban', 'accountIban', { unique: false });
+    txStore.createIndex('senderIban', 'senderIban', { unique: false });
+    txStore.createIndex('receiverIban', 'receiverIban', { unique: false });
+  } else if (idbTx) {
+    txStore = idbTx.objectStore(STORES.TRANSACTIONS);
+    if (!txStore.indexNames.contains('senderIban')) {
+      txStore.createIndex('senderIban', 'senderIban', { unique: false });
+    }
+    if (!txStore.indexNames.contains('receiverIban')) {
+      txStore.createIndex('receiverIban', 'receiverIban', { unique: false });
+    }
   }
 
   if (!db.objectStoreNames.contains(STORES.DELETED_TRANSACTIONS)) {
@@ -97,7 +108,8 @@ function openDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
-      applyMigrations(db);
+      const idbTx = (event.target as IDBOpenDBRequest).transaction;
+      applyMigrations(db, idbTx);
     };
 
     request.onsuccess = () => {
@@ -228,12 +240,39 @@ export const financeDB = {
   /* ================== TRANSACTIONS ================== */
   /**
    * Normalisiert ein Transaktionsobjekt und versieht es mit einem dynamischen Getter
-   * für den virtuellen Transaktionstyp ('inbound' bzw. 'outbound').
+   * für den virtuellen Transaktionstyp ('inbound' bzw. 'outbound') sowie standardisierten
+   * gerichteten Feldern (amount, senderIban, receiverIban, sender, receiver).
    */
   normalizeTransaction(t: Transaction): Transaction {
     const { type: _discardedType, ...rest } = t;
+    const value = t.value ?? 0;
+    const amount = t.amount !== undefined ? t.amount : Math.abs(value);
+    const isOutflow = value < 0;
+
+    let senderIban = t.senderIban;
+    let receiverIban = t.receiverIban;
+    let sender = t.sender;
+    let receiver = t.receiver;
+
+    if (!senderIban && !receiverIban) {
+      const normAccIban = (t.accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
+      const normTxIban = (t.iban || '').trim().toUpperCase().replace(/\s+/g, '');
+      senderIban = isOutflow ? normAccIban : normTxIban;
+      receiverIban = isOutflow ? normTxIban : normAccIban;
+    }
+
+    if (!sender && !receiver) {
+      sender = isOutflow ? t.issuer : t.issuer || t.receiver;
+      receiver = isOutflow ? t.receiver || t.issuer : t.receiver;
+    }
+
     return {
       ...rest,
+      amount,
+      senderIban,
+      receiverIban,
+      sender: sender || '',
+      receiver: receiver || '',
       categoryId: t.categoryId ?? null,
       get type() {
         return getTransactionType(this.value);
@@ -243,12 +282,39 @@ export const financeDB = {
 
   /**
    * Bereinigt ein Transaktionsobjekt vor der Persistierung (IndexedDB / Export),
-   * sodass virtuelle Felder wie `type` niemals physisch gespeichert werden.
+   * sodass virtuelle Felder wie `type` niemals physisch gespeichert werden,
+   * und stellt sicher, dass gerichtete Felder persistiert werden.
    */
   sanitizeForPersistence(tx: Transaction): Omit<Transaction, 'type'> {
     const { type: _discardedType, ...rest } = tx;
+    const value = tx.value ?? 0;
+    const amount = tx.amount !== undefined ? tx.amount : Math.abs(value);
+    const isOutflow = value < 0;
+
+    let senderIban = tx.senderIban;
+    let receiverIban = tx.receiverIban;
+    let sender = tx.sender;
+    let receiver = tx.receiver;
+
+    if (!senderIban && !receiverIban) {
+      const normAccIban = (tx.accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
+      const normTxIban = (tx.iban || '').trim().toUpperCase().replace(/\s+/g, '');
+      senderIban = isOutflow ? normAccIban : normTxIban;
+      receiverIban = isOutflow ? normTxIban : normAccIban;
+    }
+
+    if (!sender && !receiver) {
+      sender = isOutflow ? tx.issuer : tx.issuer || tx.receiver;
+      receiver = isOutflow ? tx.receiver || tx.issuer : tx.receiver;
+    }
+
     return {
       ...rest,
+      amount,
+      senderIban,
+      receiverIban,
+      sender: sender || '',
+      receiver: receiver || '',
       categoryId: tx.categoryId ?? null,
     };
   },

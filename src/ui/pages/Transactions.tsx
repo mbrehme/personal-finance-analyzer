@@ -18,6 +18,9 @@ import {
   Transaction,
   getTransactionAccountInfo,
   isTransactionMatchingAccount,
+  getTransactionEffectiveValueForAccount,
+  isInternalTransfer,
+  getEffectiveTransactionPartner,
 } from '@/types/finance';
 import { IconRenderer } from '@/ui/components/IconRenderer';
 import { DateRangePicker } from '@/ui/components/DateRangePicker';
@@ -764,11 +767,24 @@ export const Transactions: React.FC = () => {
               {displayedTransactions.length > 0 ? (
                 displayedTransactions.map((tx) => {
                   const accountInfo = getTransactionAccountInfo(tx, accounts);
-                  const isOutbound = tx.value < 0;
+                  const selectedAccount =
+                    appliedFilters.accountId !== 'all'
+                      ? accounts.find((a) => a.id === appliedFilters.accountId)
+                      : undefined;
+                  const effValue = selectedAccount
+                    ? (getTransactionEffectiveValueForAccount(
+                        tx,
+                        selectedAccount,
+                        accounts,
+                        displayedTransactions
+                      ) ?? tx.value)
+                    : tx.value;
+                  const isOutbound = effValue < 0;
                   const isSplitParent = splitParentIds.has(tx.id);
                   const isSplitChild = Boolean(tx.splitFromId);
                   const isSplitPart = isSplitParent || isSplitChild;
-                  const isTransfer = Boolean(accountInfo.counterAccount);
+                  const isTransfer =
+                    Boolean(accountInfo.counterAccount) || isInternalTransfer(tx, accounts);
                   const fromAccount = isTransfer
                     ? isOutbound
                       ? accountInfo.primaryAccount
@@ -952,9 +968,17 @@ export const Transactions: React.FC = () => {
                       {/* Partner & Subject */}
                       <td className="min-w-0 max-w-[200px] px-4 py-3 lg:max-w-xs">
                         <div className="flex min-w-0 max-w-full items-center gap-1.5">
-                          <span className="min-w-0 flex-1 truncate font-semibold text-slate-800">
-                            {tx.receiver || tx.issuer || 'Kein Empfänger'}
-                          </span>
+                          {(() => {
+                            const effPartner = getEffectiveTransactionPartner(tx, selectedAccount);
+                            return (
+                              <span
+                                className="min-w-0 flex-1 truncate font-semibold text-slate-800"
+                                title={effPartner.name}
+                              >
+                                {effPartner.name}
+                              </span>
+                            );
+                          })()}
                           {(() => {
                             const origPartner = (
                               tx.originalReceiver ||
@@ -1000,8 +1024,25 @@ export const Transactions: React.FC = () => {
 
                       {/* Betrag */}
                       <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-bold">
-                        <div className={isOutbound ? 'text-slate-900' : 'text-emerald-600'}>
-                          {formatMoney(tx.value, { signDisplay: 'always' })}
+                        <div
+                          className={
+                            isTransfer && !selectedAccount
+                              ? 'text-blue-700'
+                              : isOutbound
+                                ? 'text-slate-900'
+                                : 'text-emerald-600'
+                          }
+                        >
+                          {isTransfer && !selectedAccount ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                                Umbuchung
+                              </span>
+                              <span>{formatMoney(tx.amount ?? Math.abs(tx.value))}</span>
+                            </span>
+                          ) : (
+                            formatMoney(effValue, { signDisplay: 'always' })
+                          )}
                         </div>
                         {tx.originalValue !== undefined && tx.value !== tx.originalValue && (
                           <div className="mt-0.5 flex justify-end">

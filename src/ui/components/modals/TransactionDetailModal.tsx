@@ -17,6 +17,7 @@ import {
   getTransactionOrigin,
   isTransactionOverridden,
   resetTransactionToOriginal,
+  isInternalTransfer,
 } from '@/types/finance';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/ui/components/IconRenderer';
@@ -372,6 +373,11 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               >
                 {isOutbound ? 'Ausgabe' : 'Einnahme'}
               </span>
+              {isInternalTransfer(tx, accounts) && (
+                <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800">
+                  Interne Umbuchung
+                </span>
+              )}
             </div>
           </div>
 

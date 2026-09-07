@@ -42,6 +42,8 @@ import {
   Scissors,
   ArrowRight,
   FolderTree,
+  CheckSquare,
+  X,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -115,6 +117,7 @@ export const Transactions: React.FC = () => {
     splitTransaction,
     importTransactions,
     assignTransactionCategory,
+    assignTransactionCategoryBatch,
     deleteTransaction,
     reMatching,
     resetTransaction,
@@ -350,10 +353,70 @@ export const Transactions: React.FC = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
+  // Bulk-Auswahl State (Mehrfachauswahl für Massenbearbeitung)
+  const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
+
+  // Prüfen, ob alle aktuell angezeigten Buchungen ausgewählt sind
+  const isAllDisplayedSelected = useMemo(() => {
+    return (
+      displayedTransactions.length > 0 &&
+      displayedTransactions.every((tx) => selectedTxIds.has(tx.id))
+    );
+  }, [displayedTransactions, selectedTxIds]);
+
+  const isSomeDisplayedSelected = useMemo(() => {
+    return !isAllDisplayedSelected && displayedTransactions.some((tx) => selectedTxIds.has(tx.id));
+  }, [isAllDisplayedSelected, displayedTransactions, selectedTxIds]);
+
+  // Alle sichtbaren Buchungen auswählen / abwählen
+  const handleToggleSelectAll = () => {
+    if (isAllDisplayedSelected) {
+      setSelectedTxIds((prev) => {
+        const next = new Set(prev);
+        displayedTransactions.forEach((tx) => next.delete(tx.id));
+        return next;
+      });
+    } else {
+      setSelectedTxIds((prev) => {
+        const next = new Set(prev);
+        displayedTransactions.forEach((tx) => next.add(tx.id));
+        return next;
+      });
+    }
+  };
+
+  // Einzelne Buchung auswählen / abwählen
+  const handleToggleSelectTx = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Gesamte Auswahl aufheben
+  const handleDeselectAll = () => {
+    setSelectedTxIds(new Set());
+  };
+
+  // Bulk-Kategorie zuweisen
+  const handleBulkAssignCategory = async (catId: string | null) => {
+    const ids = Array.from(selectedTxIds);
+    if (ids.length === 0) return;
+    await assignTransactionCategoryBatch(ids, catId);
+    setSelectedTxIds(new Set());
+  };
+
   // Kategorie-Auswahl ändern (wendet direkt an für flüssige Bedienung)
   const handleCategoryChange = (ids: string[] | null) => {
     setInputCategoryIds(ids);
     setAppliedFilters((prev) => ({ ...prev, categoryIds: ids }));
+    setSelectedTxIds(new Set());
     setVisibleCount(PAGE_SIZE);
   };
 
@@ -361,6 +424,7 @@ export const Transactions: React.FC = () => {
   const handleAccountChange = (id: string) => {
     setInputAccountId(id);
     setAppliedFilters((prev) => ({ ...prev, accountId: id }));
+    setSelectedTxIds(new Set());
     setVisibleCount(PAGE_SIZE);
   };
 
@@ -368,6 +432,7 @@ export const Transactions: React.FC = () => {
   const handleTypeChange = (val: TransactionType | 'all') => {
     setInputType(val);
     setAppliedFilters((prev) => ({ ...prev, type: val }));
+    setSelectedTxIds(new Set());
     setVisibleCount(PAGE_SIZE);
   };
 
@@ -382,6 +447,7 @@ export const Transactions: React.FC = () => {
       startDate: inputStartDate,
       endDate: inputEndDate,
     });
+    setSelectedTxIds(new Set());
     setVisibleCount(PAGE_SIZE);
   };
 
@@ -403,6 +469,7 @@ export const Transactions: React.FC = () => {
       startDate: '',
       endDate: '',
     });
+    setSelectedTxIds(new Set());
     setVisibleCount(PAGE_SIZE);
   };
 
@@ -661,6 +728,25 @@ export const Transactions: React.FC = () => {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
+                <th className="w-10 px-3 py-3 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllDisplayedSelected}
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate = isSomeDisplayedSelected;
+                      }
+                    }}
+                    onChange={handleToggleSelectAll}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    aria-label="Alle sichtbaren Buchungen auswählen"
+                    title={
+                      isAllDisplayedSelected
+                        ? 'Auswahl aufheben'
+                        : 'Alle sichtbaren Buchungen auswählen'
+                    }
+                  />
+                </th>
                 <th className="whitespace-nowrap px-4 py-3" title="Wertstellungsdatum (Valuta)">
                   Datum
                 </th>
@@ -711,12 +797,29 @@ export const Transactions: React.FC = () => {
                       key={tx.id}
                       onClick={() => handleOpenDetailModal(tx)}
                       className={`cursor-pointer transition-colors ${
-                        isSplitPart
-                          ? 'border-l-4 border-l-amber-400 bg-amber-50/25 hover:bg-amber-50/50'
-                          : 'hover:bg-slate-50/80'
+                        selectedTxIds.has(tx.id)
+                          ? 'bg-blue-50/70 hover:bg-blue-50/90'
+                          : isSplitPart
+                            ? 'border-l-4 border-l-amber-400 bg-amber-50/25 hover:bg-amber-50/50'
+                            : 'hover:bg-slate-50/80'
                       }`}
                       title="Klicken für alle Buchungsdetails inkl. Suchstring"
                     >
+                      {/* Checkbox */}
+                      <td
+                        className="w-10 px-3 py-3 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTxIds.has(tx.id)}
+                          onChange={() => handleToggleSelectTx(tx.id)}
+                          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          aria-label={`Buchung auswählen`}
+                          data-testid={`tx-select-checkbox-${tx.id}`}
+                        />
+                      </td>
+
                       {/* Datum */}
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
                         <div className="flex items-center gap-1.5">
@@ -1011,7 +1114,7 @@ export const Transactions: React.FC = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-sm text-slate-400">
                     {appliedFilters.origin === 'deleted'
                       ? 'Keine gelöschten Buchungen im Papierkorb.'
                       : 'Keine passenden Buchungen gefunden. Lade eine CSV-Datei hoch!'}
@@ -1090,6 +1193,50 @@ export const Transactions: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* FLOATING BULK ACTION BAR */}
+      {selectedTxIds.size > 0 && (
+        <aside
+          className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/95 px-5 py-3 text-white shadow-2xl backdrop-blur-md"
+          data-testid="bulk-action-bar"
+          aria-label="Mehrfachauswahl Aktionen"
+        >
+          <div className="flex items-center gap-2 border-r border-slate-700 pr-3 text-xs font-semibold text-slate-200">
+            <CheckSquare className="h-4 w-4 text-blue-400" />
+            <span>
+              {selectedTxIds.size} {selectedTxIds.size === 1 ? 'Buchung' : 'Buchungen'} ausgewählt
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-300">Kategorie zuweisen:</span>
+            <CategoryFilterDropdown
+              categories={categories}
+              mode="single"
+              compact
+              placement="top"
+              hasUncategorized={true}
+              uncategorizedLabel="(Keine Kategorie)"
+              placeholder="Kategorie wählen..."
+              selectedCategoryId={null}
+              onSelectCategory={handleBulkAssignCategory}
+              className="w-48 text-slate-900"
+              dataTestId="bulk-category-picker"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleDeselectAll}
+            className="ml-1 flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+            title="Auswahl aufheben"
+            aria-label="Auswahl aufheben"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span>Abbrechen</span>
+          </button>
+        </aside>
+      )}
 
       {/* CSV IMPORT MODAL */}
       <CsvImportModal

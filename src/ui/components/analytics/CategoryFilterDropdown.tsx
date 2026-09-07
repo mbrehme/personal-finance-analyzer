@@ -40,6 +40,8 @@ export interface CategoryFilterDropdownProps {
   compact?: boolean;
   /** Ausrichtung des Popover-Panels ('left' oder 'right', Standard: 'left') */
   align?: 'left' | 'right';
+  /** Platzierungsrichtung des Dropdowns ('bottom', 'top' oder 'auto', Standard: 'auto') */
+  placement?: 'bottom' | 'top' | 'auto';
   /** Deaktiviert das Dropdown */
   disabled?: boolean;
   /** Test-ID für automatisierte Tests */
@@ -59,10 +61,14 @@ export const CategoryFilterDropdown: React.FC<CategoryFilterDropdownProps> = ({
   placeholder,
   compact = false,
   align = 'left',
+  placement = 'auto',
   disabled = false,
   dataTestId,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [effectivePlacement, setEffectivePlacement] = useState<'bottom' | 'top'>(
+    placement === 'top' ? 'top' : 'bottom'
+  );
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -102,6 +108,32 @@ export const CategoryFilterDropdown: React.FC<CategoryFilterDropdownProps> = ({
       setSearchQuery('');
     }
   }, [isOpen]);
+
+  // Platzierungsrichtung bestimmen (top / bottom)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (placement === 'top') {
+      setEffectivePlacement('top');
+      return;
+    }
+    if (placement === 'bottom') {
+      setEffectivePlacement('bottom');
+      return;
+    }
+
+    // Auto-Modus: Prüfen, ob nach unten genug Platz ist (~320px Panel-Höhe)
+    if (dropdownRef.current && typeof window !== 'undefined') {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      if (spaceBelow < 320 && spaceAbove > spaceBelow) {
+        setEffectivePlacement('top');
+      } else {
+        setEffectivePlacement('bottom');
+      }
+    }
+  }, [isOpen, placement]);
 
   // Baumstruktur aufbauen – genau wie auf der Config-Page nach 'order' sortiert
   const childrenMap = useMemo(() => {
@@ -595,9 +627,9 @@ export const CategoryFilterDropdown: React.FC<CategoryFilterDropdownProps> = ({
       {/* DROPDOWN POPOVER PANEL */}
       {isOpen && (
         <div
-          className={`absolute top-full z-50 mt-1.5 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-black/5 sm:w-80 ${
-            align === 'right' ? 'right-0' : 'left-0'
-          }`}
+          className={`absolute z-50 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-black/5 sm:w-80 ${
+            effectivePlacement === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          } ${align === 'right' ? 'right-0' : 'left-0'}`}
           data-testid={panelTestId}
         >
           {/* MULTI-MODUS HEADER MIT "ALLE" / "KEINE" */}

@@ -141,6 +141,7 @@ describe('Transactions Page', () => {
       splitTransaction: vi.fn(),
       importTransactions: vi.fn(),
       assignTransactionCategory: vi.fn(),
+      assignTransactionCategoryBatch: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),
       triggerReMatch: vi.fn(),
@@ -255,6 +256,7 @@ describe('Transactions Page', () => {
       splitTransaction: vi.fn(),
       importTransactions: vi.fn(),
       assignTransactionCategory: vi.fn(),
+      assignTransactionCategoryBatch: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),
       triggerReMatch: vi.fn(),
@@ -682,6 +684,154 @@ describe('Transactions Page', () => {
     await user.click(catBtn);
 
     expect(assignCategoryMock).toHaveBeenCalledWith('tx-1', 'cat-groceries');
+
+    vi.restoreAllMocks();
+  });
+
+  it('supports bulk selection and batch category assignment', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    const assignBatchMock = vi.fn().mockResolvedValue(undefined);
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        {
+          id: 'acc-giro',
+          name: 'Girokonto',
+          iban: 'DE1111',
+          color: '#000',
+          icon: 'Wallet',
+          accountType: 'real',
+        },
+      ] as any,
+      categories: [
+        {
+          id: 'cat-groceries',
+          name: 'Lebensmittel',
+          color: '#f59e0b',
+          icon: 'Utensils',
+          parentId: null,
+        },
+        {
+          id: 'cat-housing',
+          name: 'Wohnen',
+          color: '#3b82f6',
+          icon: 'Home',
+          parentId: null,
+        },
+      ] as any,
+      transactions: [
+        {
+          id: 'tx-1',
+          accountIban: 'DE1111',
+          date: '2026-03-01',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Einkauf 1',
+          type: 'outbound',
+          iban: 'DE999',
+          value: -45,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-2',
+          accountIban: 'DE1111',
+          date: '2026-03-02',
+          issuer: 'Discounter',
+          receiver: 'Ich',
+          subject: 'Einkauf 2',
+          type: 'outbound',
+          iban: 'DE888',
+          value: -25,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-3',
+          accountIban: 'DE1111',
+          date: '2026-03-03',
+          issuer: 'Baumarkt',
+          receiver: 'Ich',
+          subject: 'Einkauf 3',
+          type: 'outbound',
+          iban: 'DE777',
+          value: -60,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategoryBatch: assignBatchMock,
+      assignTransactionCategory: vi.fn(),
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Initial state: bulk action bar is not rendered
+    expect(screen.queryByTestId('bulk-action-bar')).not.toBeInTheDocument();
+
+    // 1. Select single transaction via checkbox
+    const cb1 = screen.getByTestId('tx-select-checkbox-tx-1');
+    await user.click(cb1);
+
+    // Floating bar appears with count 1
+    expect(screen.getByTestId('bulk-action-bar')).toBeInTheDocument();
+    expect(screen.getByText(/1 Buchung ausgewählt/i)).toBeInTheDocument();
+
+    // 2. Select second transaction
+    const cb2 = screen.getByTestId('tx-select-checkbox-tx-2');
+    await user.click(cb2);
+
+    expect(screen.getByText(/2 Buchungen ausgewählt/i)).toBeInTheDocument();
+
+    // 3. Test Select All via header checkbox
+    const selectAllCb = screen.getByRole('checkbox', {
+      name: /Alle sichtbaren Buchungen auswählen/i,
+    });
+    // Header should be indeterminate since 2 of 3 are selected
+    expect((selectAllCb as HTMLInputElement).indeterminate).toBe(true);
+
+    // Click select all -> all 3 selected
+    await user.click(selectAllCb);
+    expect(screen.getByText(/3 Buchungen ausgewählt/i)).toBeInTheDocument();
+    expect((selectAllCb as HTMLInputElement).checked).toBe(true);
+
+    // 4. Cancel / Abbrechen button clears selection
+    const cancelBtn = screen.getByRole('button', { name: 'Auswahl aufheben' });
+    await user.click(cancelBtn);
+    expect(screen.queryByTestId('bulk-action-bar')).not.toBeInTheDocument();
+
+    // 5. Select tx-1 and tx-2 again, then assign category
+    await user.click(cb1);
+    await user.click(cb2);
+    expect(screen.getByText(/2 Buchungen ausgewählt/i)).toBeInTheDocument();
+
+    // Open bulk category picker
+    const bulkPickerBtn = screen.getByTestId('bulk-category-picker');
+    expect(bulkPickerBtn).toBeInTheDocument();
+    await user.click(bulkPickerBtn);
+
+    // Select "Lebensmittel"
+    const catFoodBtn = screen.getByTitle('Kategorie "Lebensmittel" auswählen');
+    await user.click(catFoodBtn);
+
+    // Verify assignTransactionCategoryBatch called with tx-1 and tx-2
+    expect(assignBatchMock).toHaveBeenCalledWith(
+      expect.arrayContaining(['tx-1', 'tx-2']),
+      'cat-groceries'
+    );
+    expect(assignBatchMock.mock.calls[0][0]).toHaveLength(2);
 
     vi.restoreAllMocks();
   });

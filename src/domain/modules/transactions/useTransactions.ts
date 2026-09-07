@@ -43,6 +43,10 @@ export interface UseTransactionsResult {
     transactionId: string,
     targetCategoryId: string | null
   ) => Promise<void>;
+  assignTransactionCategoryBatch: (
+    transactionIds: string[],
+    targetCategoryId: string | null
+  ) => Promise<void>;
   importTransactions: (newTransactions: Transaction[], categories: Category[]) => Promise<number>;
 }
 
@@ -370,29 +374,33 @@ export function useTransactions(
     setTransactions((prev) => sortTransactionsDesc(prev.map((t) => (t.id === id ? finalTx : t))));
   };
 
-  const assignTransactionCategory = async (
-    transactionId: string,
+  const assignTransactionCategoryBatch = async (
+    transactionIds: string[],
     targetCategoryId: string | null
   ): Promise<void> => {
+    if (transactionIds.length === 0) return;
+    const targetSet = new Set(transactionIds);
+
+    // 1. Kategorien aktualisieren: aus alten manualTransactionIds entfernen
     let updatedCategories = categories.map((c) => {
-      if (c.manualTransactionIds && c.manualTransactionIds.includes(transactionId)) {
+      if (c.manualTransactionIds && c.manualTransactionIds.some((id) => targetSet.has(id))) {
         return {
           ...c,
-          manualTransactionIds: c.manualTransactionIds.filter((id) => id !== transactionId),
+          manualTransactionIds: c.manualTransactionIds.filter((id) => !targetSet.has(id)),
         };
       }
       return c;
     });
 
+    // 2. Zur Zielkategorie hinzufügen
     if (targetCategoryId) {
       updatedCategories = updatedCategories.map((c) => {
         if (c.id === targetCategoryId) {
           const currentList = c.manualTransactionIds || [];
+          const toAdd = transactionIds.filter((id) => !currentList.includes(id));
           return {
             ...c,
-            manualTransactionIds: currentList.includes(transactionId)
-              ? currentList
-              : [...currentList, transactionId],
+            manualTransactionIds: [...currentList, ...toAdd],
           };
         }
         return c;
@@ -402,8 +410,9 @@ export function useTransactions(
     await categoryRepo.saveAll(updatedCategories);
     setCategories(updatedCategories);
 
+    // 3. Transaktionen aktualisieren
     const updatedTxs = transactions.map((t) => {
-      if (t.id === transactionId) {
+      if (targetSet.has(t.id)) {
         return {
           ...t,
           categoryId: targetCategoryId,
@@ -415,6 +424,13 @@ export function useTransactions(
 
     await transactionRepo.saveAll(updatedTxs);
     setTransactions(sortTransactionsDesc(updatedTxs));
+  };
+
+  const assignTransactionCategory = async (
+    transactionId: string,
+    targetCategoryId: string | null
+  ): Promise<void> => {
+    await assignTransactionCategoryBatch([transactionId], targetCategoryId);
   };
 
   const importTransactions = async (
@@ -474,6 +490,7 @@ export function useTransactions(
     updateSplitGroup,
     resetTransaction,
     assignTransactionCategory,
+    assignTransactionCategoryBatch,
     importTransactions,
   };
 }

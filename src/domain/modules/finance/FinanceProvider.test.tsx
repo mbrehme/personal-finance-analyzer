@@ -90,6 +90,60 @@ describe('FinanceContext', () => {
     expect(updatedCategory?.manualTransactionIds).toContain('tx-test-assign');
   });
 
+  it('assigns multiple transactions to a category in batch', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.importTransactions([
+        {
+          id: 'tx-batch-1',
+          accountIban: 'DE123',
+          date: '2026-08-01',
+          issuer: 'Issuer A',
+          receiver: 'Receiver A',
+          subject: 'Batch Test 1',
+          value: -10,
+          iban: 'DE999',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+        },
+        {
+          id: 'tx-batch-2',
+          accountIban: 'DE123',
+          date: '2026-08-02',
+          issuer: 'Issuer B',
+          receiver: 'Receiver B',
+          subject: 'Batch Test 2',
+          value: -20,
+          iban: 'DE999',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+        },
+      ]);
+    });
+
+    const targetCategory = result.current.categories[0];
+
+    await act(async () => {
+      await result.current.assignTransactionCategoryBatch(
+        ['tx-batch-1', 'tx-batch-2'],
+        targetCategory.id
+      );
+    });
+
+    const tx1 = result.current.transactions.find((t) => t.id === 'tx-batch-1');
+    const tx2 = result.current.transactions.find((t) => t.id === 'tx-batch-2');
+    expect(tx1?.categoryId).toBe(targetCategory.id);
+    expect(tx1?.assignmentSource).toBe('manual');
+    expect(tx2?.categoryId).toBe(targetCategory.id);
+    expect(tx2?.assignmentSource).toBe('manual');
+
+    const updatedCategory = result.current.categories.find((c) => c.id === targetCategory.id);
+    expect(updatedCategory?.manualTransactionIds).toContain('tx-batch-1');
+    expect(updatedCategory?.manualTransactionIds).toContain('tx-batch-2');
+  });
+
   it('reorders categories and accounts successfully', async () => {
     const { result } = renderHook(() => useFinance(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));

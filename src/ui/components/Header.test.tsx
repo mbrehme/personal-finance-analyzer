@@ -42,6 +42,7 @@ const baseMockFinance: FinanceContextType = {
   splitTransaction: vi.fn(),
   importTransactions: vi.fn(),
   assignTransactionCategory: vi.fn(),
+  assignTransactionCategoryBatch: vi.fn(),
   deleteTransaction: vi.fn(),
   clearTransactions: vi.fn(),
   triggerReMatch: mockTriggerReMatch,

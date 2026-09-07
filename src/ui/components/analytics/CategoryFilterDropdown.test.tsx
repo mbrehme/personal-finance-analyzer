@@ -290,5 +290,41 @@ describe('CategoryFilterDropdown', () => {
       expect(handleSelect).toHaveBeenCalledWith(null);
       expect(screen.queryByTestId('category-picker-panel')).not.toBeInTheDocument();
     });
+
+    it('positions panel upwards when placement="top"', async () => {
+      const user = userEvent.setup();
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          mode="single"
+          placement="top"
+          selectedCategoryId={null}
+          onSelectCategory={vi.fn()}
+        />
+      );
+
+      await user.click(screen.getByTestId('category-picker-btn'));
+      const panel = screen.getByTestId('category-picker-panel');
+      expect(panel.className).toContain('bottom-full');
+      expect(panel.className).toContain('mb-1.5');
+    });
+
+    it('positions panel downwards when placement="bottom"', async () => {
+      const user = userEvent.setup();
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          mode="single"
+          placement="bottom"
+          selectedCategoryId={null}
+          onSelectCategory={vi.fn()}
+        />
+      );
+
+      await user.click(screen.getByTestId('category-picker-btn'));
+      const panel = screen.getByTestId('category-picker-panel');
+      expect(panel.className).toContain('top-full');
+      expect(panel.className).toContain('mt-1.5');
+    });
   });
 });

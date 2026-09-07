@@ -83,6 +83,10 @@ export interface FinanceContextType {
   updateSplitGroup?: (rootTransactionId: string, splits: SplitPartInput[]) => Promise<void>;
   importTransactions: (newTransactions: Transaction[]) => Promise<number>;
   assignTransactionCategory: (transactionId: string, categoryId: string | null) => Promise<void>;
+  assignTransactionCategoryBatch: (
+    transactionIds: string[],
+    categoryId: string | null
+  ) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
   clearTransactions: () => Promise<void>;
   triggerReMatch: () => Promise<void>;
@@ -848,31 +852,33 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return toInsert.length;
   };
 
-  const assignTransactionCategory = async (
-    transactionId: string,
+  const assignTransactionCategoryBatch = async (
+    transactionIds: string[],
     targetCategoryId: string | null
   ): Promise<void> => {
-    // 1. Vorherige Kategorie aktualisieren (Transaction ID entfernen)
+    if (transactionIds.length === 0) return;
+    const targetSet = new Set(transactionIds);
+
+    // 1. Vorherige Kategorie aktualisieren (Transaction IDs entfernen)
     let updatedCategories = categories.map((c) => {
-      if (c.manualTransactionIds && c.manualTransactionIds.includes(transactionId)) {
+      if (c.manualTransactionIds && c.manualTransactionIds.some((id) => targetSet.has(id))) {
         return {
           ...c,
-          manualTransactionIds: c.manualTransactionIds.filter((id) => id !== transactionId),
+          manualTransactionIds: c.manualTransactionIds.filter((id) => !targetSet.has(id)),
         };
       }
       return c;
     });
 
-    // 2. Neue Kategorie aktualisieren (Transaction ID hinzufügen)
+    // 2. Neue Kategorie aktualisieren (Transaction IDs hinzufügen)
     if (targetCategoryId) {
       updatedCategories = updatedCategories.map((c) => {
         if (c.id === targetCategoryId) {
           const currentList = c.manualTransactionIds || [];
+          const toAdd = transactionIds.filter((id) => !currentList.includes(id));
           return {
             ...c,
-            manualTransactionIds: currentList.includes(transactionId)
-              ? currentList
-              : [...currentList, transactionId],
+            manualTransactionIds: [...currentList, ...toAdd],
           };
         }
         return c;
@@ -882,9 +888,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await financeDB.saveCategories(updatedCategories);
     setCategories(updatedCategories);
 
-    // 3. Transaktion aktualisieren
+    // 3. Transaktionen aktualisieren
     const updatedTxs = transactions.map((t) => {
-      if (t.id === transactionId) {
+      if (targetSet.has(t.id)) {
         return {
           ...t,
           categoryId: targetCategoryId,
@@ -896,6 +902,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     await financeDB.saveTransactions(updatedTxs);
     setTransactions(sortTransactionsDesc(updatedTxs));
+  };
+
+  const assignTransactionCategory = async (
+    transactionId: string,
+    targetCategoryId: string | null
+  ): Promise<void> => {
+    await assignTransactionCategoryBatch([transactionId], targetCategoryId);
   };
 
   const deleteTransaction = async (transactionId: string): Promise<void> => {
@@ -1272,6 +1285,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateSplitGroup,
         importTransactions,
         assignTransactionCategory,
+        assignTransactionCategoryBatch,
         deleteTransaction,
         clearTransactions,
         triggerReMatch,

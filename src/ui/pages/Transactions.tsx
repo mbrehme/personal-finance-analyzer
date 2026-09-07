@@ -199,41 +199,6 @@ export const Transactions: React.FC = () => {
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Strukturierte Kategorie-Optionen für schnelle und übersichtliche Auswahl
-  const categoryOptions = useMemo(() => {
-    const childrenMap = new Map<string | null, typeof categories>();
-    categories.forEach((c) => {
-      const list = childrenMap.get(c.parentId) || [];
-      list.push(c);
-      childrenMap.set(c.parentId, list);
-    });
-
-    const getPathName = (c: (typeof categories)[0]): string => {
-      const parts = [c.name];
-      let currentParentId = c.parentId;
-      while (currentParentId) {
-        const parent = categories.find((p) => p.id === currentParentId);
-        if (parent) {
-          if (parent.parentId !== null) {
-            parts.unshift(parent.name);
-          }
-          currentParentId = parent.parentId;
-        } else {
-          break;
-        }
-      }
-      return parts.join(' > ');
-    };
-
-    return categories
-      .map((c) => ({
-        id: c.id,
-        name: getPathName(c),
-        isLeaf: (childrenMap.get(c.id) || []).length === 0,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  }, [categories]);
-
   // IDs aller Transaktionen, die als Original aufgeteilt (gesplittet) wurden
   const splitParentIds = useMemo(
     () => new Set(transactions.map((t) => t.splitFromId).filter(Boolean) as string[]),
@@ -758,10 +723,12 @@ export const Transactions: React.FC = () => {
                           <span>{formatDate(currentDate)}</span>
                           {origDate !== undefined && currentDate !== origDate && (
                             <span
-                              className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                              className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-800"
                               title={`Ursprüngliches Bankdatum (Valuta): ${formatDate(origDate)}`}
+                              aria-label="Datum geändert"
                             >
-                              Geändert
+                              <Pencil className="h-2.5 w-2.5" />
+                              <span className="sr-only">Geändert</span>
                             </span>
                           )}
                         </div>
@@ -865,10 +832,12 @@ export const Transactions: React.FC = () => {
 
                           {hasModifiedAccount && (
                             <span
-                              className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                              className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-800"
                               title="Konto manuell angepasst"
+                              aria-label="Konto geändert"
                             >
-                              Geändert
+                              <Pencil className="h-2.5 w-2.5" />
+                              <span className="sr-only">Geändert</span>
                             </span>
                           )}
                         </div>
@@ -894,10 +863,12 @@ export const Transactions: React.FC = () => {
                               origPartner !== '' &&
                               currentPartner !== origPartner && (
                                 <span
-                                  className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                                  className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-800"
                                   title={`Ursprünglich: ${origPartner}`}
+                                  aria-label="Partner geändert"
                                 >
-                                  Geändert
+                                  <Pencil className="h-2.5 w-2.5" />
+                                  <span className="sr-only">Geändert</span>
                                 </span>
                               )
                             );
@@ -910,10 +881,12 @@ export const Transactions: React.FC = () => {
                           {tx.originalSubject !== undefined &&
                             tx.subject !== tx.originalSubject && (
                               <span
-                                className="py-0.2 inline-flex shrink-0 items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-800"
                                 title={`Ursprünglich: ${tx.originalSubject}`}
+                                aria-label="Verwendungszweck geändert"
                               >
-                                Geändert
+                                <Pencil className="h-2.5 w-2.5" />
+                                <span className="sr-only">Geändert</span>
                               </span>
                             )}
                         </div>
@@ -925,12 +898,14 @@ export const Transactions: React.FC = () => {
                           {formatMoney(tx.value, { signDisplay: 'always' })}
                         </div>
                         {tx.originalValue !== undefined && tx.value !== tx.originalValue && (
-                          <div className="mt-0.5">
+                          <div className="mt-0.5 flex justify-end">
                             <span
-                              className="py-0.2 inline-flex items-center rounded bg-blue-100 px-1 text-[9px] font-bold text-blue-800"
+                              className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-800"
                               title={`Ursprünglicher Betrag: ${formatMoney(tx.originalValue, { signDisplay: 'always' })}`}
+                              aria-label="Betrag geändert"
                             >
-                              Geändert
+                              <Pencil className="h-2.5 w-2.5" />
+                              <span className="sr-only">Geändert</span>
                             </span>
                           </div>
                         )}
@@ -942,28 +917,27 @@ export const Transactions: React.FC = () => {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center gap-1.5">
-                          <select
-                            value={tx.categoryId || ''}
-                            onChange={(e) =>
-                              assignTransactionCategory(tx.id, e.target.value || null)
-                            }
-                            className="max-w-[160px] truncate rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="">(Keine Kategorie)</option>
-                            {categoryOptions.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
+                          <CategoryFilterDropdown
+                            categories={categories}
+                            mode="single"
+                            compact
+                            hasUncategorized={true}
+                            uncategorizedLabel="(Keine Kategorie)"
+                            selectedCategoryId={tx.categoryId ?? null}
+                            onSelectCategory={(catId) => assignTransactionCategory(tx.id, catId)}
+                            className="w-36 max-w-[150px]"
+                            dataTestId={`tx-category-picker-${tx.id}`}
+                          />
 
-                          {/* Geändert Badge bei manueller Zuweisung */}
+                          {/* Geändert Symbol bei manueller Zuweisung */}
                           {tx.origin !== 'override' && tx.assignmentSource === 'manual' && (
                             <span
-                              className="inline-flex shrink-0 items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
+                              className="shadow-xs inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-800"
                               title="Kategorie manuell zugewiesen / angepasst"
+                              aria-label="Kategorie geändert"
                             >
-                              Geändert
+                              <Pencil className="h-2.5 w-2.5" />
+                              <span className="sr-only">Geändert</span>
                             </span>
                           )}
                         </div>

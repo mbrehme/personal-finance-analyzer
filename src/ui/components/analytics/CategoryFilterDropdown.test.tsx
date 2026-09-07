@@ -165,4 +165,130 @@ describe('CategoryFilterDropdown', () => {
 
     expect(screen.getByText('Keine Kategorien (0/6)')).toBeInTheDocument();
   });
+
+  describe('search functionality', () => {
+    it('filters categories by search query and shows matching nodes', async () => {
+      const user = userEvent.setup();
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          selectedCategoryIds={null}
+          onChange={vi.fn()}
+        />
+      );
+
+      await user.click(screen.getByTestId('category-filter-dropdown-btn'));
+      const searchInput = screen.getByPlaceholderText('Kategorie suchen...');
+      expect(searchInput).toBeInTheDocument();
+
+      await user.type(searchInput, 'Miete');
+
+      // Miete sollte sichtbar sein, Ausgaben (Parent) ebenfalls
+      expect(screen.getByText('Miete')).toBeInTheDocument();
+      expect(screen.getByText('Ausgaben')).toBeInTheDocument();
+      // Unbeteiligte Kategorien wie Gehalt oder Einnahmen sollten nicht sichtbar sein
+      expect(screen.queryByText('Gehalt')).not.toBeInTheDocument();
+    });
+
+    it('shows "Keine Kategorien gefunden" when search yields no matches', async () => {
+      const user = userEvent.setup();
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          selectedCategoryIds={null}
+          onChange={vi.fn()}
+        />
+      );
+
+      await user.click(screen.getByTestId('category-filter-dropdown-btn'));
+      const searchInput = screen.getByPlaceholderText('Kategorie suchen...');
+
+      await user.type(searchInput, 'XYZGibtsNicht');
+      expect(screen.getByText('Keine Kategorien gefunden')).toBeInTheDocument();
+
+      // Clear search button
+      const clearBtn = screen.getByLabelText('Suche zurücksetzen');
+      await user.click(clearBtn);
+      expect(screen.queryByText('Keine Kategorien gefunden')).not.toBeInTheDocument();
+      expect(screen.getByText('Miete')).toBeInTheDocument();
+    });
+  });
+
+  describe('single-select mode', () => {
+    it('renders selected category name and icon on the trigger button', () => {
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          mode="single"
+          selectedCategoryId="cat-rent"
+          onSelectCategory={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Miete')).toBeInTheDocument();
+    });
+
+    it('renders uncategorized label when selectedCategoryId is null', () => {
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          mode="single"
+          selectedCategoryId={null}
+          uncategorizedLabel="(Keine Kategorie)"
+          onSelectCategory={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('(Keine Kategorie)')).toBeInTheDocument();
+    });
+
+    it('calls onSelectCategory and closes dropdown when a category is clicked', async () => {
+      const user = userEvent.setup();
+      const handleSelect = vi.fn();
+
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          mode="single"
+          selectedCategoryId={null}
+          onSelectCategory={handleSelect}
+        />
+      );
+
+      await user.click(screen.getByTestId('category-picker-btn'));
+      expect(screen.getByTestId('category-picker-panel')).toBeInTheDocument();
+
+      // Wähle "Gehalt"
+      const salaryBtn = screen.getByTitle('Kategorie "Gehalt" auswählen');
+      await user.click(salaryBtn);
+
+      expect(handleSelect).toHaveBeenCalledWith('cat-salary');
+      // Dropdown schließt sich nach Auswahl
+      expect(screen.queryByTestId('category-picker-panel')).not.toBeInTheDocument();
+    });
+
+    it('calls onSelectCategory with null when "(Keine Kategorie)" is clicked', async () => {
+      const user = userEvent.setup();
+      const handleSelect = vi.fn();
+
+      render(
+        <CategoryFilterDropdown
+          categories={mockCategories}
+          mode="single"
+          selectedCategoryId="cat-rent"
+          uncategorizedLabel="(Keine Kategorie)"
+          onSelectCategory={handleSelect}
+        />
+      );
+
+      await user.click(screen.getByTestId('category-picker-btn'));
+
+      // Klick auf (Keine Kategorie)
+      const noneBtn = screen.getByText('(Keine Kategorie)');
+      await user.click(noneBtn);
+
+      expect(handleSelect).toHaveBeenCalledWith(null);
+      expect(screen.queryByTestId('category-picker-panel')).not.toBeInTheDocument();
+    });
+  });
 });

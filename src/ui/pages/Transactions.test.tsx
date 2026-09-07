@@ -614,4 +614,75 @@ describe('Transactions Page', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('assigns transaction category directly via table row category picker', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    const assignCategoryMock = vi.fn();
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        {
+          id: 'acc-giro',
+          name: 'Girokonto',
+          iban: 'DE1111',
+          color: '#000',
+          icon: 'Wallet',
+          accountType: 'real',
+        },
+      ] as any,
+      categories: [
+        {
+          id: 'cat-groceries',
+          name: 'Lebensmittel',
+          color: '#f59e0b',
+          icon: 'Utensils',
+          parentId: null,
+        },
+      ] as any,
+      transactions: [
+        {
+          id: 'tx-1',
+          accountIban: 'DE1111',
+          date: '2026-03-01',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Einkauf',
+          type: 'outbound',
+          iban: 'DE999',
+          value: -45,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategory: assignCategoryMock,
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Initial state: "(Keine Kategorie)"
+    const rowPickerBtn = screen.getByTestId('tx-category-picker-tx-1');
+    expect(rowPickerBtn).toBeInTheDocument();
+    expect(rowPickerBtn).toHaveTextContent('(Keine Kategorie)');
+
+    // Open row picker
+    await user.click(rowPickerBtn);
+
+    // Pick "Lebensmittel"
+    const catBtn = screen.getByTitle('Kategorie "Lebensmittel" auswählen');
+    await user.click(catBtn);
+
+    expect(assignCategoryMock).toHaveBeenCalledWith('tx-1', 'cat-groceries');
+
+    vi.restoreAllMocks();
+  });
 });

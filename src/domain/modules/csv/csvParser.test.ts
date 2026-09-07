@@ -210,4 +210,76 @@ describe('csvParser', () => {
     expect(transactions[4].date).toBe('2026-09-02');
     expect(transactions[4].dayIndex).toBe(1);
   });
+
+  it('automatically detects and skips metadata preamble headers and extracts account IBAN (e.g. DKB format)', () => {
+    const dkbCsv = `"Tagesgeld";"DE80120300001027106861"
+"Zeitraum:";"01.01.2024 - 07.09.2026"
+"Kontostand vom 07.09.2026:";"15.442,57 €"
+""
+"Buchungsdatum";"Wertstellung";"Status";"Zahlungspflichtige*r";"Zahlungsempfänger*in";"Verwendungszweck";"Umsatztyp";"IBAN";"Betrag (€)";"Gläubiger-ID";"Mandatsreferenz";"Kundenreferenz"
+"07.09.26";"07.09.26";"Gebucht";"Denise Gül Brehme und Martin Brehme";"Denise Gül Brehme";"Rücklage: Urlaub";"Eingang";"DE89120300001083850147";"250";"";"";""
+"01.09.26";"01.09.26";"Gebucht";"Denise Gül Brehme";"Denise Gül Brehme";"Buffer";"Ausgang";"DE89120300001083850147";"-1.000";"";"";""
+"28.08.26";"28.08.26";"Gebucht";"Denise Gül Brehme";"Denise Gül Brehme";"Einschulung";"Ausgang";"DE89120300001083850147";"-1.500";"";"";""`;
+
+    const parsed = parseRawCsv(dkbCsv);
+
+    // 1. Erkennt Header-Zeile 4 und ignoriert Zeilen 0-3
+    expect(parsed.headerRowIndex).toBe(4);
+    expect(parsed.headers).toEqual([
+      'Buchungsdatum',
+      'Wertstellung',
+      'Status',
+      'Zahlungspflichtige*r',
+      'Zahlungsempfänger*in',
+      'Verwendungszweck',
+      'Umsatztyp',
+      'IBAN',
+      'Betrag (€)',
+      'Gläubiger-ID',
+      'Mandatsreferenz',
+      'Kundenreferenz',
+    ]);
+
+    // 2. Erkennt die IBAN aus der Preamble-Zeile 0
+    expect(parsed.detectedAccountIban).toBe('DE80120300001027106861');
+
+    // 3. Spaltenzuordnungen werden präzise erraten
+    expect(parsed.suggestedMapping.dateColumn).toBe('Wertstellung');
+    expect(parsed.suggestedMapping.issuerColumn).toBe('Zahlungspflichtige*r');
+    expect(parsed.suggestedMapping.receiverColumn).toBe('Zahlungsempfänger*in');
+    expect(parsed.suggestedMapping.subjectColumn).toBe('Verwendungszweck');
+    expect(parsed.suggestedMapping.typeColumn).toBe('Umsatztyp');
+    expect(parsed.suggestedMapping.ibanColumn).toBe('IBAN');
+    expect(parsed.suggestedMapping.valueColumn).toBe('Betrag (€)');
+
+    // 4. Zeilen werden korrekt konvertiert
+    expect(parsed.rows).toHaveLength(3);
+
+    const txs = convertRowsToTransactions(
+      parsed.rows,
+      parsed.suggestedMapping,
+      parsed.detectedAccountIban
+    );
+    expect(txs).toHaveLength(3);
+
+    // Transaktion 1 (Eingang 250 €)
+    expect(txs[0].date).toBe('2026-09-07');
+    expect(txs[0].accountIban).toBe('DE80120300001027106861');
+    expect(txs[0].iban).toBe('DE89120300001083850147');
+    expect(txs[0].issuer).toBe('Denise Gül Brehme und Martin Brehme');
+    expect(txs[0].receiver).toBe('Denise Gül Brehme');
+    expect(txs[0].subject).toBe('Rücklage: Urlaub');
+    expect(txs[0].value).toBe(250);
+    expect(txs[0].type).toBe('inbound');
+
+    // Transaktion 2 (Ausgang -1000 € mit Tausenderpunkt "-1.000")
+    expect(txs[1].date).toBe('2026-09-01');
+    expect(txs[1].value).toBe(-1000);
+    expect(txs[1].type).toBe('outbound');
+
+    // Transaktion 3 (Ausgang -1500 €)
+    expect(txs[2].date).toBe('2026-08-28');
+    expect(txs[2].value).toBe(-1500);
+    expect(txs[2].type).toBe('outbound');
+  });
 });

@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { Account, Transaction } from '@/types/finance';
+import { Account, Transaction, normalizeIban } from '@/types/finance';
 import { parseRawCsv, convertRowsToTransactions, CsvColumnMapping, CsvParseResult } from '@/domain';
 import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, Landmark } from 'lucide-react';
 
@@ -47,6 +47,19 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         const text = event.target?.result as string;
         const parsed = parseRawCsv(text);
         setParseResult(parsed);
+
+        // Automatische Kontoauswahl, falls im CSV-Header/Preamble eine bekannte IBAN stand
+        if (parsed.detectedAccountIban) {
+          const normDetected = normalizeIban(parsed.detectedAccountIban);
+          const matched = realAccounts.find(
+            (acc) =>
+              (acc.iban && normalizeIban(acc.iban) === normDetected) ||
+              acc.id === parsed.detectedAccountIban
+          );
+          if (matched) {
+            setSelectedAccountId(matched.id);
+          }
+        }
 
         const initialDateCol = parsed.suggestedMapping.dateColumn || parsed.headers[0] || '';
         const safeMapping: CsvColumnMapping = {
@@ -222,6 +235,15 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         </option>
                       ))}
                     </select>
+                    {parseResult?.detectedAccountIban && (
+                      <p className="text-[11px] text-emerald-700">
+                        IBAN in CSV-Kopfzeilen erkannt:{' '}
+                        <span className="font-mono font-semibold">
+                          {parseResult.detectedAccountIban}
+                        </span>
+                        {selectedAccountId ? ' (Konto automatisch vorausgewählt)' : ''}
+                      </p>
+                    )}
                     {realAccounts.length === 0 && (
                       <p className="text-[11px] text-amber-700">
                         Es wurden keine realen Bankkonten gefunden. Bitte lege zuerst unter

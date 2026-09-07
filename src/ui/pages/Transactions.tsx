@@ -248,7 +248,10 @@ export const Transactions: React.FC = () => {
       const txCatId = tx.categoryId ?? null;
 
       // 1. Account Filter (prüft Buchungskonto, Gegenkonto bei Umbuchung und virtuelle Unterkonten)
-      if (accountId !== 'all' && !isTransactionMatchingAccount(tx, accountId, accounts)) {
+      if (
+        accountId !== 'all' &&
+        !isTransactionMatchingAccount(tx, accountId, accounts, transactions)
+      ) {
         return false;
       }
 

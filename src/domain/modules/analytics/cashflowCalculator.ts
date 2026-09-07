@@ -123,7 +123,7 @@ export function calculateCashflowMatrix(
   let filteredTx = selectedAccountId
     ? transactions.filter((t) => {
         if (options?.accounts) {
-          return isTransactionMatchingAccount(t, selectedAccountId, options.accounts);
+          return isTransactionMatchingAccount(t, selectedAccountId, options.accounts, transactions);
         }
         return false;
       })
@@ -200,15 +200,14 @@ export function calculateCashflowMatrix(
       ? options.accounts.find((a) => a.id === selectedAccountId)
       : undefined;
 
-  const getEffectiveValue = (tx: Transaction): number => {
+  const getEffectiveValue = (tx: Transaction): number | null => {
     if (targetAccount && options?.accounts) {
-      const eff = getTransactionEffectiveValueForAccount(
+      return getTransactionEffectiveValueForAccount(
         tx,
         targetAccount,
         options.accounts,
         filteredTx
       );
-      if (eff !== null) return eff;
     }
     return tx.value;
   };
@@ -222,6 +221,7 @@ export function calculateCashflowMatrix(
 
     if (catPeriods && catPeriods[pKey]) {
       const val = getEffectiveValue(tx);
+      if (val === null) return;
       if (val >= 0) {
         catPeriods[pKey].inbound += val;
       } else {
@@ -411,6 +411,7 @@ export function calculateCashflowMatrix(
       const txDate = tx.date || '';
       if (getPeriodKey(txDate, granularity) === pKey) {
         const val = getEffectiveValue(tx);
+        if (val === null) return;
         if (val >= 0) {
           inbound += val;
         } else {

@@ -26,6 +26,8 @@ export interface CsvParseResult {
   rows: Record<string, string>[];
   delimiter: string;
   suggestedMapping: CsvColumnMapping;
+  detectedAccountIban?: string;
+  headerRowIndex?: number;
 }
 
 /**
@@ -80,7 +82,94 @@ function parseCsvLine(line: string, delimiter: string): string[] {
 }
 
 /**
+ * Sucht in den ersten Zeilen einer CSV-Datei nach der tatsächlichen Tabellenkopf-Zeile (Header Row).
+ * Ignoriert vorgeschaltete Metadaten-Kopfzeilen (z. B. DKB-, ING- oder Sparkassen-Preamble).
+ *
+ * @param {string[]} lines - Nicht-leere CSV-Zeilen
+ * @param {string} delimiter - Das ermittelte Trennzeichen
+ * @returns {number} Der 0-basierte Index der Header-Zeile in `lines`
+ */
+export function findHeaderRowIndex(lines: string[], delimiter: string): number {
+  const maxScanLines = Math.min(lines.length, 30);
+  let bestIndex = 0;
+  let maxScore = -1;
+
+  // Patterns für typische Spalten-Schlüsselbegriffe
+  const datePattern = /(datum|date|valuta|wertstellung|buchungstag|buchungsdatum|booking)/i;
+  const valuePattern = /(betrag|amount|umsatz|saldo|wert|summe)/i;
+  const subjectPattern =
+    /(verwendungszweck|buchungstext|beschreibung|vorgang|subject|details|memo|text)/i;
+  const partnerPattern =
+    /(empf[aä]nger|beg[uü]nstigter|zahlungspflichtig|zahlungsempf|auftraggeber|absender|partner|payee|von|an)/i;
+  const ibanPattern = /(iban|konto|kontonummer|account)/i;
+
+  for (let i = 0; i < maxScanLines; i++) {
+    const rawLine = lines[i].trim();
+    if (!rawLine) continue;
+
+    const values = parseCsvLine(rawLine, delimiter);
+    if (values.length < 2) continue;
+
+    // Prüfen, ob die Spaltennamen wie typische Tabellenheader klingen
+    let score = 0;
+    if (values.some((v) => datePattern.test(v))) score += 3;
+    if (values.some((v) => valuePattern.test(v))) score += 3;
+    if (values.some((v) => subjectPattern.test(v))) score += 2;
+    if (values.some((v) => partnerPattern.test(v))) score += 2;
+    if (values.some((v) => ibanPattern.test(v))) score += 1;
+
+    // Zeilen, die typische Datums-Werte wie "07.09.26" oder "2026-09-07" enthalten, sind Datenzeilen, keine Header!
+    const containsDateValue = values.some(
+      (v) =>
+        /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(v.trim()) || /^\d{4}-\d{2}-\d{2}$/.test(v.trim())
+    );
+    if (containsDateValue) {
+      score -= 5;
+    }
+
+    // Zeilen mit vielen Spalten (echte Banktabellen haben meist >= 4 Spalten)
+    if (values.length >= 4) {
+      score += 1;
+    }
+
+    if (score > maxScore) {
+      maxScore = score;
+      bestIndex = i;
+    }
+  }
+
+  // Plausibilitäts-Schwellenwert (mindestens zwei Treffer wie Datum + Betrag)
+  if (maxScore >= 5) {
+    return bestIndex;
+  }
+
+  return 0;
+}
+
+/**
+ * Durchsucht Zeilen vor dem eigentlichen Tabellenkopf nach einer IBAN des eigenen Kontos.
+ *
+ * @param {string[]} lines - CSV-Zeilen
+ * @param {number} headerRowIndex - Index der Header-Zeile
+ * @returns {string | undefined} Gefundene IBAN oder undefined
+ */
+export function extractIbanFromPreamble(
+  lines: string[],
+  headerRowIndex: number
+): string | undefined {
+  const ibanRegex = /\b([A-Z]{2}\d{2}[A-Z0-9]{11,30})\b/i;
+  for (let i = 0; i < headerRowIndex; i++) {
+    const match = lines[i].match(ibanRegex);
+    if (match) {
+      return match[1].toUpperCase().replace(/\s+/g, '');
+    }
+  }
+  return undefined;
+}
+
+/**
  * Analysiert den rohen CSV-Text und schlägt automatisch eine Spaltenzuordnung vor.
+ * Erkennt und überspringt automatisch Metadaten-Header / Kopfzeilen vor der Datentabelle.
  */
 export function parseRawCsv(csvContent: string): CsvParseResult {
   const delimiter = detectDelimiter(csvContent);
@@ -93,15 +182,20 @@ export function parseRawCsv(csvContent: string): CsvParseResult {
     throw new Error('Die CSV-Datei ist leer.');
   }
 
-  const rawHeaders = parseCsvLine(lines[0], delimiter);
+  const headerRowIndex = findHeaderRowIndex(lines, delimiter);
+  const detectedAccountIban = extractIbanFromPreamble(lines, headerRowIndex);
+
+  const rawHeaders = parseCsvLine(lines[headerRowIndex], delimiter);
   // BOM und Whitespaces bereinigen
   const headers = rawHeaders.map((h) => h.replace(/^\uFEFF/, '').trim());
 
   const rows: Record<string, string>[] = [];
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerRowIndex + 1; i < lines.length; i++) {
     const values = parseCsvLine(lines[i], delimiter);
     if (values.length <= 1 && values[0] === '') continue;
+    // Trailer-Zeilen oder unvollständige Zeilen mit weniger als 2 gefüllten Spalten ignorieren
+    if (values.filter(Boolean).length < 2) continue;
 
     const row: Record<string, string> = {};
     headers.forEach((header, idx) => {
@@ -117,6 +211,8 @@ export function parseRawCsv(csvContent: string): CsvParseResult {
     rows,
     delimiter,
     suggestedMapping,
+    detectedAccountIban,
+    headerRowIndex,
   };
 }
 
@@ -149,7 +245,7 @@ export function guessColumnMapping(headers: string[]): CsvColumnMapping {
       '',
     issuerColumn: findHeader([
       /auftraggeber/i,
-      /zahlungspflichtiger/i,
+      /zahlungspflichtig/i,
       /absender/i,
       /sender/i,
       /von/i,
@@ -203,7 +299,7 @@ export function guessColumnMapping(headers: string[]): CsvColumnMapping {
       /absender.?iban/i,
       /iban.?auftragskonto/i,
     ]),
-    typeColumn: findHeader([/typ/i, /art/i, /type/i, /buchungsart/i]),
+    typeColumn: findHeader([/umsatztyp/i, /typ/i, /art/i, /type/i, /buchungsart/i]),
   };
 }
 
@@ -417,6 +513,7 @@ export function convertRowsToTransactions(
         rawType === 'lastschrift' ||
         rawType === 'belastung' ||
         rawType === 'ausgabe' ||
+        rawType === 'ausgang' ||
         rawType === 'abgang';
       if (isDebit && value > 0) {
         value = -value;

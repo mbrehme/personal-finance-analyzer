@@ -86,6 +86,15 @@ describe('Balances Page', () => {
     expect(screen.getByText('Urlaubstopf Virtual')).toBeInTheDocument();
     expect(screen.getByText('Virtuell')).toBeInTheDocument();
 
+    // Verify sticky Konto column header and cell
+    const kontoHeader = screen.getByRole('columnheader', { name: 'Konto' });
+    expect(kontoHeader.className).toContain('sticky');
+    expect(kontoHeader.className).toContain('left-0');
+
+    const giroCell = screen.getByText('Girokonto Real').closest('td');
+    expect(giroCell?.className).toContain('sticky');
+    expect(giroCell?.className).toContain('left-0');
+
     vi.restoreAllMocks();
   });
 });

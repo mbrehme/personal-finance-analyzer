@@ -69,7 +69,9 @@ export const Balances: React.FC = () => {
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
-                <th className="min-w-[200px] px-4 py-3.5">Konto</th>
+                <th className="sticky left-0 z-30 w-[240px] min-w-[240px] max-w-[240px] border-b-2 border-r-2 border-slate-300 bg-slate-200 px-4 py-3.5 text-left text-slate-900 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]">
+                  Konto
+                </th>
                 {balanceMatrix.periodKeys.map((pKey) => (
                   <th key={pKey} className="min-w-[140px] px-4 py-3.5 text-right">
                     {formatPeriodLabel(pKey, granularity)}
@@ -88,14 +90,12 @@ export const Balances: React.FC = () => {
                   return (
                     <tr
                       key={row.account.id}
-                      className={
-                        isVirtual
-                          ? 'bg-slate-50/50 transition-colors hover:bg-slate-100/60'
-                          : 'transition-colors hover:bg-slate-50/80'
-                      }
+                      className={`group transition-colors ${
+                        isVirtual ? 'bg-slate-50/50 hover:bg-slate-100/60' : 'hover:bg-slate-50/80'
+                      }`}
                     >
                       {/* Konto Name */}
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td className="sticky left-0 z-20 w-[240px] min-w-[240px] max-w-[240px] whitespace-nowrap border-b border-r-2 border-b-slate-200 border-r-slate-300 bg-slate-100 px-4 py-3 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)] transition-colors group-hover:bg-slate-200">
                         <div
                           className={`flex items-center gap-2.5 ${isVirtual ? 'pl-5 sm:pl-7' : ''}`}
                         >
@@ -171,8 +171,10 @@ export const Balances: React.FC = () => {
             {/* Gesamtsummenzeile */}
             {balanceMatrix.periodKeys.length > 0 && (
               <tfoot>
-                <tr className="border-t-2 border-slate-300 bg-slate-100/80 text-xs font-bold">
-                  <td className="px-4 py-3.5 font-bold text-slate-900">Gesamtvermögen</td>
+                <tr className="border-t-2 border-slate-300 bg-slate-200 text-xs font-extrabold">
+                  <td className="sticky left-0 z-20 w-[240px] min-w-[240px] max-w-[240px] border-r-2 border-t-2 border-slate-300 bg-slate-200 px-4 py-3.5 font-extrabold text-slate-900 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]">
+                    Gesamtvermögen
+                  </td>
                   {balanceMatrix.periodKeys.map((pKey) => {
                     const endBal = balanceMatrix.totalRow.periods[pKey]?.endBalance || 0;
                     return (

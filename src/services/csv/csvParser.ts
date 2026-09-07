@@ -415,6 +415,7 @@ export function convertRowsToTransactions(
 ): Transaction[] {
   const timestamp = importedAt || new Date().toISOString();
   const dayOccurrences = new Map<string, number>();
+  const dayIndices = new Map<string, number>();
   const fallbackAccountIban = (accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
 
   return rows.map((row, index) => {
@@ -467,6 +468,11 @@ export function convertRowsToTransactions(
     const occurrenceIndex = dayOccurrences.get(dayKey) || 0;
     dayOccurrences.set(dayKey, occurrenceIndex + 1);
 
+    // Tagesbezogener Index für dieses Datum & Konto (für stabile, tagesgebundene Sortierung)
+    const dateAccountKey = `${normAccountIban}|${date}`;
+    const dayIndex = dayIndices.get(dateAccountKey) || 0;
+    dayIndices.set(dateAccountKey, dayIndex + 1);
+
     const rawFingerprint = computeRawFingerprint(
       normAccountIban,
       date,
@@ -510,6 +516,7 @@ export function convertRowsToTransactions(
       rawFingerprint,
       importFilename: filename || undefined,
       importIndex: index,
+      dayIndex,
       importedAt: timestamp,
 
       // Flache Original-Rohdaten aus der Bank-CSV

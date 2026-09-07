@@ -24,6 +24,7 @@ export {
 
 export {
   getTransactionType,
+  getTransactionOrigin,
   isTransactionOverridden,
   isManualTransaction,
   resetTransactionToOriginal,

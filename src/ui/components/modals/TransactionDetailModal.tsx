@@ -14,6 +14,7 @@ import {
   normalizeIban,
   buildCompoundSearchField,
   getTransactionAccountInfo,
+  getTransactionOrigin,
   isTransactionOverridden,
   resetTransactionToOriginal,
 } from '@/types/finance';
@@ -342,21 +343,31 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {tx.origin === 'manual' && (
-                <span className="rounded-full bg-purple-100 px-2.5 py-1 text-[10px] font-bold text-purple-800">
-                  Manuell erfasst
-                </span>
-              )}
-              {isSplitChild && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900">
-                  <Scissors className="h-3 w-3" /> Split-Teilbetrag
-                </span>
-              )}
-              {isOverridden && (
-                <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800">
-                  Manuell angepasst
-                </span>
-              )}
+              {(() => {
+                const origin = getTransactionOrigin(tx);
+                if (origin === 'split') {
+                  return (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900">
+                      <Scissors className="h-3 w-3" /> Split-Teilbetrag
+                    </span>
+                  );
+                }
+                if (origin === 'override') {
+                  return (
+                    <span
+                      className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800"
+                      title="Manuell angepasste Buchung (Override)"
+                    >
+                      Override
+                    </span>
+                  );
+                }
+                return (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700">
+                    Bank-Import
+                  </span>
+                );
+              })()}
               <span
                 className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
                   isOutbound ? 'bg-slate-200 text-slate-700' : 'bg-emerald-100 text-emerald-800'
@@ -633,6 +644,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                   <div>
                     <span className="text-slate-500">Quelldatei: </span>
                     <span className="font-mono text-slate-800">{tx.importFilename}</span>
+                  </div>
+                )}
+                {tx.dayIndex !== undefined && (
+                  <div>
+                    <span className="text-slate-500">Tages-Index: </span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      #{tx.dayIndex + 1}
+                    </span>
                   </div>
                 )}
                 {tx.importIndex !== undefined && (

@@ -227,8 +227,8 @@ describe('TransactionDetailModal', () => {
       />
     );
 
-    // Badge "Manuell angepasst" und Rohdatenanzeige
-    expect(screen.getByText('Manuell angepasst')).toBeInTheDocument();
+    // Badge "Override" und Rohdatenanzeige
+    expect(screen.getByText('Override')).toBeInTheDocument();
     expect(screen.getByText('Ursprüngliche Bank-Rohdaten:')).toBeInTheDocument();
     expect(screen.getByText('Ursprünglicher Flug')).toBeInTheDocument();
 

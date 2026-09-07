@@ -179,4 +179,40 @@ describe('csvParser', () => {
     );
     expect(fpDiffDay).not.toBe(fp1);
   });
+
+  it('assigns dayIndex sequentially per date and account', () => {
+    const csv = `Buchungstag;Empfänger;Verwendungszweck;Betrag
+01.09.2026;Rewe Markt;Einkauf 1;-10,00
+01.09.2026;Bäcker;Einkauf 2;-5,00
+01.09.2026;Apotheke;Einkauf 3;-15,00
+02.09.2026;Tanken;Sprit;-70,00
+02.09.2026;Supermarkt;Einkauf 4;-25,00`;
+
+    const parsed = parseRawCsv(csv);
+    const transactions = convertRowsToTransactions(
+      parsed.rows,
+      {
+        dateColumn: 'Buchungstag',
+        receiverColumn: 'Empfänger',
+        subjectColumn: 'Verwendungszweck',
+        valueColumn: 'Betrag',
+      },
+      'DE11112222'
+    );
+
+    expect(transactions).toHaveLength(5);
+    // Same date (01.09.2026) -> sequential 0, 1, 2
+    expect(transactions[0].date).toBe('2026-09-01');
+    expect(transactions[0].dayIndex).toBe(0);
+    expect(transactions[1].date).toBe('2026-09-01');
+    expect(transactions[1].dayIndex).toBe(1);
+    expect(transactions[2].date).toBe('2026-09-01');
+    expect(transactions[2].dayIndex).toBe(2);
+
+    // Next date (02.09.2026) -> resets to 0, 1
+    expect(transactions[3].date).toBe('2026-09-02');
+    expect(transactions[3].dayIndex).toBe(0);
+    expect(transactions[4].date).toBe('2026-09-02');
+    expect(transactions[4].dayIndex).toBe(1);
+  });
 });

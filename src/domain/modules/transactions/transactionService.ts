@@ -35,7 +35,28 @@ export function isTransactionOverridden(tx: Transaction): boolean {
 }
 
 export function isManualTransaction(tx: Transaction): boolean {
-  return tx.origin === 'manual' || Boolean(tx.splitFromId) || isTransactionOverridden(tx);
+  return (
+    tx.origin === 'manual' ||
+    tx.origin === 'override' ||
+    Boolean(tx.splitFromId) ||
+    isTransactionOverridden(tx)
+  );
+}
+
+/**
+ * Ermittelt die virtuelle Herkunft einer Transaktion:
+ * - 'split': Teilbuchung aus einem Split (`tx.splitFromId` vorhanden)
+ * - 'override': Manuell editiert / überschrieben (`isTransactionOverridden(tx)`) oder als override markiert
+ * - 'imported': Unveränderte Original-Bankbuchung
+ */
+export function getTransactionOrigin(tx: Transaction): 'imported' | 'split' | 'override' {
+  if (tx.splitFromId) {
+    return 'split';
+  }
+  if (isTransactionOverridden(tx) || tx.origin === 'override' || tx.origin === 'manual') {
+    return 'override';
+  }
+  return 'imported';
 }
 
 export function resetTransactionToOriginal(tx: Transaction): Transaction {
@@ -57,6 +78,7 @@ export function resetTransactionToOriginal(tx: Transaction): Transaction {
     categoryId: null,
     bucketId: null,
     assignmentSource: 'unassigned',
+    origin: 'imported',
   };
 }
 
@@ -81,9 +103,15 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
     const dateComp = dateB.localeCompare(dateA);
     if (dateComp !== 0) return dateComp;
 
+    // Am gleichen Tag primär nach dem tagesbezogenen Import-Index (dayIndex) sortieren
+    if (a.dayIndex !== undefined && b.dayIndex !== undefined) {
+      return a.dayIndex - b.dayIndex;
+    }
+
     if (a.importedAt && b.importedAt && a.importedAt !== b.importedAt) {
       return b.importedAt.localeCompare(a.importedAt);
     }
+    // Fallback auf den dateiweiten importIndex für Bestandsdaten
     if (a.importIndex !== undefined && b.importIndex !== undefined) {
       return a.importIndex - b.importIndex;
     }

@@ -13,9 +13,13 @@ import { CategoryAssignmentSource } from './category.types';
 export type TransactionType = 'inbound' | 'outbound';
 
 /**
- * Herkunft einer Transaktion.
+ * Herkunft einer Transaktion:
+ * - 'imported': Unveränderte Original-Bankbuchung
+ * - 'split': Aus einer Aufteilung hervorgegangene Teilbuchung
+ * - 'override': Nachträglich manuell editiert oder überschrieben
+ * - 'manual': Abwärtskompatibler Alias für 'override'
  */
-export type TransactionOrigin = 'imported' | 'manual';
+export type TransactionOrigin = 'imported' | 'split' | 'override' | 'manual';
 
 /**
  * Eine einzelne Finanzbuchung / Transaktion.
@@ -63,11 +67,16 @@ export interface Transaction {
   assignmentSource: CategoryAssignmentSource;
   /** Dateiname der ursprünglichen CSV-Importdatei */
   importFilename?: string;
-  /** Zeilenindex der Transaktion in der Importdatei zur Erhaltung der CSV-Reihenfolge */
+  /** Index der Transaktion innerhalb desselben Wertstellungstages (0, 1, 2, ...) für tagesbasierte Reihenfolge */
+  dayIndex?: number;
+  /** @deprecated Verwende dayIndex. Zeilenindex der Transaktion in der Importdatei */
   importIndex?: number;
   /** Import-Zeitpunkt als ISO-String */
   importedAt?: string;
-  /** Herkunft der Transaktion: 'imported' (Default) oder 'manual' */
+  /**
+   * Virtuelle oder persistierte Herkunft der Transaktion:
+   * 'imported' (Default), 'split' (Split-Kind) oder 'override' (manuell angepasst).
+   */
   origin?: TransactionOrigin;
   /** Unveränderlicher Fingerabdruck der ursprünglichen Bank-Rohdaten (nur bei importierten Buchungen) */
   rawFingerprint?: string;
@@ -101,7 +110,7 @@ export interface TransactionFilterOptions {
   categoryId?: string | 'uncategorized' | 'assigned' | 'manual';
   bucketId?: string | 'uncategorized';
   type?: TransactionType | 'all';
-  origin?: 'all' | 'imported' | 'manual';
+  origin?: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
   startDate?: ISODateString;
   endDate?: ISODateString;
   searchTerm?: string;

@@ -66,7 +66,7 @@ describe('Transactions Page', () => {
     expect(screen.getByText('Alle Quellen')).toBeInTheDocument();
   });
 
-  it('filters transactions by origin (Manuell vs. Importiert)', async () => {
+  it('filters transactions by origin (Overrides vs. Importiert)', async () => {
     const { userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
     const FinanceContextModule = await import('@/services/storage/FinanceContext');
@@ -171,19 +171,19 @@ describe('Transactions Page', () => {
     expect(await screen.findByText('Importierter Einkauf')).toBeInTheDocument();
     expect(screen.getByText('Manuelle Buchung')).toBeInTheDocument();
 
-    // Select "Manuell"
+    // Select "Overrides"
     const selects = screen.getAllByRole('combobox');
-    // Origin select has options: Herkunft: Alle, Importiert, Manuell
+    // Origin select has options: Herkunft: Alle, Importiert, Splits, Overrides
     const originSelect = selects.find((s) =>
       Array.from((s as HTMLSelectElement).options).some((o) => o.value === 'imported')
     ) as HTMLSelectElement;
     expect(originSelect).toBeDefined();
 
-    await user.selectOptions(originSelect, 'manual');
+    await user.selectOptions(originSelect, 'override');
     const applyBtn = screen.getByRole('button', { name: /Filter anwenden/i });
     await user.click(applyBtn);
 
-    // Under "Manuell": both manual booking and overridden bank booking are visible
+    // Under "Overrides": both manual booking and overridden bank booking are visible
     expect(screen.getByText('Manuelle Buchung')).toBeInTheDocument();
     expect(screen.getByText('Tanken angepasst')).toBeInTheDocument();
     expect(screen.getAllByText('Geändert').length).toBeGreaterThanOrEqual(1);
@@ -193,9 +193,9 @@ describe('Transactions Page', () => {
     await user.selectOptions(originSelect, 'imported');
     await user.click(applyBtn);
 
-    // Both original bank imports (including the overridden one) are visible, purely manual is hidden
+    // Only untouched bank imports are visible, overrides and manual bookings are hidden
     expect(screen.getByText('Importierter Einkauf')).toBeInTheDocument();
-    expect(screen.getByText('Tanken angepasst')).toBeInTheDocument();
+    expect(screen.queryByText('Tanken angepasst')).not.toBeInTheDocument();
     expect(screen.queryByText('Manuelle Buchung')).not.toBeInTheDocument();
   });
 

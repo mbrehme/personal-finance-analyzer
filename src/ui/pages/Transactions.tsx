@@ -12,7 +12,7 @@ import {
   ISODateString,
   buildCompoundSearchField,
   sortTransactionsDesc,
-  isManualTransaction,
+  getTransactionOrigin,
   isTransactionOverridden,
   getTransactionType,
   Transaction,
@@ -127,7 +127,9 @@ export const Transactions: React.FC = () => {
   const [inputAccountId, setInputAccountId] = useState<string>('all');
   const [inputCategoryIds, setInputCategoryIds] = useState<string[] | null>(null);
   const [inputType, setInputType] = useState<TransactionType | 'all'>('all');
-  const [inputOrigin, setInputOrigin] = useState<'all' | 'imported' | 'manual' | 'deleted'>('all');
+  const [inputOrigin, setInputOrigin] = useState<
+    'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted'
+  >('all');
   const [inputStartDate, setInputStartDate] = useState<string>('');
   const [inputEndDate, setInputEndDate] = useState<string>('');
 
@@ -137,7 +139,7 @@ export const Transactions: React.FC = () => {
     accountId: string;
     categoryIds: string[] | null;
     type: TransactionType | 'all';
-    origin: 'all' | 'imported' | 'manual' | 'deleted';
+    origin: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
     startDate: string;
     endDate: string;
   }>({
@@ -241,14 +243,19 @@ export const Transactions: React.FC = () => {
   // Anzahl Buchungen je Quellen-Option (für Anzeige in Klammern im Dropdown)
   const originCounts = useMemo(() => {
     let imported = 0;
-    let manual = 0;
+    let split = 0;
+    let override = 0;
     for (const tx of transactions) {
-      if (tx.origin !== 'manual' || Boolean(tx.splitFromId)) imported++;
-      if (isManualTransaction(tx)) manual++;
+      const orig = getTransactionOrigin(tx);
+      if (orig === 'imported') imported++;
+      else if (orig === 'split') split++;
+      else if (orig === 'override') override++;
     }
     return {
       imported,
-      manual,
+      split,
+      override,
+      manual: override,
       deleted: deletedTransactions.length,
     };
   }, [transactions, deletedTransactions]);
@@ -300,12 +307,18 @@ export const Transactions: React.FC = () => {
         return false;
       }
 
-      // 4. Quelle Filter (Alle Quellen | Bank-Import | Manuell)
-      if (origin === 'imported' && tx.origin === 'manual' && !tx.splitFromId) {
-        return false;
-      }
-      if (origin === 'manual' && !isManualTransaction(tx)) {
-        return false;
+      // 4. Quelle Filter (Alle Quellen | Bank-Import | Splits | Overrides / Manuell)
+      if (origin !== 'all') {
+        const txOrigin = getTransactionOrigin(tx);
+        if (origin === 'imported' && txOrigin !== 'imported') {
+          return false;
+        }
+        if (origin === 'split' && txOrigin !== 'split') {
+          return false;
+        }
+        if ((origin === 'override' || origin === 'manual') && txOrigin !== 'override') {
+          return false;
+        }
       }
 
       // 5. Datum Filter (Wertstellungsdatum)
@@ -627,7 +640,8 @@ export const Transactions: React.FC = () => {
             <select
               value={inputOrigin}
               onChange={(e) => {
-                const val = e.target.value as 'all' | 'imported' | 'manual' | 'deleted';
+                const val = e.target.value as
+                  'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
                 setInputOrigin(val);
                 setAppliedFilters((prev) => ({ ...prev, origin: val }));
                 setVisibleCount(PAGE_SIZE);
@@ -637,8 +651,9 @@ export const Transactions: React.FC = () => {
               aria-label="Buchungsquelle filtern"
             >
               <option value="all">Alle Quellen</option>
-              <option value="imported">Imported</option>
-              <option value="manual">Manuell ({originCounts.manual})</option>
+              <option value="imported">Importiert ({originCounts.imported})</option>
+              <option value="split">Splits ({originCounts.split})</option>
+              <option value="override">Overrides ({originCounts.override})</option>
               <option value="deleted">Gelöscht ({originCounts.deleted})</option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -755,13 +770,13 @@ export const Transactions: React.FC = () => {
                             </span>
                           </div>
                         )}
-                        {tx.origin === 'manual' && !isSplitChild && (
+                        {getTransactionOrigin(tx) === 'override' && !isSplitChild && (
                           <div className="mt-1">
                             <span
-                              className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-800"
-                              title="Manuell erfasste Buchung"
+                              className="inline-flex items-center gap-0.5 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
+                              title="Manuell angepasste Buchung (Override)"
                             >
-                              Manuell
+                              Override
                             </span>
                           </div>
                         )}

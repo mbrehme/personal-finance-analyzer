@@ -12,6 +12,7 @@ import {
   getTransactionAccountInfo,
   isTransactionMatchingAccount,
   getTransactionEffectiveValueForAccount,
+  getTransactionOrigin,
   normalizeIban,
   Account,
   Transaction,
@@ -596,6 +597,107 @@ describe('finance domain helpers', () => {
       expect(
         getTransactionEffectiveValueForAccount(tx, orphanVirtual, [...allAccounts, orphanVirtual])
       ).toBeNull();
+    });
+  });
+
+  describe('getTransactionOrigin', () => {
+    it('returns "split" when transaction is derived from a split (splitFromId present)', () => {
+      const splitChildTx: Transaction = {
+        id: 'tx-split-1',
+        splitFromId: 'tx-parent',
+        valueDate: '2026-03-01',
+        value: -20,
+      } as any;
+
+      expect(getTransactionOrigin(splitChildTx)).toBe('split');
+    });
+
+    it('returns "override" when transaction is manually overridden or has legacy manual origin', () => {
+      const overriddenTx: Transaction = {
+        id: 'tx-overridden',
+        valueDate: '2026-03-01',
+        value: -50,
+        subject: 'Neuer Zweck',
+        originalSubject: 'Alter Bank-Zweck',
+        origin: 'imported',
+      } as any;
+
+      expect(getTransactionOrigin(overriddenTx)).toBe('override');
+
+      const legacyManualTx: Transaction = {
+        id: 'tx-legacy-man',
+        valueDate: '2026-03-01',
+        value: -30,
+        origin: 'manual',
+      } as any;
+
+      expect(getTransactionOrigin(legacyManualTx)).toBe('override');
+
+      const explicitOverrideTx: Transaction = {
+        id: 'tx-override-explicit',
+        valueDate: '2026-03-01',
+        value: -30,
+        origin: 'override',
+      } as any;
+
+      expect(getTransactionOrigin(explicitOverrideTx)).toBe('override');
+    });
+
+    it('returns "imported" for unaltered bank transactions', () => {
+      const importedTx: Transaction = {
+        id: 'tx-imported',
+        valueDate: '2026-03-01',
+        value: -100,
+        subject: 'REWE Markt',
+        origin: 'imported',
+      } as any;
+
+      expect(getTransactionOrigin(importedTx)).toBe('imported');
+    });
+  });
+
+  describe('sortTransactionsDesc with dayIndex', () => {
+    it('sorts primarily by date descending, then dayIndex ascending for same date', () => {
+      const txDay0: Transaction = {
+        id: 'tx-d0',
+        date: '2026-08-10',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        value: -10,
+        dayIndex: 0,
+      } as any;
+
+      const txDay1: Transaction = {
+        id: 'tx-d1',
+        date: '2026-08-10',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        value: -20,
+        dayIndex: 1,
+      } as any;
+
+      const txDay2: Transaction = {
+        id: 'tx-d2',
+        date: '2026-08-10',
+        valueDate: '2026-08-10',
+        bookingDate: '2026-08-10',
+        value: -30,
+        dayIndex: 2,
+      } as any;
+
+      const txYesterday: Transaction = {
+        id: 'tx-yesterday',
+        date: '2026-08-09',
+        valueDate: '2026-08-09',
+        bookingDate: '2026-08-09',
+        value: -50,
+        dayIndex: 0,
+      } as any;
+
+      // Pass in mixed order
+      const sorted = sortTransactionsDesc([txDay2, txYesterday, txDay0, txDay1]);
+
+      expect(sorted.map((t) => t.id)).toEqual(['tx-d0', 'tx-d1', 'tx-d2', 'tx-yesterday']);
     });
   });
 });

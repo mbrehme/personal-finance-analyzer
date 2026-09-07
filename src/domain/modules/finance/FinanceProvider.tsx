@@ -656,7 +656,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       categoryId: splitData.categoryId || null,
       bucketId: splitData.categoryId || null,
       assignmentSource: splitData.categoryId ? 'manual' : 'unassigned',
-      origin: 'manual',
+      origin: 'split',
       splitFromId: originalId,
     };
 
@@ -804,7 +804,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           categoryId: split.categoryId || null,
           bucketId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',
-          origin: 'manual',
+          origin: 'split',
           splitFromId: actualRootId,
         };
         childrenToSave.push(newChild);

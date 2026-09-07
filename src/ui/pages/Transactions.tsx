@@ -52,6 +52,59 @@ import {
 const PAGE_SIZE = 50;
 
 /**
+ * Prüft, ob eine Transaktion mit einem Suchbegriff übereinstimmt.
+ * Durchsucht den Compound-Key, formatierte und rohe Beträge sowie den Kategorienamen.
+ *
+ * @param {Transaction} tx - Die zu prüfende Transaktion
+ * @param {string} term - Der Suchbegriff
+ * @param {Map<string, string>} [categoryNameMap] - Optionales Mapping von Kategorie-ID zu Kategoriename
+ * @returns {boolean} true, falls der Suchbegriff gefunden wurde
+ */
+export function matchesSearch(
+  tx: Transaction,
+  term: string,
+  categoryNameMap?: Map<string, string>
+): boolean {
+  if (!term) return true;
+  const normTerm = term.trim().toLowerCase();
+  if (!normTerm) return true;
+
+  // 1. Compound Search Key ([Typ] Partner: Zweck (IBAN))
+  const compound = buildCompoundSearchField(tx).toLowerCase();
+  if (compound.includes(normTerm)) return true;
+
+  // 2. Betragssuche (formatiert und roh)
+  const amt = tx.amount !== undefined ? tx.amount : Math.abs(tx.value);
+  const formattedValue = formatMoney(tx.value).toLowerCase();
+  const formattedAmount = formatMoney(amt).toLowerCase();
+  const rawValue = String(tx.value).toLowerCase();
+  const rawAmount = String(amt).toLowerCase();
+  const fixedAmount = amt.toFixed(2);
+  const germanFixedAmount = fixedAmount.replace('.', ',');
+
+  if (
+    formattedValue.includes(normTerm) ||
+    formattedAmount.includes(normTerm) ||
+    rawValue.includes(normTerm) ||
+    rawAmount.includes(normTerm) ||
+    fixedAmount.includes(normTerm) ||
+    germanFixedAmount.includes(normTerm)
+  ) {
+    return true;
+  }
+
+  // 3. Kategorie-Name
+  if (tx.categoryId && categoryNameMap) {
+    const catName = categoryNameMap.get(tx.categoryId);
+    if (catName && catName.toLowerCase().includes(normTerm)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Kreisförmige Gauge (Radial-Fortschrittsanzeige)
  */
 export const CircularGauge: React.FC<{
@@ -231,19 +284,21 @@ export const Transactions: React.FC = () => {
     };
   }, [transactions, deletedTransactions]);
 
+  const categoryNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach((c) => map.set(c.id, c.name));
+    return map;
+  }, [categories]);
+
   // Gefilterte Transaktionen basierend auf angewandten Filtern
   const filteredTransactions = useMemo(() => {
     const { searchTerm, accountId, categoryIds, type, origin, startDate, endDate } = appliedFilters;
 
     // Papierkorb-Ansicht: gelöschte Transaktionen anzeigen
     if (origin === 'deleted') {
-      const matches = deletedTransactions.filter((tx) => {
-        if (searchTerm.trim()) {
-          const compound = buildCompoundSearchField(tx).toLowerCase();
-          if (!compound.includes(searchTerm.trim().toLowerCase())) return false;
-        }
-        return true;
-      });
+      const matches = deletedTransactions.filter((tx) =>
+        matchesSearch(tx, searchTerm.trim(), categoryNameMap)
+      );
       return sortTransactionsDesc(matches);
     }
 
@@ -304,20 +359,16 @@ export const Transactions: React.FC = () => {
         return false;
       }
 
-      // 6. Compound-Suche
-      if (searchTerm.trim()) {
-        const compound = buildCompoundSearchField(tx).toLowerCase();
-        const term = searchTerm.trim().toLowerCase();
-        if (!compound.includes(term)) {
-          return false;
-        }
+      // 6. Freitext- & Betragssuche
+      if (searchTerm.trim() && !matchesSearch(tx, searchTerm.trim(), categoryNameMap)) {
+        return false;
       }
 
       return true;
     });
 
     return sortTransactionsDesc(matches);
-  }, [transactions, deletedTransactions, appliedFilters, accounts]);
+  }, [transactions, deletedTransactions, appliedFilters, accounts, categoryNameMap]);
 
   // Reset Lazy Loading wenn angewandte Filter geändert werden
   useEffect(() => {
@@ -776,7 +827,7 @@ export const Transactions: React.FC = () => {
                         tx,
                         selectedAccount,
                         accounts,
-                        displayedTransactions
+                        transactions
                       ) ?? tx.value)
                     : tx.value;
                   const isOutbound = effValue < 0;

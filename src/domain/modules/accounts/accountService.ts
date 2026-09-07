@@ -179,15 +179,33 @@ export function hasDirectCounterpart(
   accounts: Account[]
 ): boolean {
   const txTime = new Date(tx.date).getTime();
+  const txAmount = tx.amount !== undefined ? tx.amount : Math.abs(tx.value);
+  const normTxSender = normalizeIban(tx.senderIban);
+  const normTxReceiver = normalizeIban(tx.receiverIban);
 
   return allTransactions.some((other) => {
     if (other.id === tx.id) return false;
-    if (other.value !== -tx.value) return false;
+    const otherAmount = other.amount !== undefined ? other.amount : Math.abs(other.value);
+    if (Math.abs(otherAmount - txAmount) > 0.005) return false;
 
     // Datumstoleranz von bis zu 4 Tagen für bankübliche Wertstellungs-Laufzeiten
     const otherTime = new Date(other.date).getTime();
     if (!isNaN(txTime) && !isNaN(otherTime)) {
       if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
+    }
+
+    // Bei gerichteten Transaktionen: Absender & Empfänger identisch
+    const normOtherSender = normalizeIban(other.senderIban);
+    const normOtherReceiver = normalizeIban(other.receiverIban);
+    if (
+      normTxSender &&
+      normTxReceiver &&
+      normOtherSender &&
+      normOtherReceiver &&
+      normOtherSender === normTxSender &&
+      normOtherReceiver === normTxReceiver
+    ) {
+      return true;
     }
 
     const otherInfo = getTransactionAccountInfo(other, accounts);
@@ -344,22 +362,99 @@ export function getTransactionEffectiveValueForAccount(
     if (!info.virtualAccounts.some((v) => v.id === targetAccount.id)) {
       return null;
     }
-    if (info.counterAccount && targetAccount.parentAccountId === info.counterAccount.id) {
-      if (allTransactions) {
-        const hasDirectVirtualBooking = allTransactions.some((other) => {
-          if (other.id === tx.id || other.value !== -tx.value) return false;
-          const otherInfo = getTransactionAccountInfo(other, accounts);
-          return (
-            otherInfo.primaryAccount?.id === targetAccount.parentAccountId &&
-            otherInfo.virtualAccounts.some((v) => v.id === targetAccount.id)
-          );
-        });
-        if (hasDirectVirtualBooking) {
-          return null;
+
+    const parentId = targetAccount.parentAccountId;
+    if (!parentId) {
+      return null;
+    }
+
+    const parentAccount = accounts.find((a) => a.id === parentId);
+    const normParentIban = normalizeIban(parentAccount?.iban);
+
+    // Prüfen, ob das Unterkonto selbst direkt als Sender oder Empfänger adressiert ist
+    const isDirectVirtualSender = tx.senderIban === targetAccount.id;
+    const isDirectVirtualReceiver = tx.receiverIban === targetAccount.id;
+
+    if (isDirectVirtualSender && isDirectVirtualReceiver) {
+      return 0;
+    }
+    if (isDirectVirtualSender) {
+      return -amount;
+    }
+    if (isDirectVirtualReceiver) {
+      return amount;
+    }
+
+    // Prüfen der Rolle des übergeordneten Hauptkontos bei gerichteter Buchung
+    const isParentSender = Boolean(
+      (normParentIban && normSenderIban && normParentIban === normSenderIban) ||
+      parentId === tx.senderIban
+    );
+    const isParentReceiver = Boolean(
+      (normParentIban && normReceiverIban && normParentIban === normReceiverIban) ||
+      parentId === tx.receiverIban
+    );
+
+    // Gegenbuchungs-Deduplizierung bei Vorliegen von allTransactions
+    if (allTransactions) {
+      const txTime = new Date(tx.date).getTime();
+      const hasDirectVirtualBooking = allTransactions.some((other) => {
+        if (other.id === tx.id) return false;
+        const otherAmount = other.amount !== undefined ? other.amount : Math.abs(other.value);
+        if (Math.abs(otherAmount - amount) > 0.005) return false;
+
+        const otherTime = new Date(other.date).getTime();
+        if (!isNaN(txTime) && !isNaN(otherTime)) {
+          if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
         }
+
+        const otherInfo = getTransactionAccountInfo(other, accounts);
+        if (!otherInfo.virtualAccounts.some((v) => v.id === targetAccount.id)) return false;
+
+        // Wenn other direkt auf dem übergeordneten Konto gebucht wurde (bessere Primärquelle)
+        const otherAccountIban = normalizeIban(other.accountIban);
+        const thisAccountIban = normalizeIban(tx.accountIban);
+        if (
+          normParentIban &&
+          otherAccountIban === normParentIban &&
+          thisAccountIban !== normParentIban
+        ) {
+          return true;
+        }
+        // Bei gleichem Buchungskonto: deterministischer Tie-Breaker (nach ID)
+        if (otherAccountIban === thisAccountIban && other.id < tx.id) {
+          return true;
+        }
+        return false;
+      });
+
+      if (hasDirectVirtualBooking) {
+        return null;
       }
+    }
+
+    if (isParentSender && isParentReceiver) {
+      // Transfer innerhalb desselben echten Kontos ohne explizite Unterkonto-Adressierung
+      return 0;
+    }
+
+    if (isParentSender) {
+      return -amount;
+    }
+
+    if (isParentReceiver) {
+      return amount;
+    }
+
+    // Fallback für Legacy-Transaktionen ohne explizite senderIban / receiverIban
+    if (info.primaryAccount && info.primaryAccount.id === parentId) {
+      return tx.value;
+    }
+
+    if (info.counterAccount && info.counterAccount.id === parentId) {
       return -tx.value;
     }
+
     return tx.value;
   }
 
@@ -376,6 +471,70 @@ export function getTransactionEffectiveValueForAccount(
   if (isSender && isReceiver) {
     // Umbuchung auf dasselbe Konto (Netto 0)
     return 0;
+  }
+
+  // Gegenbuchungs-Deduplizierung bei Vorliegen beider Gegenstücke in allTransactions
+  if (allTransactions && (isSender || isReceiver)) {
+    const isInternal = accounts.some(
+      (a) =>
+        a.accountType !== 'virtual' &&
+        a.id !== targetAccount.id &&
+        ((isSender &&
+          Boolean(
+            (a.iban && normalizeIban(a.iban) === normReceiverIban) || a.id === tx.receiverIban
+          )) ||
+          (isReceiver &&
+            Boolean(
+              (a.iban && normalizeIban(a.iban) === normSenderIban) || a.id === tx.senderIban
+            )))
+    );
+
+    if (isInternal) {
+      const txTime = new Date(tx.date).getTime();
+      const normThisAccountIban = normalizeIban(tx.accountIban);
+      const hasDirectStatementBooking = allTransactions.some((other) => {
+        if (other.id === tx.id) return false;
+        const otherAmount = other.amount !== undefined ? other.amount : Math.abs(other.value);
+        if (Math.abs(otherAmount - amount) > 0.005) return false;
+
+        const otherTime = new Date(other.date).getTime();
+        if (!isNaN(txTime) && !isNaN(otherTime)) {
+          if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
+        }
+
+        const otherSenderIban = normalizeIban(other.senderIban);
+        const otherReceiverIban = normalizeIban(other.receiverIban);
+        const otherAccountIban = normalizeIban(other.accountIban);
+
+        const isSameTransfer =
+          (normSenderIban &&
+            normReceiverIban &&
+            otherSenderIban === normSenderIban &&
+            otherReceiverIban === normReceiverIban) ||
+          (otherAccountIban &&
+            (otherAccountIban === normSenderIban || otherAccountIban === normReceiverIban));
+
+        if (!isSameTransfer) return false;
+
+        // Wenn other direkt aus dem Auszug von targetAccount stammt, aber tx nicht -> tx unterdrücken
+        if (
+          normTargetIban &&
+          otherAccountIban === normTargetIban &&
+          normThisAccountIban !== normTargetIban
+        ) {
+          return true;
+        }
+        // Wenn beide aus demselben Auszug stammen oder kein Auszug unterscheidbar ist: Tie-Breaker
+        if (otherAccountIban === normThisAccountIban && other.id < tx.id) {
+          return true;
+        }
+        return false;
+      });
+
+      if (hasDirectStatementBooking) {
+        return null;
+      }
+    }
   }
 
   if (isSender) {

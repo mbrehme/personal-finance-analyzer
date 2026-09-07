@@ -58,7 +58,24 @@ describe('accountService', () => {
     balanceEntries: [],
   };
 
-  const allAccounts: Account[] = [giroAccount, tagesgeldAccount, cashAccount, virtualWohnen];
+  const virtualBuffer: Account = {
+    id: 'acc-virt-buffer',
+    name: 'Buffer Rücklage',
+    accountType: 'virtual',
+    parentAccountId: 'acc-tagesgeld',
+    categoryIds: ['cat-buffer'],
+    color: '#38bdf8',
+    icon: 'FolderTree',
+    balanceEntries: [],
+  };
+
+  const allAccounts: Account[] = [
+    giroAccount,
+    tagesgeldAccount,
+    cashAccount,
+    virtualWohnen,
+    virtualBuffer,
+  ];
 
   describe('normalizeIban', () => {
     it('returns empty string for undefined or empty input', () => {
@@ -183,6 +200,126 @@ describe('accountService', () => {
         assignmentSource: 'manual',
       };
       expect(getTransactionEffectiveValueForAccount(tx, virtualWohnen, allAccounts)).toBe(-800);
+    });
+
+    it('evaluates outbound payment from parent account as negative for virtual account even if tx.value is positive', () => {
+      // Buchung stammt aus dem Giro-Kontoauszug (deshalb value: +960), ist aber ein Transfer von Tagesgeld nach Giro
+      const txFromGiroStatement: Transaction = {
+        id: 'tx-transfer-buffer',
+        date: '2026-08-01',
+        senderIban: tagesgeldAccount.iban,
+        receiverIban: giroAccount.iban,
+        accountIban: giroAccount.iban,
+        iban: tagesgeldAccount.iban || '',
+        issuer: 'Denise',
+        receiver: 'Martin',
+        amount: 960,
+        value: 960, // positiv im Giro-Auszug
+        subject: 'Krankenkasse Martin',
+        categoryId: 'cat-buffer', // gehört zu virtualBuffer unter acc-tagesgeld
+        assignmentSource: 'auto_regex',
+      };
+
+      // Für das Unterkonto des Absenders (Tagesgeld) MUSS es ein Abgang (-960 €) sein!
+      expect(
+        getTransactionEffectiveValueForAccount(txFromGiroStatement, virtualBuffer, allAccounts)
+      ).toBe(-960);
+
+      // Für das Tagesgeldkonto selbst: -960 €
+      expect(
+        getTransactionEffectiveValueForAccount(txFromGiroStatement, tagesgeldAccount, allAccounts)
+      ).toBe(-960);
+
+      // Für das Empfängerkonto Giro: +960 €
+      expect(
+        getTransactionEffectiveValueForAccount(txFromGiroStatement, giroAccount, allAccounts)
+      ).toBe(960);
+    });
+
+    it('evaluates inbound payment to parent account as positive for virtual account', () => {
+      // Transfer von Giro nach Tagesgeld (Aufbau Buffer)
+      const savingTx: Transaction = {
+        id: 'tx-save-buffer',
+        date: '2026-08-01',
+        senderIban: giroAccount.iban,
+        receiverIban: tagesgeldAccount.iban,
+        accountIban: giroAccount.iban,
+        iban: tagesgeldAccount.iban || '',
+        issuer: 'Martin',
+        receiver: 'Denise',
+        amount: 250,
+        value: -250,
+        subject: 'Buffer Sparen',
+        categoryId: 'cat-buffer',
+        assignmentSource: 'manual',
+      };
+
+      // Für das Unterkonto des Empfängers (Tagesgeld) MUSS es ein Eingang (+250 €) sein!
+      expect(getTransactionEffectiveValueForAccount(savingTx, virtualBuffer, allAccounts)).toBe(
+        250
+      );
+    });
+
+    it('deduplicates directed counterpart transactions when both statements are in allTransactions', () => {
+      const txFromTg: Transaction = {
+        id: 'tx-tg-out',
+        date: '2026-08-01',
+        senderIban: tagesgeldAccount.iban,
+        receiverIban: giroAccount.iban,
+        accountIban: tagesgeldAccount.iban,
+        iban: giroAccount.iban || '',
+        issuer: 'Denise',
+        receiver: 'Martin',
+        amount: 960,
+        value: -960,
+        subject: 'Krankenkasse Martin',
+        categoryId: 'cat-buffer',
+        assignmentSource: 'auto_regex',
+      };
+
+      const txFromGiro: Transaction = {
+        id: 'tx-giro-in',
+        date: '2026-08-01',
+        senderIban: tagesgeldAccount.iban,
+        receiverIban: giroAccount.iban,
+        accountIban: giroAccount.iban,
+        iban: tagesgeldAccount.iban || '',
+        issuer: 'Denise',
+        receiver: 'Martin',
+        amount: 960,
+        value: 960,
+        subject: 'Krankenkasse Martin',
+        categoryId: 'cat-buffer',
+        assignmentSource: 'auto_regex',
+      };
+
+      const bothTxs = [txFromTg, txFromGiro];
+
+      // Für Tagesgeld: Nur die Buchung aus dem Tagesgeld-Auszug wird gewertet
+      expect(
+        getTransactionEffectiveValueForAccount(txFromTg, tagesgeldAccount, allAccounts, bothTxs)
+      ).toBe(-960);
+      expect(
+        getTransactionEffectiveValueForAccount(txFromGiro, tagesgeldAccount, allAccounts, bothTxs)
+      ).toBeNull();
+
+      // Für Giro: Nur die Buchung aus dem Giro-Auszug wird gewertet
+      expect(
+        getTransactionEffectiveValueForAccount(txFromGiro, giroAccount, allAccounts, bothTxs)
+      ).toBe(960);
+      expect(
+        getTransactionEffectiveValueForAccount(txFromTg, giroAccount, allAccounts, bothTxs)
+      ).toBeNull();
+
+      // Für das Unterkonto virtualBuffer (unter Tagesgeld):
+      // txFromTg stammt direkt vom Tagesgeld-Auszug -> -960
+      // txFromGiro stammt vom Giro-Auszug -> wird dedupliziert (null)
+      expect(
+        getTransactionEffectiveValueForAccount(txFromTg, virtualBuffer, allAccounts, bothTxs)
+      ).toBe(-960);
+      expect(
+        getTransactionEffectiveValueForAccount(txFromGiro, virtualBuffer, allAccounts, bothTxs)
+      ).toBeNull();
     });
   });
 

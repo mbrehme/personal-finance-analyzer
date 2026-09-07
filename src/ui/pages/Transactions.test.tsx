@@ -835,4 +835,37 @@ describe('Transactions Page', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('matchesSearch correctly matches compound key, formatted and raw amount, and category name', async () => {
+    const { matchesSearch } = await import('./Transactions');
+    const tx: any = {
+      id: 'tx-reaktor',
+      date: '2025-12-08',
+      amount: 6943.75,
+      value: -6943.75,
+      senderIban: 'DE80120300001027106861',
+      receiverIban: 'DE89120300001083850147',
+      subject: 'Abschlusszahlung Reaktor Berlin',
+      receiver: 'Denise Gül Brehme und Martin Brehme',
+      categoryId: 'cat-reaktor',
+    };
+
+    const categoryMap = new Map([['cat-reaktor', 'Reaktor Berlin Kredit']]);
+
+    // Match by subject
+    expect(matchesSearch(tx, 'Abschlusszahlung', categoryMap)).toBe(true);
+    expect(matchesSearch(tx, 'Reaktor', categoryMap)).toBe(true);
+
+    // Match by amount (various notations: 6943, 6.943,75, 6943.75, -6943)
+    expect(matchesSearch(tx, '6943', categoryMap)).toBe(true);
+    expect(matchesSearch(tx, '6.943,75', categoryMap)).toBe(true);
+    expect(matchesSearch(tx, '-6.943', categoryMap)).toBe(true);
+    expect(matchesSearch(tx, '6943.75', categoryMap)).toBe(true);
+
+    // Match by category name
+    expect(matchesSearch(tx, 'Kredit', categoryMap)).toBe(true);
+
+    // No match
+    expect(matchesSearch(tx, 'Unbekannt', categoryMap)).toBe(false);
+  });
 });

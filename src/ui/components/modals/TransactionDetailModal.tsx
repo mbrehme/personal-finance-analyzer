@@ -113,14 +113,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     setSaving(false);
     setSubject(transaction.subject || '');
     setPartner(transaction.receiver || transaction.issuer || '');
-    setCategoryId(transaction.categoryId ?? transaction.bucketId ?? null);
-    setDate(transaction.date || transaction.valueDate || '');
+    setCategoryId(transaction.categoryId ?? null);
+    setDate(transaction.date || '');
 
     const matchingAcc = transaction.accountIban
       ? realAccounts.find(
           (a) => a.iban && normalizeIban(a.iban) === normalizeIban(transaction.accountIban)
         )
-      : realAccounts.find((a) => a.id === transaction.accountId);
+      : undefined;
     setAccountId(matchingAcc?.id || realAccounts[0]?.id || '');
   }, [isOpen, transaction, realAccounts]);
 
@@ -141,14 +141,13 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   // Dynamischer Suchstring basierend auf den aktuellen Eingaben
   const compoundSearchString = useMemo(() => {
     if (!transaction) return '';
-    const previewDate = (date || transaction.date || transaction.valueDate) as ISODateString;
+    const previewDate = (date || transaction.date) as ISODateString;
     const previewTx: Transaction = {
       ...transaction,
       subject: subject.trim(),
       receiver: isOutbound ? partner.trim() : transaction.receiver ? partner.trim() : '',
       issuer: !isOutbound ? partner.trim() : transaction.issuer ? partner.trim() : '',
       date: previewDate,
-      valueDate: previewDate,
     };
     return buildCompoundSearchField(previewTx);
   }, [transaction, subject, partner, isOutbound, date]);
@@ -207,14 +206,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     const restored = resetTransactionToOriginal(tx);
     setSubject(restored.subject || '');
     setPartner(restored.receiver || restored.issuer || '');
-    setDate(restored.date || restored.valueDate || '');
+    setDate(restored.date || '');
     setCategoryId(null);
 
     const matchingAcc = restored.accountIban
       ? realAccounts.find(
           (a) => a.iban && normalizeIban(a.iban) === normalizeIban(restored.accountIban)
         )
-      : realAccounts.find((a) => a.id === restored.accountId);
+      : undefined;
     setAccountId(matchingAcc?.id || realAccounts[0]?.id || '');
 
     if (onReset) {
@@ -248,16 +247,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         }
       }
 
-      const initialCategoryId = tx.categoryId ?? tx.bucketId ?? null;
+      const initialCategoryId = tx.categoryId ?? null;
       const isCategoryFieldChanged = categoryId !== initialCategoryId;
-      const finalDate = (date || tx.date || tx.valueDate) as ISODateString;
+      const finalDate = (date || tx.date) as ISODateString;
 
       const updatedTx: Transaction = {
         ...tx,
         accountIban: targetAccountIban,
         date: finalDate,
-        valueDate: finalDate,
-        bookingDate: finalDate,
         subject: subject.trim(),
         receiver: finalReceiver,
         issuer: finalIssuer,
@@ -604,7 +601,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
               <div className="flex items-center gap-2 pt-1 text-[11px]">
                 <span className="text-slate-500">Status / Herkunft:</span>
-                {categoryId !== (tx.categoryId ?? tx.bucketId ?? null) ? (
+                {categoryId !== (tx.categoryId ?? null) ? (
                   <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
                     Wird als manuell zugewiesen gespeichert
                   </span>
@@ -654,12 +651,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                     </span>
                   </div>
                 )}
-                {tx.importIndex !== undefined && (
-                  <div>
-                    <span className="text-slate-500">CSV-Zeile: </span>
-                    <span className="font-mono text-slate-800">#{tx.importIndex + 1}</span>
-                  </div>
-                )}
                 {tx.importedAt && (
                   <div>
                     <span className="text-slate-500">Importiert am: </span>
@@ -697,10 +688,10 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                         <span className="text-slate-400">Betrag:</span> {tx.originalValue} €
                       </p>
                     )}
-                    {(tx.originalDate !== undefined || tx.originalValueDate !== undefined) && (
+                    {tx.originalDate !== undefined && (
                       <p>
                         <span className="text-slate-400">Datum (Wertstellung):</span>{' '}
-                        {tx.originalDate ?? tx.originalValueDate}
+                        {tx.originalDate}
                       </p>
                     )}
                   </div>

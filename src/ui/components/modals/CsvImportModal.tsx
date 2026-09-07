@@ -7,14 +7,7 @@
 
 import React, { useState } from 'react';
 import { Account, Transaction } from '@/types/finance';
-import {
-  parseRawCsv,
-  convertRowsToTransactions,
-  parseCurrencyValue,
-  CsvColumnMapping,
-  CsvParseResult,
-} from '@/domain';
-import { formatMoney } from '@/utils/moneyUtils';
+import { parseRawCsv, convertRowsToTransactions, CsvColumnMapping, CsvParseResult } from '@/domain';
 import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, Landmark } from 'lucide-react';
 
 export interface CsvImportModalProps {
@@ -55,15 +48,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
         const parsed = parseRawCsv(text);
         setParseResult(parsed);
 
-        const initialDateCol =
-          parsed.suggestedMapping.dateColumn ||
-          parsed.suggestedMapping.valueDateColumn ||
-          parsed.headers[0] ||
-          '';
+        const initialDateCol = parsed.suggestedMapping.dateColumn || parsed.headers[0] || '';
         const safeMapping: CsvColumnMapping = {
           ...parsed.suggestedMapping,
           dateColumn: initialDateCol,
-          valueDateColumn: initialDateCol,
           subjectColumn:
             parsed.suggestedMapping.subjectColumn ||
             (parsed.headers.length > 1 ? parsed.headers[1] : parsed.headers[0] || ''),
@@ -254,10 +242,9 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                             Wertstellungsdatum (Valuta) *
                           </label>
                           <select
-                            value={mapping.dateColumn || mapping.valueDateColumn}
+                            value={mapping.dateColumn}
                             onChange={(e) => {
                               handleMappingChange('dateColumn', e.target.value);
-                              handleMappingChange('valueDateColumn', e.target.value);
                             }}
                             className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
@@ -379,8 +366,8 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                                 <span>Datum *</span>
                               </div>
                               <div className="max-w-[140px] truncate font-mono text-[10px] font-normal text-blue-600">
-                                {mapping?.valueDateColumn
-                                  ? `↳ ${mapping.valueDateColumn}`
+                                {mapping?.dateColumn
+                                  ? `↳ ${mapping.dateColumn}`
                                   : '(nicht gewählt)'}
                               </div>
                             </th>
@@ -432,9 +419,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {parseResult.rows.slice(0, 3).map((row, idx) => {
-                            const rawDate = mapping?.valueDateColumn
-                              ? row[mapping.valueDateColumn]
-                              : '';
+                            const rawDate = mapping?.dateColumn ? row[mapping.dateColumn] : '';
                             const rawValue = mapping?.valueColumn ? row[mapping.valueColumn] : '';
                             const rawSubject = mapping?.subjectColumn
                               ? row[mapping.subjectColumn]
@@ -448,64 +433,35 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                             const rawIban = mapping?.ibanColumn ? row[mapping.ibanColumn] : '';
 
                             return (
-                              <tr key={idx} className="hover:bg-slate-50/60">
-                                <td className="whitespace-nowrap px-3.5 py-2 font-mono text-xs text-slate-800">
-                                  {rawDate || <span className="text-slate-300">-</span>}
+                              <tr key={idx} className="hover:bg-slate-50/70">
+                                <td className="max-w-[130px] truncate px-3.5 py-2 font-mono text-[11px] text-slate-800">
+                                  {rawDate || <span className="italic text-slate-400">Leer</span>}
                                 </td>
-                                <td className="whitespace-nowrap px-3.5 py-2 font-semibold text-slate-900">
-                                  {rawValue ? (
-                                    <div className="flex items-center gap-1.5 font-mono text-xs">
-                                      <span>{rawValue}</span>
-                                      {(() => {
-                                        const parsedVal = parseCurrencyValue(rawValue);
-                                        const badgeClass =
-                                          parsedVal < 0
-                                            ? 'text-rose-600 bg-rose-50 border-rose-200'
-                                            : parsedVal > 0
-                                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                                              : 'text-slate-500 bg-slate-50 border-slate-200';
-                                        return (
-                                          <span
-                                            className={`py-0.2 rounded border px-1 text-[10px] font-semibold ${badgeClass}`}
-                                            title="Erkannter Betrag"
-                                          >
-                                            ↳ {formatMoney(parsedVal)}
-                                          </span>
-                                        );
-                                      })()}
-                                    </div>
-                                  ) : (
-                                    <span className="text-slate-300">-</span>
+                                <td className="max-w-[110px] truncate px-3.5 py-2 font-mono text-[11px] font-semibold text-slate-900">
+                                  {rawValue || <span className="italic text-slate-400">Leer</span>}
+                                </td>
+                                <td className="max-w-[200px] truncate px-3.5 py-2 text-slate-700">
+                                  {rawSubject || (
+                                    <span className="italic text-slate-400">Leer</span>
                                   )}
                                 </td>
-                                <td
-                                  className="max-w-[260px] truncate px-3.5 py-2 text-slate-700"
-                                  title={rawSubject}
-                                >
-                                  {rawSubject || <span className="text-slate-300">-</span>}
-                                </td>
                                 {mapping?.receiverColumn && (
-                                  <td
-                                    className="max-w-[160px] truncate px-3.5 py-2 text-slate-700"
-                                    title={rawReceiver}
-                                  >
-                                    {rawReceiver || <span className="text-slate-300">-</span>}
+                                  <td className="max-w-[130px] truncate px-3.5 py-2 text-slate-700">
+                                    {rawReceiver || (
+                                      <span className="italic text-slate-400">Leer</span>
+                                    )}
                                   </td>
                                 )}
                                 {mapping?.accountIbanColumn && (
-                                  <td
-                                    className="max-w-[160px] truncate px-3.5 py-2 font-mono text-[11px] text-slate-600"
-                                    title={rawAccountIban}
-                                  >
-                                    {rawAccountIban || <span className="text-slate-300">-</span>}
+                                  <td className="max-w-[130px] truncate px-3.5 py-2 font-mono text-[11px] text-slate-600">
+                                    {rawAccountIban || (
+                                      <span className="italic text-slate-400">Leer</span>
+                                    )}
                                   </td>
                                 )}
                                 {mapping?.ibanColumn && (
-                                  <td
-                                    className="max-w-[160px] truncate px-3.5 py-2 font-mono text-[11px] text-slate-600"
-                                    title={rawIban}
-                                  >
-                                    {rawIban || <span className="text-slate-300">-</span>}
+                                  <td className="max-w-[130px] truncate px-3.5 py-2 font-mono text-[11px] text-slate-600">
+                                    {rawIban || <span className="italic text-slate-400">Leer</span>}
                                   </td>
                                 )}
                               </tr>
@@ -533,7 +489,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                     !parseResult ||
                     !selectedAccountId ||
                     !mapping ||
-                    !mapping.valueDateColumn ||
+                    !mapping.dateColumn ||
                     !mapping.valueColumn ||
                     !mapping.subjectColumn ||
                     importing

@@ -53,13 +53,8 @@ export interface AccountCashflowAnalysisResult {
   };
 }
 
-/** @deprecated Verwende CategoryPeriodCashflow */
-export type BucketPeriodCashflow = CategoryPeriodCashflow;
-
 export interface CategoryCashflowRow {
   category: Category;
-  /** @deprecated Verwende category */
-  bucket: Category;
   depth: number;
   hasChildren: boolean;
   periods: Record<string, CategoryPeriodCashflow>;
@@ -72,9 +67,6 @@ export interface CategoryCashflowRow {
   /** Kennzeichnet, ob das Budget durch Summation von Kind-Budgets zustande kam */
   isBudgetRollup?: boolean;
 }
-
-/** @deprecated Verwende CategoryCashflowRow */
-export type BucketCashflowRow = CategoryCashflowRow;
 
 export interface CashflowAnalysisResult {
   periodKeys: string[];
@@ -102,7 +94,7 @@ export function extractPeriodKeys(
 ): string[] {
   const keys = new Set<string>();
   transactions.forEach((tx) => {
-    const d = tx.date || tx.valueDate || '';
+    const d = tx.date || '';
     if (d) {
       keys.add(getPeriodKey(d, granularity));
     }
@@ -134,13 +126,13 @@ export function calculateCashflowMatrix(
         if (options?.accounts) {
           return isTransactionMatchingAccount(t, selectedAccountId, options.accounts);
         }
-        return t.accountId === selectedAccountId;
+        return false;
       })
     : transactions;
 
   if (options?.startDate || options?.endDate) {
     filteredTx = filteredTx.filter((tx) => {
-      const txDate = tx.date || tx.valueDate || '';
+      const txDate = tx.date || '';
       if (options.startDate && txDate < options.startDate) return false;
       if (options.endDate && txDate > options.endDate) return false;
       return true;
@@ -152,7 +144,7 @@ export function calculateCashflowMatrix(
     const allowUncategorized = allowed.has('__uncategorized__');
 
     filteredTx = filteredTx.filter((tx) => {
-      const catId = tx.categoryId ?? tx.bucketId;
+      const catId = tx.categoryId;
       if (!catId) {
         return allowUncategorized;
       }
@@ -218,9 +210,9 @@ export function calculateCashflowMatrix(
   };
 
   filteredTx.forEach((tx) => {
-    const txDate = tx.date || tx.valueDate || '';
+    const txDate = tx.date || '';
     const pKey = getPeriodKey(txDate, granularity);
-    const rawCatId = tx.categoryId ?? tx.bucketId ?? null;
+    const rawCatId = tx.categoryId ?? null;
     const catId = rawCatId && categoryIdsSet.has(rawCatId) ? rawCatId : uncategorizedCategoryId;
     const catPeriods = directSums.get(catId);
 
@@ -382,7 +374,6 @@ export function calculateCashflowMatrix(
 
     rows.push({
       category,
-      bucket: category,
       depth,
       hasChildren,
       periods,
@@ -413,7 +404,7 @@ export function calculateCashflowMatrix(
     let outbound = 0;
 
     filteredTx.forEach((tx) => {
-      const txDate = tx.date || tx.valueDate || '';
+      const txDate = tx.date || '';
       if (getPeriodKey(txDate, granularity) === pKey) {
         const val = getEffectiveValue(tx);
         if (val >= 0) {
@@ -508,7 +499,7 @@ export function calculateAccountCashflowMatrix(
 
   if (options?.startDate || options?.endDate) {
     filteredTx = filteredTx.filter((tx) => {
-      const txDate = tx.date || tx.valueDate || '';
+      const txDate = tx.date || '';
       if (options.startDate && txDate < options.startDate) return false;
       if (options.endDate && txDate > options.endDate) return false;
       return true;
@@ -520,7 +511,7 @@ export function calculateAccountCashflowMatrix(
     const allowUncategorized = allowed.has('__uncategorized__');
 
     filteredTx = filteredTx.filter((tx) => {
-      const catId = tx.categoryId ?? tx.bucketId;
+      const catId = tx.categoryId;
       if (!catId) {
         return allowUncategorized;
       }
@@ -624,7 +615,7 @@ export function calculateAccountCashflowMatrix(
     const isVirtual = row.account.accountType === 'virtual';
 
     filteredTx.forEach((tx) => {
-      const txDate = tx.date || tx.valueDate || '';
+      const txDate = tx.date || '';
       const pKey = getPeriodKey(txDate, granularity);
       const p = row.periods[pKey];
       if (!p) return;
@@ -722,13 +713,6 @@ export function convertAccountResultToCashflowResult(
 ): CashflowAnalysisResult {
   const rows: CategoryCashflowRow[] = accountResult.rows.map((ar) => ({
     category: {
-      id: ar.account.id,
-      name: ar.account.name,
-      color: ar.account.color || '#3b82f6',
-      icon: ar.account.icon || 'Landmark',
-      parentId: ar.parent?.id ?? null,
-    },
-    bucket: {
       id: ar.account.id,
       name: ar.account.name,
       color: ar.account.color || '#3b82f6',

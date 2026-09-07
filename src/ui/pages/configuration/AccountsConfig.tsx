@@ -104,7 +104,7 @@ export const AccountsConfig: React.FC = () => {
   const renderAccountCard = (acc: Account, isSubAccount: boolean = false) => {
     const isDraggingThis = draggedAccountId === acc.id;
     const isTarget = dropTargetAccountId === acc.id;
-    const accountCatIds = acc.categoryIds || acc.bucketIds || [];
+    const accountCatIds = acc.categoryIds || [];
 
     return (
       <div
@@ -184,7 +184,7 @@ export const AccountsConfig: React.FC = () => {
                 </div>
                 <div className="flex max-h-16 flex-wrap gap-1 overflow-y-auto">
                   {accountCatIds.length > 0 ? (
-                    accountCatIds.map((cId) => {
+                    accountCatIds.map((cId: string) => {
                       const c = categories.find((item) => item.id === cId);
                       if (!c) return null;
                       return (

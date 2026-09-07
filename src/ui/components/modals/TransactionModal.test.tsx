@@ -22,8 +22,6 @@ describe('TransactionModal', () => {
     id: 'tx-1',
     accountIban: 'DE12345',
     date: '2026-09-01',
-    valueDate: '2026-09-01',
-    bookingDate: '2026-09-01',
     issuer: '',
     receiver: 'REWE Markt GmbH',
     subject: 'REWE SAG DANKE FILIALE 1234',
@@ -33,7 +31,6 @@ describe('TransactionModal', () => {
     assignmentSource: 'unassigned',
     origin: 'imported',
     rawFingerprint: 'fp-12345',
-    originalValueDate: '2026-09-01',
     originalValue: -100,
     originalSubject: 'REWE SAG DANKE FILIALE 1234',
     originalReceiver: 'REWE Markt GmbH',
@@ -170,7 +167,7 @@ describe('TransactionModal', () => {
     );
   });
 
-  it('preserves partner and assignmentSource when only valueDate is changed in edit mode', async () => {
+  it('preserves partner and assignmentSource when only date is changed in edit mode', async () => {
     const txWithRegex: Transaction = {
       ...mockTransaction,
       categoryId: 'cat-food',
@@ -204,7 +201,6 @@ describe('TransactionModal', () => {
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         date: '2026-09-15',
-        valueDate: '2026-09-15',
         receiver: 'REWE Markt GmbH',
         issuer: '',
         categoryId: 'cat-food',

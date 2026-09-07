@@ -482,6 +482,3 @@ export const CategoriesConfig: React.FC = () => {
     </div>
   );
 };
-
-// Re-Export für Abwärtskompatibilität
-export const BucketsConfig = CategoriesConfig;

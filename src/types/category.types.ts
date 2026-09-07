@@ -11,9 +11,6 @@ import { EntityVisualMetadata, PeriodGranularity } from './common.types';
  */
 export type CategoryAssignmentSource = 'auto_regex' | 'manual' | 'unassigned';
 
-/** @deprecated Verwende CategoryAssignmentSource */
-export type BucketAssignmentSource = CategoryAssignmentSource;
-
 /**
  * Soll-Budget für eine Kategorie bezogen auf eine bestimmte Zeitperiode.
  */
@@ -46,6 +43,3 @@ export interface Category extends EntityVisualMetadata {
    */
   manualTransactionIds?: string[];
 }
-
-/** @deprecated Verwende Category */
-export type Bucket = Category;

@@ -35,8 +35,6 @@ export interface SplitPartInput {
 export interface FinanceContextType {
   accounts: Account[];
   categories: Category[];
-  /** @deprecated Verwende categories */
-  buckets: Category[];
   transactions: Transaction[];
   loading: boolean;
   error: string | null;
@@ -55,16 +53,6 @@ export interface FinanceContextType {
   updateCategory: (category: Category) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
   reorderCategories: (updatedCategories: Category[]) => Promise<void>;
-
-  // Backwards compatible Bucket aliases
-  /** @deprecated Verwende addCategory */
-  addBucket: (bucket: Omit<Category, 'id'>) => Promise<Category>;
-  /** @deprecated Verwende updateCategory */
-  updateBucket: (bucket: Category) => Promise<void>;
-  /** @deprecated Verwende deleteCategory */
-  deleteBucket: (bucketId: string) => Promise<void>;
-  /** @deprecated Verwende reorderCategories */
-  reorderBuckets: (updatedBuckets: Category[]) => Promise<void>;
 
   // Account Operations
   addAccount: (account: Omit<Account, 'id'>) => Promise<Account>;
@@ -95,8 +83,6 @@ export interface FinanceContextType {
   updateSplitGroup?: (rootTransactionId: string, splits: SplitPartInput[]) => Promise<void>;
   importTransactions: (newTransactions: Transaction[]) => Promise<number>;
   assignTransactionCategory: (transactionId: string, categoryId: string | null) => Promise<void>;
-  /** @deprecated Verwende assignTransactionCategory */
-  assignTransactionBucket: (transactionId: string, bucketId: string | null) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
   clearTransactions: () => Promise<void>;
   triggerReMatch: () => Promise<void>;
@@ -124,7 +110,7 @@ export const FinanceContext = createContext<FinanceContextType | undefined>(unde
 
 const SEED_CONFIG = seedConfigurationJson as unknown as FinanceConfigExport;
 const SEED_ACCOUNTS: Account[] = SEED_CONFIG.accounts || [];
-const SEED_CATEGORIES: Category[] = SEED_CONFIG.categories || SEED_CONFIG.buckets || [];
+const SEED_CATEGORIES: Category[] = SEED_CONFIG.categories || [];
 
 const REMATCH_STATUS_STORAGE_KEY = 'finance_rematch_status';
 const AUTO_REPROGRESS_STORAGE_KEY = 'finance_auto_reprogress';
@@ -152,27 +138,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     return 'has_progressed';
   });
-  const [error, setError] = useState<string | null>(null);
-
-  const setReMatchStatus = useCallback((status: ReMatchStatus) => {
-    setReMatchStatusState(status);
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(REMATCH_STATUS_STORAGE_KEY, status);
-      }
-    } catch {
-      // ignore storage access errors
-    }
-  }, []);
-
-  const needsReMatch = reMatchStatus === 'needs_reprogress';
-  const reMatching = reMatchStatus === 'is_reprogressing';
-  const setNeedsReMatch = useCallback(
-    (val: boolean) => {
-      setReMatchStatus(val ? 'needs_reprogress' : 'has_progressed');
-    },
-    [setReMatchStatus]
-  );
 
   const [autoReprogress, setAutoReprogressState] = useState<boolean>(() => {
     try {
@@ -185,48 +150,76 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch {
       // ignore storage access errors
     }
-    return true;
+    return true; // standardmäßig aktiv
   });
 
-  const performReMatch = useCallback(
-    async (overrideTxs?: Transaction[], overrideCategories?: Category[]): Promise<void> => {
-      try {
-        setReMatchStatus('is_reprogressing');
-        const allTxs =
-          overrideTxs ??
-          (transactions.length > 0 ? transactions : await financeDB.getTransactions());
-        const allCategories =
-          overrideCategories ??
-          (categories.length > 0 ? categories : await financeDB.getCategories());
-        const updatedTxs = reMatchAllTransactions(allTxs, allCategories);
-
-        if (updatedTxs.length > 0) {
-          await financeDB.saveTransactions(updatedTxs);
-        }
-        setTransactions(sortTransactionsDesc(updatedTxs));
-        setReMatchStatus('has_progressed');
-      } catch (err) {
-        console.error('Re-Match fehlgeschlagen:', err);
-        setReMatchStatus('needs_reprogress');
-        throw err;
+  const setReMatchStatus = useCallback((status: ReMatchStatus) => {
+    setReMatchStatusState(status);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(REMATCH_STATUS_STORAGE_KEY, status);
       }
+    } catch {
+      // ignore storage access errors
+    }
+  }, []);
+
+  const [error, setError] = useState<string | null>(null);
+
+  const needsReMatch = reMatchStatus === 'needs_reprogress';
+  const reMatching = reMatchStatus === 'is_reprogressing';
+
+  const setNeedsReMatch = useCallback(
+    (val: boolean) => {
+      setReMatchStatus(val ? 'needs_reprogress' : 'has_progressed');
     },
-    [transactions, categories, setReMatchStatus]
+    [setReMatchStatus]
   );
 
-  const triggerReMatch = useCallback(async (): Promise<void> => {
-    await performReMatch();
-  }, [performReMatch]);
+  const triggerReMatch = useCallback(async () => {
+    if (reMatchStatus === 'is_reprogressing') return;
+    setReMatchStatus('is_reprogressing');
 
+    try {
+      // Aktuellen Stand der Kategorien und Transaktionen aus der DB laden
+      const [currentTxs, currentCats] = await Promise.all([
+        financeDB.getTransactions(),
+        financeDB.getCategories(),
+      ]);
+
+      const reMatched = reMatchAllTransactions(currentTxs, currentCats);
+      await financeDB.saveTransactions(reMatched);
+      setTransactions(sortTransactionsDesc(reMatched));
+      setReMatchStatus('has_progressed');
+    } catch (err) {
+      console.error('Fehler beim Neu-Matching:', err);
+      setReMatchStatus('needs_reprogress');
+    }
+  }, [reMatchStatus, setReMatchStatus]);
+
+  // Interne Benachrichtigung, wenn sich Kategorien / Match-Regeln geändert haben
   const notifyConfigChanged = useCallback(
-    async (overrideTxs?: Transaction[], overrideCategories?: Category[]): Promise<void> => {
-      if (autoReprogress) {
-        await performReMatch(overrideTxs, overrideCategories);
+    async (
+      currentTxs: Transaction[],
+      currentCats: Category[],
+      activeAutoReprogress = autoReprogress
+    ) => {
+      if (activeAutoReprogress) {
+        setReMatchStatus('is_reprogressing');
+        try {
+          const reMatched = reMatchAllTransactions(currentTxs, currentCats);
+          await financeDB.saveTransactions(reMatched);
+          setTransactions(sortTransactionsDesc(reMatched));
+          setReMatchStatus('has_progressed');
+        } catch (err) {
+          console.error('Automatisches Reprogress fehlgeschlagen:', err);
+          setReMatchStatus('needs_reprogress');
+        }
       } else {
         setReMatchStatus('needs_reprogress');
       }
     },
-    [autoReprogress, performReMatch, setReMatchStatus]
+    [autoReprogress, setReMatchStatus]
   );
 
   const setAutoReprogress = useCallback(
@@ -257,9 +250,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const validDeleted: Transaction[] = [];
 
       for (const d of loadedDeleted) {
-        if (d.origin === 'manual') {
-          // Manuelle Buchungen gehören nicht in den Papierkorb
-          await financeDB.permanentlyDeleteTransaction(d.id);
+        if (d.origin === 'override') {
+          validDeleted.push(d);
         } else {
           validDeleted.push(d);
         }
@@ -292,41 +284,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           {
             ...SEED_ACCOUNTS[0],
             categoryIds: loadedCategories.map((c) => c.id),
-            bucketIds: loadedCategories.map((c) => c.id),
           },
         ];
         await financeDB.saveAccounts(seededAccounts);
         loadedAccounts = seededAccounts;
       }
 
-      // Migration: Transaktionen mit accountId aber ohne accountIban mit der IBAN des Kontos anreichern
-      const accountsMap = new Map(loadedAccounts.map((a) => [a.id, a]));
-      let txsMigrated = false;
-      const migratedTransactions = loadedTransactions.map((tx) => {
-        if (!tx.accountIban && tx.accountId) {
-          const acc = accountsMap.get(tx.accountId);
-          if (acc?.iban) {
-            txsMigrated = true;
-            return {
-              ...tx,
-              accountIban: acc.iban,
-              originalAccountIban: tx.originalAccountIban ?? acc.iban,
-            };
-          }
-        }
-        return tx;
-      });
-
-      if (txsMigrated) {
-        await financeDB.saveTransactions(migratedTransactions);
-      }
-
       setAccounts(loadedAccounts);
       setCategories(loadedCategories);
-      setTransactions(sortTransactionsDesc(migratedTransactions));
+      setTransactions(sortTransactionsDesc(loadedTransactions));
       setDeletedTransactions(sortTransactionsDesc(validDeleted));
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden der Finanzdaten.');
+      setError(
+        err instanceof Error ? err.message : 'Fehler beim Laden der lokalen Finanzdatenbank.'
+      );
     } finally {
       setLoading(false);
     }
@@ -342,8 +314,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...accountData,
       id: `acc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       balanceEntries: accountData.balanceEntries || [],
-      categoryIds: accountData.categoryIds || accountData.bucketIds || [],
-      bucketIds: accountData.categoryIds || accountData.bucketIds || [],
+      categoryIds: accountData.categoryIds || [],
     };
     await financeDB.saveAccount(newAccount);
     setAccounts((prev) => [...prev, newAccount]);
@@ -353,8 +324,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateAccount = async (updated: Account): Promise<void> => {
     const normalized: Account = {
       ...updated,
-      categoryIds: updated.categoryIds || updated.bucketIds || [],
-      bucketIds: updated.categoryIds || updated.bucketIds || [],
+      categoryIds: updated.categoryIds || [],
     };
     await financeDB.saveAccount(normalized);
     setAccounts((prev) => prev.map((a) => (a.id === normalized.id ? normalized : a)));
@@ -372,91 +342,91 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const addBalanceEntry = async (
     accountId: string,
-    entryData: Omit<BalanceEntry, 'id'>
+    entry: Omit<BalanceEntry, 'id'>
   ): Promise<void> => {
-    const targetAccount = accounts.find((a) => a.id === accountId);
-    if (!targetAccount) throw new Error('Konto nicht gefunden.');
+    const account = accounts.find((a) => a.id === accountId);
+    if (!account) throw new Error('Konto nicht gefunden.');
 
     const newEntry: BalanceEntry = {
-      ...entryData,
-      id: `be-${Date.now()}`,
+      ...entry,
+      id: `be-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     };
 
     const updatedAccount: Account = {
-      ...targetAccount,
-      balanceEntries: [...targetAccount.balanceEntries, newEntry].sort((a, b) =>
+      ...account,
+      balanceEntries: [...account.balanceEntries, newEntry].sort((a, b) =>
         a.date.localeCompare(b.date)
       ),
     };
 
-    await updateAccount(updatedAccount);
+    await financeDB.saveAccount(updatedAccount);
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? updatedAccount : a)));
   };
 
   const deleteBalanceEntry = async (accountId: string, entryId: string): Promise<void> => {
-    const targetAccount = accounts.find((a) => a.id === accountId);
-    if (!targetAccount) return;
+    const account = accounts.find((a) => a.id === accountId);
+    if (!account) throw new Error('Konto nicht gefunden.');
 
     const updatedAccount: Account = {
-      ...targetAccount,
-      balanceEntries: targetAccount.balanceEntries.filter((e) => e.id !== entryId),
+      ...account,
+      balanceEntries: account.balanceEntries.filter((e) => e.id !== entryId),
     };
 
-    await updateAccount(updatedAccount);
+    await financeDB.saveAccount(updatedAccount);
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? updatedAccount : a)));
   };
 
-  /* ================== CATEGORIES (BUCKETS) ================== */
+  /* ================== CATEGORIES ================== */
   const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<Category> => {
     const newCategory: Category = {
       ...categoryData,
-      id: `b-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      manualTransactionIds: [],
+      id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      order: categories.length,
     };
 
-    let updatedCategories = [...categories, newCategory];
-
-    // Wenn die neue Kategorie eine übergeordnete Kategorie hat, verliert diese ihr regexPattern
+    // Falls die Kategorie ein Eltern-Element hat, prüfen ob das Eltern-Element ein regexPattern hatte
+    let updatedCategories = [...categories];
     if (newCategory.parentId) {
-      const parent = categories.find((c) => c.id === newCategory.parentId);
-      if (parent && parent.regexPattern) {
-        const cleanedParent: Category = {
-          ...parent,
-          regexPattern: undefined,
-        };
-        await financeDB.saveCategory(cleanedParent);
-        updatedCategories = updatedCategories.map((c) =>
-          c.id === cleanedParent.id ? cleanedParent : c
-        );
-      }
+      updatedCategories = updatedCategories.map((c) => {
+        if (c.id === newCategory.parentId && c.regexPattern) {
+          return { ...c, regexPattern: undefined };
+        }
+        return c;
+      });
     }
 
-    await financeDB.saveCategory(newCategory);
+    updatedCategories.push(newCategory);
+
+    // Beide Speichervorgänge in der DB
+    await financeDB.saveCategories(updatedCategories);
     setCategories(updatedCategories);
+
+    // Automatische Zuordnung neu berechnen
     await notifyConfigChanged(transactions, updatedCategories);
 
     return newCategory;
   };
 
-  const updateCategory = async (updated: Category): Promise<void> => {
-    // 1. Hat die aktualisierte Kategorie Kinder? Dann darf sie selbst kein Regex haben.
-    const hasChildren = categories.some((c) => c.parentId === updated.id);
-    const sanitizedUpdated: Category = hasChildren
-      ? { ...updated, regexPattern: undefined }
-      : updated;
+  const updateCategory = async (updatedCategory: Category): Promise<void> => {
+    // Falls diese Kategorie Kinder hat, darf sie kein eigenes regexPattern haben
+    const hasChildren = categories.some((c) => c.parentId === updatedCategory.id);
+    const sanitizedUpdated = hasChildren
+      ? { ...updatedCategory, regexPattern: undefined }
+      : updatedCategory;
 
+    // Falls die Kategorie nun ein Parent geworden ist, oder ein neues Eltern-Element referenziert
     let updatedCategories = categories.map((c) =>
       c.id === sanitizedUpdated.id ? sanitizedUpdated : c
     );
 
-    // 2. Hat die Kategorie einen Parent bekommen, der noch ein Regex hat? Dann Parent bereinigen.
     if (sanitizedUpdated.parentId) {
-      const parent = categories.find((c) => c.id === sanitizedUpdated.parentId);
-      if (parent && parent.regexPattern) {
-        const cleanedParent: Category = { ...parent, regexPattern: undefined };
-        await financeDB.saveCategory(cleanedParent);
-        updatedCategories = updatedCategories.map((c) =>
-          c.id === cleanedParent.id ? cleanedParent : c
-        );
-      }
+      updatedCategories = updatedCategories.map((c) => {
+        if (c.id === sanitizedUpdated.parentId && c.regexPattern) {
+          return { ...c, regexPattern: undefined };
+        }
+        return c;
+      });
+      await financeDB.saveCategories(updatedCategories);
     }
 
     await financeDB.saveCategory(sanitizedUpdated);
@@ -487,9 +457,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Transaktionen bereinigen, die dieser Kategorie zugeordnet waren
     const updatedTxs = transactions.map((t) => {
-      const currentCatId = t.categoryId ?? t.bucketId;
-      return currentCatId === categoryId
-        ? { ...t, categoryId: null, bucketId: null, assignmentSource: 'unassigned' as const }
+      return t.categoryId === categoryId
+        ? { ...t, categoryId: null, assignmentSource: 'unassigned' as const }
         : t;
     });
     await financeDB.saveTransactions(updatedTxs);
@@ -513,10 +482,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newTx: Transaction = {
       ...txData,
       id,
-      origin: 'manual',
+      origin: 'override',
       assignmentSource: txData.categoryId ? 'manual' : 'unassigned',
       categoryId: txData.categoryId || null,
-      bucketId: txData.categoryId || null,
     };
 
     if (newTx.categoryId) {
@@ -541,8 +509,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateTransaction = async (updatedTx: Transaction): Promise<void> => {
     const oldTx = transactions.find((t) => t.id === updatedTx.id);
-    const oldCatId = oldTx?.categoryId ?? oldTx?.bucketId ?? null;
-    const newCatId = updatedTx.categoryId ?? updatedTx.bucketId ?? null;
+    const oldCatId = oldTx?.categoryId ?? null;
+    const newCatId = updatedTx.categoryId ?? null;
 
     if (oldCatId !== newCatId) {
       let updatedCats = categories.map((c) => {
@@ -577,7 +545,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const preparedTx: Transaction = {
       ...updatedTx,
       categoryId: newCatId,
-      bucketId: newCatId,
       assignmentSource: isCategoryChanged
         ? newCatId
           ? 'manual'
@@ -588,11 +555,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalSubject: oldTx?.originalSubject ?? oldTx?.subject,
       originalReceiver: oldTx?.originalReceiver ?? oldTx?.receiver,
       originalIssuer: oldTx?.originalIssuer ?? oldTx?.issuer,
-      originalAccountId: oldTx?.originalAccountId ?? oldTx?.accountId,
       originalAccountIban: oldTx?.originalAccountIban ?? oldTx?.accountIban,
-      originalDate:
-        oldTx?.originalDate ?? oldTx?.originalValueDate ?? oldTx?.date ?? oldTx?.valueDate,
-      originalValueDate: oldTx?.originalValueDate ?? oldTx?.valueDate,
+      originalDate: oldTx?.originalDate ?? oldTx?.date,
       originalIban: oldTx?.originalIban ?? oldTx?.iban,
     };
 
@@ -624,7 +588,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const remainingAbs = origAbs - splitAmount;
     const updatedOriginalValue = (sign * Math.round(remainingAbs * 100)) / 100;
 
-    const originalTxDate = originalTx.date ?? originalTx.valueDate;
+    const originalTxDate = originalTx.date;
 
     const updatedOriginalTx: Transaction = {
       ...originalTx,
@@ -632,10 +596,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalValue: originalTx.originalValue ?? originalTx.value,
       originalSubject: originalTx.originalSubject ?? originalTx.subject,
       originalReceiver: originalTx.originalReceiver ?? originalTx.receiver,
-      originalAccountId: originalTx.originalAccountId ?? originalTx.accountId,
       originalAccountIban: originalTx.originalAccountIban ?? originalTx.accountIban,
-      originalDate: originalTx.originalDate ?? originalTx.originalValueDate ?? originalTxDate,
-      originalValueDate: originalTx.originalValueDate ?? originalTx.valueDate,
+      originalDate: originalTx.originalDate ?? originalTxDate,
       originalIban: originalTx.originalIban ?? originalTx.iban,
     };
 
@@ -643,18 +605,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const splitValue = (sign * Math.round(splitAmount * 100)) / 100;
     const newSplitTx: Transaction = {
       id: splitId,
-      accountId: originalTx.accountId,
       accountIban: originalTx.accountIban,
       date: originalTxDate,
-      valueDate: originalTxDate,
-      bookingDate: originalTxDate,
       issuer: originalTx.issuer,
       receiver: splitData.receiver.trim() || originalTx.receiver,
       subject: splitData.subject.trim() || `${originalTx.subject} (Split)`,
       iban: originalTx.iban,
       value: splitValue,
       categoryId: splitData.categoryId || null,
-      bucketId: splitData.categoryId || null,
       assignmentSource: splitData.categoryId ? 'manual' : 'unassigned',
       origin: 'split',
       splitFromId: originalId,
@@ -696,57 +654,51 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ): Promise<void> => {
     // 1. Root-Transaktion finden (falls eine Child-ID übergeben wurde, zu Root auflösen)
     let rootTx = transactions.find((t) => t.id === rootTransactionId);
-    if (!txExists(rootTx)) {
+    if (!rootTx) {
       throw new Error('Root-Transaktion nicht gefunden.');
     }
-    if (rootTx.splitFromId) {
+    while (rootTx.splitFromId) {
       const parent = transactions.find((t) => t.id === rootTx!.splitFromId);
-      if (parent) {
-        rootTx = parent;
-      }
+      if (!parent) break;
+      rootTx = parent;
     }
 
     const actualRootId = rootTx.id;
-    // Der ursprüngliche Gesamtbetrag aus den Bankdaten
-    const bankTotal = rootTx.originalValue !== undefined ? rootTx.originalValue : rootTx.value;
-    const bankTotalAbs = Math.round(Math.abs(bankTotal) * 100) / 100;
-    const sign = bankTotal < 0 ? -1 : 1;
+    const totalOriginalAbs = Math.abs(rootTx.originalValue ?? rootTx.value);
+    const sign = (rootTx.originalValue ?? rootTx.value) < 0 ? -1 : 1;
 
-    // 2. Summe der Splits validieren
-    let totalSplitsAbs = 0;
-    for (const split of splits) {
-      if (split.amount <= 0) {
-        throw new Error('Der Betrag jedes Split-Teils muss größer als 0,00 € sein.');
-      }
-      totalSplitsAbs = Math.round((totalSplitsAbs + split.amount) * 100) / 100;
+    // Validierung: Summe aller Splits muss echt kleiner sein als der Originalbetrag
+    const splitsSum = splits.reduce((acc, s) => acc + s.amount, 0);
+    const roundedSplitsSum = Math.round(splitsSum * 100) / 100;
+    const roundedTotalOriginal = Math.round(totalOriginalAbs * 100) / 100;
+
+    if (splits.some((s) => s.amount <= 0)) {
+      throw new Error('Jeder Split-Teil muss einen Betrag größer als 0,00 € haben.');
     }
 
-    if (totalSplitsAbs >= bankTotalAbs) {
+    if (roundedSplitsSum >= roundedTotalOriginal) {
       throw new Error(
         'Die Summe aller Split-Teile muss kleiner als der Gesamtbetrag der Buchung sein, damit ein Restbetrag verbleibt.'
       );
     }
 
-    const remainingAbs = Math.round((bankTotalAbs - totalSplitsAbs) * 100) / 100;
+    const remainingAbs = Math.round((roundedTotalOriginal - roundedSplitsSum) * 100) / 100;
     const updatedRootValue = (sign * Math.round(remainingAbs * 100)) / 100;
+    const rootTxDate = rootTx.date;
 
-    const rootTxDate = rootTx.date ?? rootTx.valueDate;
-
-    // 3. Root-Transaktion vorbereiten
+    // 2. Root-Transaktion mit neuem Restbetrag vorbereiten
     const updatedRootTx: Transaction = {
       ...rootTx,
       value: updatedRootValue,
       originalValue: rootTx.originalValue ?? rootTx.value,
       originalSubject: rootTx.originalSubject ?? rootTx.subject,
       originalReceiver: rootTx.originalReceiver ?? rootTx.receiver,
-      originalAccountId: rootTx.originalAccountId ?? rootTx.accountId,
       originalAccountIban: rootTx.originalAccountIban ?? rootTx.accountIban,
-      originalDate: rootTx.originalDate ?? rootTx.originalValueDate ?? rootTxDate,
-      originalValueDate: rootTx.originalValueDate ?? rootTx.valueDate,
+      originalDate: rootTx.originalDate ?? rootTxDate,
       originalIban: rootTx.originalIban ?? rootTx.iban,
     };
 
-    // 4. Bestehende Kinder ermitteln
+    // 3. Bestehende Kinder identifizieren
     const existingChildren = transactions.filter((t) => t.splitFromId === actualRootId);
     const existingChildrenMap = new Map(existingChildren.map((c) => [c.id, c]));
 
@@ -768,7 +720,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           receiver: split.receiver.trim() || updatedRootTx.receiver,
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
           categoryId: split.categoryId || null,
-          bucketId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',
         };
         childrenToSave.push(updatedChild);
@@ -791,18 +742,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const newChildId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const newChild: Transaction = {
           id: newChildId,
-          accountId: updatedRootTx.accountId,
           accountIban: updatedRootTx.accountIban,
           date: rootTxDate,
-          valueDate: rootTxDate,
-          bookingDate: rootTxDate,
           issuer: updatedRootTx.issuer,
           receiver: split.receiver.trim() || updatedRootTx.receiver,
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
           iban: updatedRootTx.iban,
           value: splitValue,
           categoryId: split.categoryId || null,
-          bucketId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',
           origin: 'split',
           splitFromId: actualRootId,
@@ -850,30 +797,24 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
-  function txExists(tx: Transaction | undefined): tx is Transaction {
-    return tx !== undefined;
-  }
-
   const importTransactions = async (newTransactions: Transaction[]): Promise<number> => {
-    // 1. Vorhandene Fingerprints erfassen, um bestehende Overrides und Splits vor Überschreiben zu schützen
+    // 1. Bereits vorhandene IDs & Fingerabdrücke sammeln
     const existingIds = new Set(transactions.map((t) => t.id));
-    const existingFingerprints = new Map<string, Transaction>();
-    transactions.forEach((t) => {
-      if (t.rawFingerprint) {
-        existingFingerprints.set(t.rawFingerprint, t);
-      }
-    });
+    const existingFingerprints = new Set(
+      transactions.map((t) => t.rawFingerprint).filter(Boolean) as string[]
+    );
 
-    // 2. Gelöschte Buchungen als Sperre: IDs und Fingerprints aus dem Papierkorb
-    const deletedIds = new Set(deletedTransactions.map((t) => t.id));
+    // Gelöschte Transaktionen (Tombstones) laden
+    const deletedList = await financeDB.getDeletedTransactions();
+    const deletedIds = new Set(deletedList.map((t) => t.id));
     const deletedFingerprints = new Set(
-      deletedTransactions.filter((t) => t.rawFingerprint).map((t) => t.rawFingerprint as string)
+      deletedList.map((t) => t.rawFingerprint).filter(Boolean) as string[]
     );
 
     const toInsert: Transaction[] = [];
 
     for (const rawTx of newTransactions) {
-      // Duplikatprüfung: Bereits per ID oder per unveränderlichem Roh-Fingerabdruck vorhanden
+      // 2. Duplikatsprüfung: ID oder rawFingerprint bereits aktiv vorhanden?
       if (existingIds.has(rawTx.id)) {
         continue;
       }
@@ -893,7 +834,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const preparedTx: Transaction = {
         ...rawTx,
         categoryId: match.categoryId,
-        bucketId: match.categoryId,
         assignmentSource: match.assignmentSource,
       };
 
@@ -948,7 +888,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {
           ...t,
           categoryId: targetCategoryId,
-          bucketId: targetCategoryId,
           assignmentSource: targetCategoryId ? ('manual' as const) : ('unassigned' as const),
         };
       }
@@ -978,24 +917,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (parentTx) {
         // Den Betrag des gelöschten Split-Teils wieder dem Parent gutschreiben
-        const newParentValue = Math.round((parentTx.value + tx.value) * 100) / 100;
-        const otherChildren = transactions.filter(
-          (t) => t.splitFromId === parentTx.id && t.id !== transactionId
-        );
+        const childAbs = Math.abs(tx.value);
+        const parentCurrentAbs = Math.abs(parentTx.value);
+        const newAbs = Math.round((parentCurrentAbs + childAbs) * 100) / 100;
+        const sign = parentTx.value < 0 ? -1 : 1;
 
-        // Falls keine weiteren Kinder mehr existieren und der Parent wieder den Originalwert hat,
-        // kann der Originalwert-Snapshot bereinigt werden, wenn keine anderen Felder abweichen
         const updatedParent: Transaction = {
           ...parentTx,
-          value: newParentValue,
-          originalValue:
-            otherChildren.length === 0 &&
-            parentTx.originalValue !== undefined &&
-            Math.abs(newParentValue - parentTx.originalValue) < 0.001 &&
-            parentTx.originalSubject === undefined &&
-            parentTx.originalReceiver === undefined
-              ? undefined
-              : parentTx.originalValue,
+          value: sign * newAbs,
         };
 
         await financeDB.saveTransaction(updatedParent);
@@ -1003,20 +932,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setCategories(updatedCategories);
 
         setTransactions((prev) =>
-          prev
-            .filter((t) => t.id !== transactionId)
-            .map((t) => (t.id === parentTx.id ? updatedParent : t))
+          sortTransactionsDesc(
+            prev
+              .filter((t) => t.id !== transactionId)
+              .map((t) => (t.id === parentTx.id ? updatedParent : t))
+          )
         );
-      } else {
-        await financeDB.saveCategories(updatedCategories);
-        setCategories(updatedCategories);
-        setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
+        return;
       }
-      return;
     }
 
-    // Fall 2: Gelöschte Buchung ist ein Split-Parent oder normale Buchung
-    // Falls es ein Parent ist: Alle Split-Kinder ebenfalls löschen
+    // Fall 2: Gelöschte Buchung ist eine Parent-Buchung mit vorhandenen Split-Kindern
     const children = transactions.filter((t) => t.splitFromId === transactionId);
     const childIds = new Set(children.map((c) => c.id));
     for (const child of children) {
@@ -1028,8 +954,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     // Nur importierte Bank-Transaktionen wandern in den Papierkorb (Gelöscht-Stapel & CSV-Tombstone).
-    // Manuell erstellte Transaktionen (origin === 'manual') werden direkt endgültig gelöscht.
-    const isManual = tx.origin === 'manual';
+    // Manuell erstellte Transaktionen (origin === 'override') werden direkt endgültig gelöscht.
+    const isManual = tx.origin === 'override' && !tx.originalDate;
 
     if (!isManual) {
       await financeDB.saveDeletedTransaction(tx);
@@ -1088,7 +1014,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const finalTx: Transaction = {
       ...restored,
       categoryId: match.categoryId,
-      bucketId: match.categoryId,
       assignmentSource: match.assignmentSource,
     };
 
@@ -1122,7 +1047,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const restoredTx: Transaction = {
       ...(withoutMetadata as Transaction),
       categoryId: match.categoryId,
-      bucketId: match.categoryId,
       assignmentSource: match.assignmentSource,
     };
 
@@ -1156,7 +1080,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const parsed: FinanceConfigExport = JSON.parse(jsonContent);
     await financeDB.importConfiguration(parsed);
 
-    const loadedCats = parsed.categories || parsed.buckets;
+    const loadedCats = parsed.categories;
     let accountsCount = 0;
     let categoriesCount = 0;
     let transactionsCount = 0;
@@ -1208,7 +1132,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             {
               ...SEED_ACCOUNTS[0],
               categoryIds: SEED_CATEGORIES.map((c) => c.id),
-              bucketIds: SEED_CATEGORIES.map((c) => c.id),
             },
           ];
           await financeDB.saveAccounts(seededAccounts);
@@ -1229,7 +1152,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
               prev.map((acc) => ({
                 ...acc,
                 categoryIds: SEED_CATEGORIES.map((c) => c.id),
-                bucketIds: SEED_CATEGORIES.map((c) => c.id),
               }))
             );
           }
@@ -1247,10 +1169,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setTransactions([]);
         }
       } else {
-        const doResetSplits = Boolean(options.resetSplits || options.resetTransactionOverrides);
-        const doResetOverrides = Boolean(
-          options.resetOverrides || options.resetTransactionOverrides
-        );
+        const doResetSplits = Boolean(options.resetSplits);
+        const doResetOverrides = Boolean(options.resetOverrides);
 
         if (doResetSplits || doResetOverrides) {
           const baseTransactions =
@@ -1261,7 +1181,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           // 1. Splits auflösen: Split-Kinder entfernen und Elternbuchungen auf den vollen Betrag zurücksetzen
           if (doResetSplits) {
             workingTransactions = workingTransactions
-              .filter((t) => !t.splitFromId && t.origin !== 'manual')
+              .filter((t) => !t.splitFromId && t.origin !== 'override')
               .map((t) => {
                 if (t.originalValue !== undefined && t.value !== t.originalValue) {
                   return {
@@ -1293,7 +1213,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             // Alle importierten Buchungen auf Bank-Originaldaten zurücksetzen
             const restoredTxs = workingTransactions.map((t) => {
-              if (t.origin === 'manual') return t;
+              if (t.origin === 'override' && !t.originalDate) return t;
               return resetTransactionToOriginal(t);
             });
 
@@ -1326,7 +1246,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       value={{
         accounts,
         categories,
-        buckets: categories,
         transactions,
         loading,
         error,
@@ -1347,17 +1266,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateCategory,
         deleteCategory,
         reorderCategories,
-        addBucket: addCategory,
-        updateBucket: updateCategory,
-        deleteBucket: deleteCategory,
-        reorderBuckets: reorderCategories,
         addTransaction,
         updateTransaction,
         splitTransaction,
         updateSplitGroup,
         importTransactions,
         assignTransactionCategory,
-        assignTransactionBucket: assignTransactionCategory,
         deleteTransaction,
         clearTransactions,
         triggerReMatch,

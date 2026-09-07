@@ -277,7 +277,7 @@ export const Transactions: React.FC = () => {
     }
 
     const matches = transactions.filter((tx) => {
-      const txCatId = tx.categoryId ?? tx.bucketId ?? null;
+      const txCatId = tx.categoryId ?? null;
 
       // 1. Account Filter (prüft Buchungskonto, Gegenkonto bei Umbuchung und virtuelle Unterkonten)
       if (accountId !== 'all' && !isTransactionMatchingAccount(tx, accountId, accounts)) {
@@ -322,7 +322,7 @@ export const Transactions: React.FC = () => {
       }
 
       // 5. Datum Filter (Wertstellungsdatum)
-      const txDate = tx.date || tx.valueDate;
+      const txDate = tx.date;
       if (startDate && txDate < (startDate as ISODateString)) {
         return false;
       }
@@ -719,12 +719,11 @@ export const Transactions: React.FC = () => {
                     ? accountInfo.virtualAccounts.filter((v) => v.parentAccountId === toAccount.id)
                     : [];
                   const hasModifiedAccount =
-                    (tx.originalAccountIban !== undefined &&
-                      tx.accountIban !== tx.originalAccountIban) ||
-                    (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId);
+                    tx.originalAccountIban !== undefined &&
+                    tx.accountIban !== tx.originalAccountIban;
 
-                  const currentDate = tx.date || tx.valueDate;
-                  const origDate = tx.originalDate ?? tx.originalValueDate;
+                  const currentDate = tx.date;
+                  const origDate = tx.originalDate;
 
                   return (
                     <tr
@@ -928,7 +927,7 @@ export const Transactions: React.FC = () => {
                       >
                         <div className="flex items-center gap-1.5">
                           <select
-                            value={tx.categoryId || tx.bucketId || ''}
+                            value={tx.categoryId || ''}
                             onChange={(e) =>
                               assignTransactionCategory(tx.id, e.target.value || null)
                             }
@@ -943,7 +942,7 @@ export const Transactions: React.FC = () => {
                           </select>
 
                           {/* Geändert Badge bei manueller Zuweisung */}
-                          {tx.origin !== 'manual' && tx.assignmentSource === 'manual' && (
+                          {tx.origin !== 'override' && tx.assignmentSource === 'manual' && (
                             <span
                               className="inline-flex shrink-0 items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800"
                               title="Kategorie manuell zugewiesen / angepasst"

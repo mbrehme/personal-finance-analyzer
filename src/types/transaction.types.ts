@@ -17,9 +17,8 @@ export type TransactionType = 'inbound' | 'outbound';
  * - 'imported': Unveränderte Original-Bankbuchung
  * - 'split': Aus einer Aufteilung hervorgegangene Teilbuchung
  * - 'override': Nachträglich manuell editiert oder überschrieben
- * - 'manual': Abwärtskompatibler Alias für 'override'
  */
-export type TransactionOrigin = 'imported' | 'split' | 'override' | 'manual';
+export type TransactionOrigin = 'imported' | 'split' | 'override';
 
 /**
  * Eine einzelne Finanzbuchung / Transaktion.
@@ -27,18 +26,10 @@ export type TransactionOrigin = 'imported' | 'split' | 'override' | 'manual';
 export interface Transaction {
   /** Eindeutige, deterministische ID (generiert aus Datum, Betrag, IBAN, Text) */
   id: string;
-  /**
-   * @deprecated Nicht mehr statisch persistieren. Kontozugehörigkeit wird dynamisch via accountIban / IBAN oder CategoryId ermittelt.
-   */
-  accountId?: string;
   /** Eigene Bank-IBAN des Kontos, auf dem die Buchung gebucht wurde */
   accountIban?: string;
   /** Wertstellungsdatum (Valutadatum) der Buchung */
   date: ISODateString;
-  /** @deprecated Bitte nur noch `date` verwenden */
-  valueDate?: ISODateString;
-  /** @deprecated Bitte nur noch `date` verwenden */
-  bookingDate?: ISODateString;
   /** Auftraggeber / Absender der Zahlung */
   issuer: string;
   /** Empfänger der Zahlung */
@@ -56,8 +47,6 @@ export interface Transaction {
   value: number;
   /** ID der zugeordneten Kategorie oder null */
   categoryId?: string | null;
-  /** @deprecated Verwende categoryId */
-  bucketId?: string | null;
   /**
    * Zuweisungs-Herkunft:
    * - 'auto_regex': Automatisch via Regex zugewiesen (wird bei Regex-Update neu evaluiert)
@@ -69,8 +58,6 @@ export interface Transaction {
   importFilename?: string;
   /** Index der Transaktion innerhalb desselben Wertstellungstages (0, 1, 2, ...) für tagesbasierte Reihenfolge */
   dayIndex?: number;
-  /** @deprecated Verwende dayIndex. Zeilenindex der Transaktion in der Importdatei */
-  importIndex?: number;
   /** Import-Zeitpunkt als ISO-String */
   importedAt?: string;
   /**
@@ -84,15 +71,9 @@ export interface Transaction {
   splitFromId?: string;
 
   /* Flache Original-Felder der Bank-Rohdaten (nur bei importierten Buchungen vorhanden) */
-  /** @deprecated Verwende originalAccountIban */
-  originalAccountId?: string;
   originalAccountIban?: string;
   /** Ursprüngliches Wertstellungsdatum (Valutadatum) aus den Bank-Rohdaten */
   originalDate?: ISODateString;
-  /** @deprecated Bitte originalDate verwenden */
-  originalValueDate?: ISODateString;
-  /** @deprecated Bitte originalDate verwenden */
-  originalBookingDate?: ISODateString;
   originalValue?: number;
   originalSubject?: string;
   originalReceiver?: string;
@@ -108,9 +89,8 @@ export interface Transaction {
 export interface TransactionFilterOptions {
   accountId?: string;
   categoryId?: string | 'uncategorized' | 'assigned' | 'manual';
-  bucketId?: string | 'uncategorized';
   type?: TransactionType | 'all';
-  origin?: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
+  origin?: 'all' | 'imported' | 'split' | 'override' | 'deleted';
   startDate?: ISODateString;
   endDate?: ISODateString;
   searchTerm?: string;

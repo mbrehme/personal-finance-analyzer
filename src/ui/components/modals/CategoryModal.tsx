@@ -20,32 +20,20 @@ export interface CategoryModalProps {
   onSave: (categoryData: Omit<Category, 'id'> | Category) => Promise<void>;
   onDelete?: (categoryId: string) => Promise<void>;
   category?: Category | null;
-  /** @deprecated Verwende category */
-  bucket?: Category | null;
   existingCategories?: Category[];
-  /** @deprecated Verwende existingCategories */
-  existingBuckets?: Category[];
   /** Vorausgewählte übergeordnete Kategorie beim Neuanlegen */
   initialParentId?: string | null;
 }
-
-/** @deprecated Verwende CategoryModalProps */
-export type BucketModalProps = CategoryModalProps;
 
 export const CategoryModal: React.FC<CategoryModalProps> = ({
   isOpen,
   onClose,
   onSave,
   onDelete,
-  category: propCategory,
-  bucket: propBucket,
-  existingCategories: propExistingCategories,
-  existingBuckets: propExistingBuckets,
+  category: currentCategory,
+  existingCategories = [],
   initialParentId = null,
 }) => {
-  const currentCategory = propCategory ?? propBucket;
-  const existingCategories = propExistingCategories ?? propExistingBuckets ?? [];
-
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [parentId, setParentId] = useState<string | null>(null);

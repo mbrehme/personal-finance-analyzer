@@ -52,7 +52,7 @@ export const ResetModal: React.FC<ResetModalProps> = ({ isOpen, onClose }) => {
   const overridesCount = useMemo(() => {
     return transactions.filter(
       (t) =>
-        t.origin !== 'manual' &&
+        !t.splitFromId &&
         (isTransactionOverridden(t) ||
           t.assignmentSource === 'manual' ||
           (t.originalValue !== undefined && t.value !== t.originalValue))

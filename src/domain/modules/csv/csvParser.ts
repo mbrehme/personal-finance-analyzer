@@ -12,10 +12,6 @@ import { roundToTwoDecimals } from '@/utils/moneyUtils';
 export interface CsvColumnMapping {
   /** Spalte für das Wertstellungsdatum (Valutadatum) */
   dateColumn: string;
-  /** @deprecated Verwende dateColumn */
-  valueDateColumn?: string;
-  /** @deprecated Verwende dateColumn */
-  bookingDateColumn?: string;
   issuerColumn?: string;
   receiverColumn?: string;
   subjectColumn: string;
@@ -151,21 +147,6 @@ export function guessColumnMapping(headers: string[]): CsvColumnMapping {
       ]) ||
       headers[0] ||
       '',
-    valueDateColumn:
-      findHeader([
-        /valuta/i,
-        /wertstellung/i,
-        /wertst/i,
-        /datum/i,
-        /date/i,
-        /buchungstag/i,
-        /buchungsdatum/i,
-        /booking/i,
-        /tag/i,
-      ]) ||
-      headers[0] ||
-      '',
-    bookingDateColumn: findHeader([/buchungstag/i, /buchungsdatum/i, /booking/i, /datum/i]),
     issuerColumn: findHeader([
       /auftraggeber/i,
       /zahlungspflichtiger/i,
@@ -419,8 +400,7 @@ export function convertRowsToTransactions(
   const fallbackAccountIban = (accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
 
   return rows.map((row, index) => {
-    const rawValDate =
-      (mapping.dateColumn ? row[mapping.dateColumn] : row[mapping.valueDateColumn || '']) || '';
+    const rawValDate = (mapping.dateColumn ? row[mapping.dateColumn] : '') || '';
     const date: ISODateString = toISODateString(rawValDate);
 
     const rawValue = row[mapping.valueColumn] || '0';
@@ -499,8 +479,6 @@ export function convertRowsToTransactions(
       id,
       accountIban: normAccountIban,
       date,
-      valueDate: date,
-      bookingDate: date,
       issuer,
       receiver,
       subject,
@@ -510,20 +488,16 @@ export function convertRowsToTransactions(
       iban,
       value,
       categoryId: null,
-      bucketId: null,
       assignmentSource: 'unassigned',
       origin: 'imported',
       rawFingerprint,
       importFilename: filename || undefined,
       dayIndex,
-      importIndex: index,
       importedAt: timestamp,
 
       // Flache Original-Rohdaten aus der Bank-CSV
       originalAccountIban: normAccountIban,
       originalDate: date,
-      originalValueDate: date,
-      originalBookingDate: date,
       originalValue: value,
       originalSubject: subject,
       originalReceiver: receiver,

@@ -80,8 +80,6 @@ describe('csvParser', () => {
 
     const mapping = guessColumnMapping(headers);
     expect(mapping.dateColumn).toBe('Valutadatum');
-    expect(mapping.valueDateColumn).toBe('Valutadatum');
-    expect(mapping.bookingDateColumn).toBe('Buchungstag');
     expect(mapping.subjectColumn).toBe('Verwendungszweck');
     expect(mapping.valueColumn).toBe('Betrag (EUR)');
     expect(mapping.ibanColumn).toBe('IBAN');
@@ -109,9 +107,7 @@ describe('csvParser', () => {
 
     expect(transactions).toHaveLength(2);
     expect(transactions[0].accountIban).toBe('DE11112222');
-    expect(transactions[0].accountId).toBeUndefined();
     expect(transactions[0].date).toBe('2026-09-01');
-    expect(transactions[0].valueDate).toBe('2026-09-01');
     expect(transactions[0].receiver).toBe('Rewe Markt');
     expect(transactions[0].value).toBe(-45.5);
     expect(transactions[0].type).toBe('outbound');
@@ -125,7 +121,6 @@ describe('csvParser', () => {
     expect(transactions[0].originalAccountIban).toBe('DE11112222');
 
     expect(transactions[1].date).toBe('2026-09-02');
-    expect(transactions[1].valueDate).toBe('2026-09-02');
     expect(transactions[1].value).toBe(3200);
     expect(transactions[1].type).toBe('inbound');
     expect(transactions[1].originalValue).toBe(3200);

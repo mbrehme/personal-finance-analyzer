@@ -14,8 +14,6 @@ import {
 
 export interface MatchResult {
   categoryId: string | null;
-  /** @deprecated Verwende categoryId */
-  bucketId: string | null;
   assignmentSource: CategoryAssignmentSource;
 }
 
@@ -33,9 +31,6 @@ export function getLeafCategories(categories: Category[]): Category[] {
 
   return categories.filter((c) => !parentIds.has(c.id));
 }
-
-/** @deprecated Verwende getLeafCategories */
-export const getLeafBuckets = getLeafCategories;
 
 /**
  * Matcht eine einzelne Transaktion gegen die definierten Kategorien.
@@ -55,20 +50,18 @@ export function matchTransaction(tx: Transaction, categories: Category[]): Match
     if (category.manualTransactionIds && category.manualTransactionIds.includes(tx.id)) {
       return {
         categoryId: category.id,
-        bucketId: category.id,
         assignmentSource: 'manual',
       };
     }
   }
 
   // 2. Wenn Transaktion bereits manuell fixiert ist und noch eine gültige Kategorie existiert, beibehalten
-  const currentCatId = tx.categoryId ?? tx.bucketId;
+  const currentCatId = tx.categoryId;
   if (tx.assignmentSource === 'manual' && currentCatId) {
     const categoryExists = categories.some((c) => c.id === currentCatId);
     if (categoryExists) {
       return {
         categoryId: currentCatId,
-        bucketId: currentCatId,
         assignmentSource: 'manual',
       };
     }
@@ -88,7 +81,6 @@ export function matchTransaction(tx: Transaction, categories: Category[]): Match
       if (regex.test(compoundField)) {
         return {
           categoryId: category.id,
-          bucketId: category.id,
           assignmentSource: 'auto_regex',
         };
       }
@@ -102,7 +94,6 @@ export function matchTransaction(tx: Transaction, categories: Category[]): Match
 
   return {
     categoryId: null,
-    bucketId: null,
     assignmentSource: 'unassigned',
   };
 }
@@ -124,7 +115,6 @@ export function reMatchAllTransactions(
     return {
       ...tx,
       categoryId: match.categoryId,
-      bucketId: match.categoryId,
       assignmentSource: match.assignmentSource,
     };
   });

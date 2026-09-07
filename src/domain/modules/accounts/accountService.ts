@@ -45,9 +45,6 @@ export function getTransactionAccountInfo(
       (a) => a.accountType !== 'virtual' && a.iban && normalizeIban(a.iban) === normAccountIban
     );
   }
-  if (!primaryAccount && tx.accountId) {
-    primaryAccount = accounts.find((a) => a.id === tx.accountId);
-  }
   if (!primaryAccount && normTxIban) {
     primaryAccount = accounts.find(
       (a) => a.accountType !== 'virtual' && a.iban && normalizeIban(a.iban) === normTxIban
@@ -64,10 +61,10 @@ export function getTransactionAccountInfo(
         )
       : undefined;
 
-  const txCatId = tx.categoryId ?? tx.bucketId ?? null;
+  const txCatId = tx.categoryId ?? null;
   const virtualAccounts = accounts.filter((a) => {
     if (a.accountType !== 'virtual') return false;
-    const catIds = a.categoryIds || a.bucketIds || [];
+    const catIds = a.categoryIds || [];
     if (catIds.length > 0 && (!txCatId || !catIds.includes(txCatId))) return false;
 
     if (a.parentAccountId) {

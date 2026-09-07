@@ -2,7 +2,7 @@
  * @file balanceCalculator.ts
  * @description Berechnungs-Engine für historische und prognostizierte Kontostand-Entwicklungen
  * basierend auf hinterlegten Stichtags-Salden (Checkpoints) und Transaktions-Cashflows.
- * @module domain/modules/analytics/balanceCalculator
+ * @module services/analytics/balanceCalculator
  */
 
 import {
@@ -90,8 +90,8 @@ export function calculateBalanceTimeline(
   });
 
   relevantTxsWithDeltas.sort((a, b) => {
-    const dateA = a.tx.date || a.tx.valueDate || '';
-    const dateB = b.tx.date || b.tx.valueDate || '';
+    const dateA = a.tx.date || '';
+    const dateB = b.tx.date || '';
     return dateA.localeCompare(dateB);
   });
 
@@ -109,7 +109,7 @@ export function calculateBalanceTimeline(
   const getBalanceAtDate = (targetDate: string): number => {
     if (checkpoints.length === 0) {
       const sum = relevantTxsWithDeltas
-        .filter((item) => (item.tx.date || item.tx.valueDate || '') <= targetDate)
+        .filter((item) => (item.tx.date || '') <= targetDate)
         .reduce((acc, item) => acc + item.delta, 0);
       return roundToTwoDecimals(sum);
     }
@@ -120,7 +120,7 @@ export function calculateBalanceTimeline(
       const anchor = checkpointsBeforeOrOn[checkpointsBeforeOrOn.length - 1];
       const sumAfterAnchor = relevantTxsWithDeltas
         .filter((item) => {
-          const d = item.tx.date || item.tx.valueDate || '';
+          const d = item.tx.date || '';
           return d > anchor.date && d <= targetDate;
         })
         .reduce((acc, item) => acc + item.delta, 0);
@@ -131,7 +131,7 @@ export function calculateBalanceTimeline(
     const firstCheckpoint = checkpoints[0];
     const sumBetween = relevantTxsWithDeltas
       .filter((item) => {
-        const d = item.tx.date || item.tx.valueDate || '';
+        const d = item.tx.date || '';
         return d > targetDate && d <= firstCheckpoint.date;
       })
       .reduce((acc, item) => acc + item.delta, 0);
@@ -156,7 +156,7 @@ export function calculateBalanceTimeline(
     const periodCashflow = roundToTwoDecimals(
       relevantTxsWithDeltas
         .filter((item) => {
-          const d = item.tx.date || item.tx.valueDate || '';
+          const d = item.tx.date || '';
           return d >= range.startDate && d <= range.endDate;
         })
         .reduce((acc, item) => acc + item.delta, 0)
@@ -218,7 +218,7 @@ export function calculateAllBalances(
     periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
   } else {
     const allDates: ISODateString[] = transactions
-      .map((tx) => (tx.date || tx.valueDate || '') as ISODateString)
+      .map((tx) => (tx.date || '') as ISODateString)
       .filter(Boolean);
     accounts.forEach((acc) => {
       acc.balanceEntries.forEach((be) => {

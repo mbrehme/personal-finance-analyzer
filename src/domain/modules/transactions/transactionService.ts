@@ -18,8 +18,8 @@ export function isTransactionOverridden(tx: Transaction): boolean {
   const isPartnerOverridden =
     hasOrigPartner && origPartner !== '' && currentPartner !== origPartner;
 
-  const originalDate = tx.originalDate ?? tx.originalValueDate;
-  const currentDate = tx.date ?? tx.valueDate;
+  const originalDate = tx.originalDate;
+  const currentDate = tx.date;
   const isDateOverridden = originalDate !== undefined && currentDate !== originalDate;
 
   return (
@@ -28,19 +28,13 @@ export function isTransactionOverridden(tx: Transaction): boolean {
     isPartnerOverridden ||
     isDateOverridden ||
     (tx.originalAccountIban !== undefined && tx.accountIban !== tx.originalAccountIban) ||
-    (tx.originalAccountId !== undefined && tx.accountId !== tx.originalAccountId) ||
     (tx.originalIban !== undefined && tx.iban !== tx.originalIban) ||
     Boolean(tx.splitFromId)
   );
 }
 
 export function isManualTransaction(tx: Transaction): boolean {
-  return (
-    tx.origin === 'manual' ||
-    tx.origin === 'override' ||
-    Boolean(tx.splitFromId) ||
-    isTransactionOverridden(tx)
-  );
+  return tx.origin === 'override' || Boolean(tx.splitFromId) || isTransactionOverridden(tx);
 }
 
 /**
@@ -53,7 +47,7 @@ export function getTransactionOrigin(tx: Transaction): 'imported' | 'split' | 'o
   if (tx.splitFromId) {
     return 'split';
   }
-  if (isTransactionOverridden(tx) || tx.origin === 'override' || tx.origin === 'manual') {
+  if (isTransactionOverridden(tx) || tx.origin === 'override') {
     return 'override';
   }
   return 'imported';
@@ -61,7 +55,7 @@ export function getTransactionOrigin(tx: Transaction): 'imported' | 'split' | 'o
 
 export function resetTransactionToOriginal(tx: Transaction): Transaction {
   const { splitFromId: _splitFromId, deletedAt: _deletedAt, ...rest } = tx;
-  const restoredDate = tx.originalDate ?? tx.originalValueDate ?? tx.date ?? tx.valueDate;
+  const restoredDate = tx.originalDate ?? tx.date;
   return {
     ...rest,
     value: tx.originalValue ?? tx.value,
@@ -69,14 +63,10 @@ export function resetTransactionToOriginal(tx: Transaction): Transaction {
     receiver: tx.originalReceiver ?? tx.receiver,
     issuer: tx.originalIssuer ?? tx.issuer,
     date: restoredDate,
-    valueDate: restoredDate,
-    bookingDate: tx.originalBookingDate ?? restoredDate,
-    originalDate: tx.originalDate ?? tx.originalValueDate,
-    accountId: tx.originalAccountId ?? tx.accountId,
+    originalDate: tx.originalDate,
     accountIban: tx.originalAccountIban ?? tx.accountIban,
     iban: tx.originalIban ?? tx.iban,
     categoryId: null,
-    bucketId: null,
     assignmentSource: 'unassigned',
     origin: 'imported',
   };
@@ -98,8 +88,8 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
   }
 
   const compareBase = (a: Transaction, b: Transaction) => {
-    const dateA = a.date || a.valueDate || '';
-    const dateB = b.date || b.valueDate || '';
+    const dateA = a.date || '';
+    const dateB = b.date || '';
     const dateComp = dateB.localeCompare(dateA);
     if (dateComp !== 0) return dateComp;
 
@@ -110,10 +100,6 @@ export function sortTransactionsDesc(txList: Transaction[]): Transaction[] {
 
     if (a.importedAt && b.importedAt && a.importedAt !== b.importedAt) {
       return b.importedAt.localeCompare(a.importedAt);
-    }
-    // Fallback auf den dateiweiten importIndex für Bestandsdaten
-    if (a.importIndex !== undefined && b.importIndex !== undefined) {
-      return a.importIndex - b.importIndex;
     }
     if (b.value !== a.value) return b.value - a.value;
     return b.id.localeCompare(a.id);
@@ -167,7 +153,7 @@ export function calculateSingleSplit(
   const sign = originalTx.value < 0 ? -1 : 1;
   const remainingAbs = origAbs - splitAmount;
   const updatedOriginalValue = (sign * Math.round(remainingAbs * 100)) / 100;
-  const originalTxDate = originalTx.date ?? originalTx.valueDate;
+  const originalTxDate = originalTx.date;
 
   const updatedRootTx: Transaction = {
     ...originalTx,
@@ -175,10 +161,8 @@ export function calculateSingleSplit(
     originalValue: originalTx.originalValue ?? originalTx.value,
     originalSubject: originalTx.originalSubject ?? originalTx.subject,
     originalReceiver: originalTx.originalReceiver ?? originalTx.receiver,
-    originalAccountId: originalTx.originalAccountId ?? originalTx.accountId,
     originalAccountIban: originalTx.originalAccountIban ?? originalTx.accountIban,
-    originalDate: originalTx.originalDate ?? originalTx.originalValueDate ?? originalTxDate,
-    originalValueDate: originalTx.originalValueDate ?? originalTx.valueDate,
+    originalDate: originalTx.originalDate ?? originalTxDate,
     originalIban: originalTx.originalIban ?? originalTx.iban,
   };
 
@@ -187,20 +171,16 @@ export function calculateSingleSplit(
 
   const newSplitTx: Transaction = {
     id: splitId,
-    accountId: originalTx.accountId,
     accountIban: originalTx.accountIban,
     date: originalTxDate,
-    valueDate: originalTxDate,
-    bookingDate: originalTxDate,
     issuer: originalTx.issuer,
     receiver: splitData.receiver.trim() || originalTx.receiver,
     subject: splitData.subject.trim() || `${originalTx.subject} (Split)`,
     iban: originalTx.iban,
     value: splitValue,
     categoryId: splitData.categoryId || null,
-    bucketId: splitData.categoryId || null,
     assignmentSource: splitData.categoryId ? 'manual' : 'unassigned',
-    origin: 'manual',
+    origin: 'split',
     splitFromId: originalTx.id,
   };
 

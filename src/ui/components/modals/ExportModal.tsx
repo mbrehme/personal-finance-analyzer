@@ -28,7 +28,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
   if (!isOpen) return null;
 
   const manualCount = transactions.filter(
-    (t) => t.origin === 'manual' || isTransactionOverridden(t)
+    (t) => t.origin === 'override' || isTransactionOverridden(t)
   ).length;
 
   const toggleOption = (key: keyof ExportOptions) => {

@@ -96,11 +96,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Original-Bankwerte der Buchung (falls importiert)
-  const originalValueDate =
-    initialTransaction?.originalDate ??
-    initialTransaction?.originalValueDate ??
-    initialTransaction?.date ??
-    initialTransaction?.valueDate;
+  const originalValueDate = initialTransaction?.originalDate ?? initialTransaction?.date;
   const originalValue = initialTransaction?.originalValue ?? initialTransaction?.value ?? 0;
   const originalSubject = initialTransaction?.originalSubject ?? initialTransaction?.subject ?? '';
   const originalReceiver =
@@ -127,13 +123,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         ? accounts.find(
             (a) => a.iban && normalizeIban(a.iban) === normalizeIban(initialTransaction.accountIban)
           )
-        : accounts.find((a) => a.id === initialTransaction.accountId);
+        : undefined;
       setAccountId(matchingAcc?.id || accounts[0]?.id || '');
-      setValueDate(initialTransaction.date || initialTransaction.valueDate || '');
+      setValueDate(initialTransaction.date || '');
       setAmount(Math.abs(initialTransaction.value));
       setReceiver(initialTransaction.receiver || initialTransaction.issuer || '');
       setSubject(initialTransaction.subject || '');
-      setCategoryId(initialTransaction.categoryId ?? initialTransaction.bucketId ?? null);
+      setCategoryId(initialTransaction.categoryId ?? null);
 
       if (mode === 'split') {
         setSplitAmount(0);
@@ -170,7 +166,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const resetFormToOriginal = () => {
     if (!initialTransaction) return;
     const restored = resetTransactionToOriginal(initialTransaction);
-    setValueDate(restored.date || restored.valueDate || '');
+    setValueDate(restored.date || '');
     setAmount(Math.abs(restored.value));
     setReceiver(restored.receiver || restored.issuer || '');
     setSubject(restored.subject || '');
@@ -206,12 +202,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
 
     // Modus 'create' oder 'edit'
-    if (!accountId) {
-      setError('Bitte wähle ein Konto aus.');
-      return;
-    }
     if (!valueDate) {
-      setError('Bitte gib ein Valutadatum an.');
+      setError('Bitte gib ein gültiges Datum an.');
       return;
     }
     if (amount <= 0) {
@@ -230,8 +222,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         await onSave({
           accountIban,
           date: valueDate as ISODateString,
-          valueDate: valueDate as ISODateString,
-          bookingDate: valueDate as ISODateString,
           issuer: !isOutbound ? receiver : '',
           receiver: isOutbound ? receiver : '',
           subject: subject.trim(),
@@ -239,14 +229,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           value: signedValue,
           categoryId,
           assignmentSource: categoryId ? 'manual' : 'unassigned',
-          origin: 'manual',
+          origin: 'override',
         });
       } else if (initialTransaction) {
-        const {
-          type: _discardedType,
-          accountId: _discardedAccountId,
-          ...rest
-        } = initialTransaction;
+        const { type: _discardedType, ...rest } = initialTransaction;
 
         // Partner (Empfänger/Auftraggeber) sauber behandeln:
         // Wurde das Partner-Eingabefeld überhaupt verändert?
@@ -273,16 +259,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         }
 
         // Wurde die Kategorie verändert?
-        const initialCategoryId =
-          initialTransaction.categoryId ?? initialTransaction.bucketId ?? null;
+        const initialCategoryId = initialTransaction.categoryId ?? null;
         const isCategoryFieldChanged = categoryId !== initialCategoryId;
 
         await onSave({
           ...rest,
           accountIban: accountIban || initialTransaction.accountIban,
           date: valueDate as ISODateString,
-          valueDate: valueDate as ISODateString,
-          bookingDate: valueDate as ISODateString,
           value: signedValue,
           receiver: finalReceiver,
           issuer: finalIssuer,
@@ -384,7 +367,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       Originalbuchung
                     </span>
                     <span className="rounded-md bg-slate-200/60 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                      {initialTransaction.origin === 'manual' ? 'Manuell' : 'Bank-Import'}
+                      {initialTransaction.origin === 'override' ? 'Manuell' : 'Bank-Import'}
                     </span>
                   </div>
 

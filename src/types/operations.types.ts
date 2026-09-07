@@ -70,11 +70,6 @@ export interface ResetOptions {
    * Löst Split-Buchungen auf (entfernt Split-Kinder und stellt den vollen Betrag der Ursprungsbuchung wieder her).
    */
   resetSplits?: boolean;
-  /**
-   * @deprecated Verwende stattdessen resetOverrides und/oder resetSplits.
-   * Setzt manuelle Überschreibungen und Splits auf die Bank-Originaldaten zurück.
-   */
-  resetTransactionOverrides?: boolean;
   /** Gelöschte Transaktionen (Papierkorb) leeren */
   resetDeletedTransactions?: boolean;
   /** Bei target === 'seed': Ob zusätzlich realistische Beispieldaten für Buchungen geladen werden sollen */
@@ -91,7 +86,6 @@ export const DEFAULT_RESET_OPTIONS: ResetOptions = {
   resetTransactions: true,
   resetOverrides: false,
   resetSplits: false,
-  resetTransactionOverrides: false,
   resetDeletedTransactions: true,
 };
 
@@ -103,8 +97,6 @@ export interface FinanceConfigExport {
   exportedAt: string;
   accounts?: Account[];
   categories?: Category[];
-  /** @deprecated Abwärtskompatibilität für alte Exporte */
-  buckets?: Category[];
   /** Manuell erstellte Buchungen, Splits und modifizierte Overrides */
   manualTransactions?: Transaction[];
   /** Vollständiger Buchungsbestand aller Transaktionen */

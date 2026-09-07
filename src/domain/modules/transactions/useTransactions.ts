@@ -70,10 +70,9 @@ export function useTransactions(
     const newTx: Transaction = {
       ...txData,
       id,
-      origin: 'manual',
+      origin: 'override',
       assignmentSource: txData.categoryId ? 'manual' : 'unassigned',
       categoryId: txData.categoryId || null,
-      bucketId: txData.categoryId || null,
     };
 
     if (newTx.categoryId) {
@@ -98,8 +97,8 @@ export function useTransactions(
 
   const updateTransaction = async (updatedTx: Transaction): Promise<void> => {
     const oldTx = transactions.find((t) => t.id === updatedTx.id);
-    const oldCatId = oldTx?.categoryId ?? oldTx?.bucketId ?? null;
-    const newCatId = updatedTx.categoryId ?? updatedTx.bucketId ?? null;
+    const oldCatId = oldTx?.categoryId ?? null;
+    const newCatId = updatedTx.categoryId ?? null;
 
     if (oldCatId !== newCatId) {
       let updatedCats = categories.map((c) => {
@@ -133,7 +132,6 @@ export function useTransactions(
     const preparedTx: Transaction = {
       ...updatedTx,
       categoryId: newCatId,
-      bucketId: newCatId,
       assignmentSource: isCategoryChanged
         ? newCatId
           ? 'manual'
@@ -143,11 +141,8 @@ export function useTransactions(
       originalSubject: oldTx?.originalSubject ?? oldTx?.subject,
       originalReceiver: oldTx?.originalReceiver ?? oldTx?.receiver,
       originalIssuer: oldTx?.originalIssuer ?? oldTx?.issuer,
-      originalAccountId: oldTx?.originalAccountId ?? oldTx?.accountId,
       originalAccountIban: oldTx?.originalAccountIban ?? oldTx?.accountIban,
-      originalDate:
-        oldTx?.originalDate ?? oldTx?.originalValueDate ?? oldTx?.date ?? oldTx?.valueDate,
-      originalValueDate: oldTx?.originalValueDate ?? oldTx?.valueDate,
+      originalDate: oldTx?.originalDate ?? oldTx?.date,
       originalIban: oldTx?.originalIban ?? oldTx?.iban,
     };
 
@@ -161,7 +156,7 @@ export function useTransactions(
     const txToDelete = transactions.find((t) => t.id === id);
     if (!txToDelete) return;
 
-    if (txToDelete.origin === 'manual') {
+    if (txToDelete.origin === 'override' && !txToDelete.originalDate) {
       await transactionRepo.delete(id);
       setTransactions((prev) => prev.filter((t) => t.id !== id));
       return;
@@ -268,7 +263,7 @@ export function useTransactions(
 
     const remainingAbs = Math.round((bankTotalAbs - totalSplitsAbs) * 100) / 100;
     const updatedRootValue = (sign * Math.round(remainingAbs * 100)) / 100;
-    const rootTxDate = rootTx.date ?? rootTx.valueDate;
+    const rootTxDate = rootTx.date;
 
     const updatedRootTx: Transaction = {
       ...rootTx,
@@ -276,10 +271,8 @@ export function useTransactions(
       originalValue: rootTx.originalValue ?? rootTx.value,
       originalSubject: rootTx.originalSubject ?? rootTx.subject,
       originalReceiver: rootTx.originalReceiver ?? rootTx.receiver,
-      originalAccountId: rootTx.originalAccountId ?? rootTx.accountId,
       originalAccountIban: rootTx.originalAccountIban ?? rootTx.accountIban,
-      originalDate: rootTx.originalDate ?? rootTx.originalValueDate ?? rootTxDate,
-      originalValueDate: rootTx.originalValueDate ?? rootTx.valueDate,
+      originalDate: rootTx.originalDate ?? rootTxDate,
       originalIban: rootTx.originalIban ?? rootTx.iban,
     };
 
@@ -301,7 +294,6 @@ export function useTransactions(
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
           value: splitValue,
           categoryId: split.categoryId || null,
-          bucketId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',
         };
         childrenToSave.push(updatedChild);
@@ -309,20 +301,16 @@ export function useTransactions(
         const newChildId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const newChild: Transaction = {
           id: newChildId,
-          accountId: updatedRootTx.accountId,
           accountIban: updatedRootTx.accountIban,
           date: rootTxDate,
-          valueDate: rootTxDate,
-          bookingDate: rootTxDate,
           issuer: updatedRootTx.issuer,
           receiver: split.receiver.trim() || updatedRootTx.receiver,
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
           iban: updatedRootTx.iban,
           value: splitValue,
           categoryId: split.categoryId || null,
-          bucketId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',
-          origin: 'manual',
+          origin: 'split',
           splitFromId: actualRootId,
         };
         childrenToSave.push(newChild);
@@ -362,7 +350,6 @@ export function useTransactions(
     const finalTx: Transaction = {
       ...restored,
       categoryId: match.categoryId,
-      bucketId: match.categoryId,
       assignmentSource: match.assignmentSource,
     };
 
@@ -420,7 +407,6 @@ export function useTransactions(
         return {
           ...t,
           categoryId: targetCategoryId,
-          bucketId: targetCategoryId,
           assignmentSource: targetCategoryId ? ('manual' as const) : ('unassigned' as const),
         };
       }
@@ -460,7 +446,6 @@ export function useTransactions(
       const preparedTx: Transaction = {
         ...rawTx,
         categoryId: match.categoryId,
-        bucketId: match.categoryId,
         assignmentSource: match.assignmentSource,
       };
 

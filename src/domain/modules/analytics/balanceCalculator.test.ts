@@ -12,6 +12,7 @@ describe('balanceCalculator', () => {
   const account: Account = {
     id: 'acc-giro',
     name: 'Girokonto',
+    iban: 'DE00',
     categoryIds: [],
     balanceEntries: [
       {
@@ -26,10 +27,8 @@ describe('balanceCalculator', () => {
   const transactions: Transaction[] = [
     {
       id: 'tx-1',
-      accountId: 'acc-giro',
+      accountIban: 'DE00',
       date: '2026-08-15',
-      valueDate: '2026-08-15',
-      bookingDate: '2026-08-15',
       issuer: 'AG',
       receiver: 'Me',
       subject: 'Gehalt',
@@ -41,10 +40,8 @@ describe('balanceCalculator', () => {
     },
     {
       id: 'tx-2',
-      accountId: 'acc-giro',
+      accountIban: 'DE00',
       date: '2026-09-05',
-      valueDate: '2026-09-05',
-      bookingDate: '2026-09-05',
       issuer: 'Me',
       receiver: 'Miete',
       subject: 'Miete September',
@@ -122,10 +119,7 @@ describe('balanceCalculator', () => {
     const txs: Transaction[] = [
       {
         id: 'tx-1',
-        accountId: 'acc-real-1',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         issuer: 'Employer',
         receiver: 'Me',
         subject: 'Salary',
@@ -136,10 +130,7 @@ describe('balanceCalculator', () => {
       },
       {
         id: 'tx-2',
-        accountId: 'acc-real-1',
         date: '2026-08-15',
-        valueDate: '2026-08-15',
-        bookingDate: '2026-08-15',
         issuer: 'Me',
         receiver: 'Airline',
         subject: 'Flugbuchung Urlaub',
@@ -200,8 +191,6 @@ describe('balanceCalculator', () => {
         id: 'tx-dynamic-1',
         accountIban: 'DE123456789',
         date: '2026-08-05',
-        valueDate: '2026-08-05',
-        bookingDate: '2026-08-05',
         issuer: 'Employer',
         receiver: 'Me',
         subject: 'Salary',
@@ -214,8 +203,6 @@ describe('balanceCalculator', () => {
         id: 'tx-dynamic-2',
         accountIban: 'DE123456789',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         issuer: 'Me',
         receiver: 'Supermarket',
         subject: 'Wocheneinkauf',
@@ -278,8 +265,6 @@ describe('balanceCalculator', () => {
         accountIban: 'DE1111',
         iban: 'DE2222',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',
         subject: 'Sparen August',
@@ -294,8 +279,6 @@ describe('balanceCalculator', () => {
         accountIban: 'DE3333',
         iban: 'DE8888',
         date: '2026-08-15',
-        valueDate: '2026-08-15',
-        bookingDate: '2026-08-15',
         issuer: 'Martin',
         receiver: 'Sparplan extern',
         subject: 'Fremdes Konto',
@@ -357,8 +340,6 @@ describe('balanceCalculator', () => {
         accountIban: 'DE1111',
         iban: 'DE2222',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',
         subject: 'Umbuchung Sparen',
@@ -371,8 +352,6 @@ describe('balanceCalculator', () => {
         accountIban: 'DE2222',
         iban: 'DE1111',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',
         subject: 'Umbuchung Sparen',
@@ -402,6 +381,7 @@ describe('balanceCalculator', () => {
     const mainAccount: Account = {
       id: 'acc-main',
       name: 'Hauptkonto',
+      iban: 'DE00',
       accountType: 'real',
       balanceEntries: [{ id: 'b-2025', date: '2025-12-31', amount: 5000 }],
     };
@@ -410,10 +390,7 @@ describe('balanceCalculator', () => {
       // 2025 Inflow vor dem Stichtag
       {
         id: 'tx-2025-1',
-        accountId: 'acc-main',
         date: '2025-06-15',
-        valueDate: '2025-06-15',
-        bookingDate: '2025-06-15',
         issuer: 'Arbeitgeber',
         receiver: 'Ich',
         subject: 'Gehalt 2025',
@@ -425,10 +402,7 @@ describe('balanceCalculator', () => {
       // 2026 Nur Ausgänge
       {
         id: 'tx-2026-1',
-        accountId: 'acc-main',
         date: '2026-02-10',
-        valueDate: '2026-02-10',
-        bookingDate: '2026-02-10',
         issuer: 'Ich',
         receiver: 'Vermieter',
         subject: 'Miete Februar',
@@ -467,6 +441,7 @@ describe('balanceCalculator', () => {
     const accountWithoutCheckpoints: Account = {
       id: 'acc-pure-tx',
       name: 'Reines Transaktionskonto',
+      iban: 'DE00',
       accountType: 'real',
       balanceEntries: [],
     };
@@ -475,10 +450,8 @@ describe('balanceCalculator', () => {
       // 2025 Inflow
       {
         id: 'tx-2025',
-        accountId: 'acc-pure-tx',
+        accountIban: 'DE00',
         date: '2025-10-01',
-        valueDate: '2025-10-01',
-        bookingDate: '2025-10-01',
         issuer: 'Kunde',
         receiver: 'Ich',
         subject: 'Honorar',
@@ -490,10 +463,8 @@ describe('balanceCalculator', () => {
       // 2026 Outflow
       {
         id: 'tx-2026',
-        accountId: 'acc-pure-tx',
+        accountIban: 'DE00',
         date: '2026-03-01',
-        valueDate: '2026-03-01',
-        bookingDate: '2026-03-01',
         issuer: 'Ich',
         receiver: 'Shop',
         subject: 'Kauf',
@@ -521,6 +492,7 @@ describe('balanceCalculator', () => {
     const multiCheckpointAcc: Account = {
       id: 'acc-multi',
       name: 'Mehrere Stichtage',
+      iban: 'DE00',
       accountType: 'real',
       balanceEntries: [
         { id: 'cp-2024', date: '2024-12-31', amount: 2000 },
@@ -531,10 +503,8 @@ describe('balanceCalculator', () => {
     const txs: Transaction[] = [
       {
         id: 'tx-2026',
-        accountId: 'acc-multi',
+        accountIban: 'DE00',
         date: '2026-01-15',
-        valueDate: '2026-01-15',
-        bookingDate: '2026-01-15',
         issuer: 'Ich',
         receiver: 'Abo',
         subject: 'Jahresbeitrag',

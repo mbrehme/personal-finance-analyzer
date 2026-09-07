@@ -45,8 +45,6 @@ export interface Account extends EntityVisualMetadata {
   parentAccountId?: string | null;
   /** IDs der diesem Konto zugeordneten Kategorien (relevant für virtuelle Unterkonten) */
   categoryIds?: string[];
-  /** @deprecated Verwende categoryIds */
-  bucketIds?: string[];
   /** Historische Stichtags-Salden zur exakten Salden-Rekonstruktion */
   balanceEntries: BalanceEntry[];
 }

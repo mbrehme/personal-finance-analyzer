@@ -34,7 +34,7 @@ describe('ExportModal', () => {
         },
         {
           id: 'tx2',
-          origin: 'manual',
+          origin: 'override',
           value: -20,
           assignmentSource: 'manual',
         },

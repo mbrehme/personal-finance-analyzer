@@ -69,12 +69,11 @@ describe('Cashflow Page', () => {
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Giro' }] as any,
       categories: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
-      buckets: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
       transactions: [
         {
           id: 'tx-1',
           accountId: 'acc-1',
-          valueDate: `${currentMonthKey}-01`,
+          date: `${currentMonthKey}-01`,
           bookingDate: `${currentMonthKey}-01`,
           issuer: 'Supermarkt',
           receiver: 'Ich',
@@ -99,10 +98,6 @@ describe('Cashflow Page', () => {
       updateCategory: vi.fn(),
       deleteCategory: vi.fn(),
       reorderCategories: vi.fn(),
-      addBucket: vi.fn(),
-      updateBucket: vi.fn(),
-      deleteBucket: vi.fn(),
-      reorderBuckets: vi.fn(),
       addAccount: vi.fn(),
       updateAccount: vi.fn(),
       deleteAccount: vi.fn(),
@@ -114,7 +109,6 @@ describe('Cashflow Page', () => {
       splitTransaction: vi.fn(),
       importTransactions: vi.fn(),
       assignTransactionCategory: vi.fn(),
-      assignTransactionBucket: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),
       triggerReMatch: vi.fn(),
@@ -138,13 +132,11 @@ describe('Cashflow Page', () => {
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Giro' }] as any,
       categories: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
-      buckets: [{ id: 'b-1', name: 'Lebensmittel', parentId: null }] as any,
       transactions: [
         {
           id: 'tx-old',
           accountId: 'acc-1',
-          valueDate: '2023-05-15',
-          bookingDate: '2023-05-15',
+          date: '2023-05-15',
           issuer: 'Alt',
           receiver: 'Ich',
           subject: 'Alt',
@@ -157,7 +149,7 @@ describe('Cashflow Page', () => {
         {
           id: 'tx-now',
           accountId: 'acc-1',
-          valueDate: `${currentMonthKey}-01`,
+          date: `${currentMonthKey}-01`,
           bookingDate: `${currentMonthKey}-01`,
           issuer: 'Neu',
           receiver: 'Ich',
@@ -182,10 +174,6 @@ describe('Cashflow Page', () => {
       updateCategory: vi.fn(),
       deleteCategory: vi.fn(),
       reorderCategories: vi.fn(),
-      addBucket: vi.fn(),
-      updateBucket: vi.fn(),
-      deleteBucket: vi.fn(),
-      reorderBuckets: vi.fn(),
       addAccount: vi.fn(),
       updateAccount: vi.fn(),
       deleteAccount: vi.fn(),
@@ -197,7 +185,6 @@ describe('Cashflow Page', () => {
       splitTransaction: vi.fn(),
       importTransactions: vi.fn(),
       assignTransactionCategory: vi.fn(),
-      assignTransactionBucket: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),
       triggerReMatch: vi.fn(),
@@ -234,7 +221,6 @@ describe('Cashflow Page', () => {
         { id: 'acc-persist', name: 'Sparkonto' },
       ] as any,
       categories: [] as any,
-      buckets: [] as any,
       transactions: [] as any,
       loading: false,
       error: null,
@@ -249,10 +235,6 @@ describe('Cashflow Page', () => {
       updateCategory: vi.fn(),
       deleteCategory: vi.fn(),
       reorderCategories: vi.fn(),
-      addBucket: vi.fn(),
-      updateBucket: vi.fn(),
-      deleteBucket: vi.fn(),
-      reorderBuckets: vi.fn(),
       addAccount: vi.fn(),
       updateAccount: vi.fn(),
       deleteAccount: vi.fn(),
@@ -264,7 +246,6 @@ describe('Cashflow Page', () => {
       splitTransaction: vi.fn(),
       importTransactions: vi.fn(),
       assignTransactionCategory: vi.fn(),
-      assignTransactionBucket: vi.fn(),
       deleteTransaction: vi.fn(),
       clearTransactions: vi.fn(),
       triggerReMatch: vi.fn(),
@@ -335,16 +316,16 @@ describe('Cashflow Page', () => {
   });
 
   it('renders uncategorized row as second to last row before total row', async () => {
+    localStorage.clear();
     const currentMonthKey = getCurrentPeriodKey('monthly');
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Giro' }] as any,
       categories: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
-      buckets: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
       transactions: [
         {
           id: 'tx-1',
           accountId: 'acc-1',
-          valueDate: `${currentMonthKey}-05`,
+          date: `${currentMonthKey}-05`,
           bookingDate: `${currentMonthKey}-05`,
           issuer: 'Supermarkt',
           receiver: 'Ich',
@@ -358,7 +339,7 @@ describe('Cashflow Page', () => {
         {
           id: 'tx-2',
           accountId: 'acc-1',
-          valueDate: `${currentMonthKey}-10`,
+          date: `${currentMonthKey}-10`,
           bookingDate: `${currentMonthKey}-10`,
           issuer: 'Unbekannt',
           receiver: 'Ich',
@@ -381,10 +362,6 @@ describe('Cashflow Page', () => {
       updateCategory: vi.fn(),
       deleteCategory: vi.fn(),
       reorderCategories: vi.fn(),
-      addBucket: vi.fn(),
-      updateBucket: vi.fn(),
-      deleteBucket: vi.fn(),
-      reorderBuckets: vi.fn(),
       addAccount: vi.fn(),
       updateAccount: vi.fn(),
       deleteAccount: vi.fn(),
@@ -433,16 +410,11 @@ describe('Cashflow Page', () => {
         { id: 'cat-1', name: 'Lebensmittel', parentId: null },
         { id: 'cat-2', name: 'Wohnen', parentId: null },
       ] as any,
-      buckets: [
-        { id: 'cat-1', name: 'Lebensmittel', parentId: null },
-        { id: 'cat-2', name: 'Wohnen', parentId: null },
-      ] as any,
       transactions: [
         {
           id: 'tx-1',
           accountId: 'acc-1',
-          valueDate: '2026-01-15',
-          bookingDate: '2026-01-15',
+          date: '2026-01-15',
           issuer: 'Supermarkt',
           receiver: 'Ich',
           subject: 'Einkauf',
@@ -456,8 +428,7 @@ describe('Cashflow Page', () => {
         {
           id: 'tx-2',
           accountId: 'acc-1',
-          valueDate: '2026-01-10',
-          bookingDate: '2026-01-10',
+          date: '2026-01-10',
           issuer: 'Vermieter',
           receiver: 'Ich',
           subject: 'Miete',
@@ -480,10 +451,6 @@ describe('Cashflow Page', () => {
       updateCategory: vi.fn(),
       deleteCategory: vi.fn(),
       reorderCategories: vi.fn(),
-      addBucket: vi.fn(),
-      updateBucket: vi.fn(),
-      deleteBucket: vi.fn(),
-      reorderBuckets: vi.fn(),
       addAccount: vi.fn(),
       updateAccount: vi.fn(),
       deleteAccount: vi.fn(),
@@ -533,15 +500,13 @@ describe('Cashflow Page', () => {
         { id: 'acc-2', name: 'Tagesgeldkonto', accountType: 'bank', color: '#10b981' },
       ] as any,
       categories: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
-      buckets: [{ id: 'cat-1', name: 'Lebensmittel', parentId: null }] as any,
       transactions: [
         {
           id: 'tx-1',
           accountIban: 'DE1111',
           iban: 'DE1111',
           accountId: 'acc-1',
-          valueDate: '2026-01-05',
-          bookingDate: '2026-01-05',
+          date: '2026-01-05',
           issuer: 'Supermarkt',
           receiver: 'Ich',
           subject: 'Einkauf',

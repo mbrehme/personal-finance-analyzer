@@ -36,7 +36,6 @@ export class LocalMetaRepository implements MetaRepository {
     }
     if (options.includeCategories) {
       result.categories = await this.categoryRepo.findAll();
-      result.buckets = result.categories;
     }
     if (options.includeTransactions) {
       result.transactions = await this.transactionRepo.findAll();
@@ -52,9 +51,8 @@ export class LocalMetaRepository implements MetaRepository {
     if (config.accounts) {
       await this.accountRepo.saveAll(config.accounts);
     }
-    const cats = config.categories || config.buckets;
-    if (cats) {
-      await this.categoryRepo.saveAll(cats);
+    if (config.categories) {
+      await this.categoryRepo.saveAll(config.categories);
     }
     if (config.transactions) {
       await this.transactionRepo.saveAll(config.transactions);

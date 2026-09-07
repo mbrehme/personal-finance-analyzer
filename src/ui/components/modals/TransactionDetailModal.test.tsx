@@ -44,8 +44,6 @@ describe('TransactionDetailModal', () => {
     id: 'tx-101',
     accountIban: 'DE44500105175407324900',
     date: '2026-08-15',
-    valueDate: '2026-08-15',
-    bookingDate: '2026-08-15',
     issuer: '',
     receiver: 'Lufthansa AG',
     subject: 'Flugbuchung Sommerurlaub',
@@ -55,7 +53,7 @@ describe('TransactionDetailModal', () => {
     assignmentSource: 'auto_regex',
     origin: 'imported',
     importFilename: 'umsatz-2026.csv',
-    importIndex: 12,
+    dayIndex: 12,
     rawFingerprint: 'fp-lufthansa-123',
   };
 
@@ -259,8 +257,6 @@ describe('TransactionDetailModal', () => {
       id: 'tx-transfer-99',
       accountIban: 'DE44500105175407324900',
       date: '2026-08-10',
-      valueDate: '2026-08-10',
-      bookingDate: '2026-08-10',
       receiver: 'Tagesgeldkonto',
       issuer: 'Martin',
       subject: 'Umbuchung',

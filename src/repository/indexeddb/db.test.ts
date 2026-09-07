@@ -53,32 +53,24 @@ describe('financeDB Storage Layer', () => {
     const transactions: Transaction[] = [
       {
         id: 'tx-1',
-        accountId: 'acc-1',
         date: '2026-08-01',
-        valueDate: '2026-08-01',
-        bookingDate: '2026-08-01',
         issuer: 'AG',
         receiver: 'Me',
         subject: 'Gehalt August',
         type: 'inbound',
         iban: 'DE00',
         value: 3000,
-        bucketId: 'b-salary',
         assignmentSource: 'auto_regex',
       },
       {
         id: 'tx-2',
-        accountId: 'acc-1',
         date: '2026-09-01',
-        valueDate: '2026-09-01',
-        bookingDate: '2026-09-01',
         issuer: 'AG',
         receiver: 'Me',
         subject: 'Gehalt September',
         type: 'inbound',
         iban: 'DE00',
         value: 3000,
-        bucketId: 'b-salary',
         assignmentSource: 'auto_regex',
       },
     ];
@@ -114,10 +106,7 @@ describe('financeDB Storage Layer', () => {
 
     const manualTx: Transaction = {
       id: 'tx-man-1',
-      accountId: 'acc-export',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: '',
       receiver: 'Bäcker',
       subject: 'Kaffee',
@@ -125,7 +114,7 @@ describe('financeDB Storage Layer', () => {
       iban: '',
       value: -3.5,
       assignmentSource: 'manual',
-      origin: 'manual',
+      origin: 'override',
     };
     await financeDB.saveTransaction(manualTx);
 
@@ -155,10 +144,7 @@ describe('financeDB Storage Layer', () => {
   it('does not persist type field in database and provides virtual type getter upon retrieval', async () => {
     const rawTx: Transaction = {
       id: 'tx-persist-1',
-      accountId: 'acc-1',
       date: '2026-09-03',
-      valueDate: '2026-09-03',
-      bookingDate: '2026-09-03',
       issuer: 'Me',
       receiver: 'Store',
       subject: 'Groceries',
@@ -187,10 +173,7 @@ describe('financeDB Storage Layer', () => {
   it('saves, retrieves, exports, and imports deleted transactions', async () => {
     const deletedTx: Transaction = {
       id: 'tx-del-1',
-      accountId: 'acc-1',
       date: '2026-08-01',
-      valueDate: '2026-08-01',
-      bookingDate: '2026-08-01',
       issuer: 'Rewe',
       receiver: 'Me',
       subject: 'Einkauf storniert',
@@ -249,10 +232,7 @@ describe('financeDB Storage Layer', () => {
     ]);
     await financeDB.saveTransaction({
       id: 'tx-bank-1',
-      accountId: 'acc-1',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: 'Cinema',
       receiver: 'Me',
       subject: 'Kino',

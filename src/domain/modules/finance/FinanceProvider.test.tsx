@@ -24,7 +24,6 @@ describe('FinanceContext', () => {
 
     expect(result.current.accounts.length).toBeGreaterThan(0);
     expect(result.current.categories.length).toBeGreaterThan(0);
-    expect(result.current.buckets.length).toBeGreaterThan(0);
   });
 
   it('adds and updates an account', async () => {
@@ -64,10 +63,7 @@ describe('FinanceContext', () => {
       await result.current.importTransactions([
         {
           id: 'tx-test-assign',
-          accountId: 'acc-giro-main',
           date: '2026-09-01',
-          valueDate: '2026-09-01',
-          bookingDate: '2026-09-01',
           issuer: 'Unbekannt',
           receiver: 'Me',
           subject: 'Sonstige Ausgabe',
@@ -88,7 +84,6 @@ describe('FinanceContext', () => {
 
     const updatedTx = result.current.transactions.find((t) => t.id === 'tx-test-assign');
     expect(updatedTx?.categoryId).toBe(targetCategory.id);
-    expect(updatedTx?.bucketId).toBe(targetCategory.id);
     expect(updatedTx?.assignmentSource).toBe('manual');
 
     const updatedCategory = result.current.categories.find((c) => c.id === targetCategory.id);
@@ -154,10 +149,7 @@ describe('FinanceContext', () => {
     let newTx: any;
     await act(async () => {
       newTx = await result.current.addTransaction({
-        accountId: result.current.accounts[0].id,
         date: '2026-09-01',
-        valueDate: '2026-09-01',
-        bookingDate: '2026-09-01',
         issuer: 'Bargeld',
         receiver: 'Supermarkt',
         subject: 'Wocheneinkauf',
@@ -169,7 +161,7 @@ describe('FinanceContext', () => {
     });
 
     expect(newTx.id).toBeDefined();
-    expect(newTx.origin).toBe('manual');
+    expect(newTx.origin).toBe('override');
     expect(result.current.transactions).toHaveLength(1);
     expect(result.current.transactions[0].value).toBe(-100);
 
@@ -226,10 +218,7 @@ describe('FinanceContext', () => {
     // 1. Import transaction (-100 €)
     const mainTx: Transaction = {
       id: 'tx-split-root',
-      accountId: result.current.accounts[0].id,
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: '',
       receiver: 'Supermarkt',
       subject: 'Einkauf 100 Euro',
@@ -318,10 +307,7 @@ describe('FinanceContext', () => {
     let manualTx: any;
     await act(async () => {
       manualTx = await result.current.addTransaction({
-        accountId: result.current.accounts[0].id,
         date: '2026-09-01',
-        valueDate: '2026-09-01',
-        bookingDate: '2026-09-01',
         issuer: 'Bar',
         receiver: 'Flohmarkt',
         subject: 'Bargeldkauf',
@@ -331,7 +317,7 @@ describe('FinanceContext', () => {
       });
     });
 
-    expect(manualTx.origin).toBe('manual');
+    expect(manualTx.origin).toBe('override');
     expect(result.current.transactions.some((t) => t.id === manualTx.id)).toBe(true);
 
     await act(async () => {
@@ -460,10 +446,7 @@ describe('FinanceContext', () => {
       await result.current.importTransactions([
         {
           id: 'tx-auto-rematch',
-          accountId: 'acc-giro-main',
           date: '2026-09-01',
-          valueDate: '2026-09-01',
-          bookingDate: '2026-09-01',
           issuer: 'AutoSupermarkt',
           receiver: 'AutoSupermarkt',
           subject: 'Einkauf Supermarkt Express',
@@ -578,10 +561,7 @@ describe('FinanceContext', () => {
       await result.current.importTransactions([
         {
           id: 'tx-to-split',
-          accountId: 'acc-giro-main',
           date: '2026-09-01',
-          valueDate: '2026-09-01',
-          bookingDate: '2026-09-01',
           issuer: 'Einkaufszentrum',
           receiver: 'Einkaufszentrum',
           subject: 'Großer Einkauf',
@@ -596,10 +576,7 @@ describe('FinanceContext', () => {
         },
         {
           id: 'tx-to-override',
-          accountId: 'acc-giro-main',
           date: '2026-09-02',
-          valueDate: '2026-09-02',
-          bookingDate: '2026-09-02',
           issuer: 'Buchladen',
           receiver: 'Buchladen',
           subject: 'Fachbuch',

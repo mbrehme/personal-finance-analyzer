@@ -22,17 +22,13 @@ describe('finance domain helpers', () => {
   it('builds a compound search field with format [Typ] Empfänger: Zweck (Iban)', () => {
     const tx: Transaction = {
       id: 'tx-123',
-      accountId: 'acc-ing',
       date: '2026-09-02',
-      valueDate: '2026-09-02',
-      bookingDate: '2026-09-02',
       issuer: 'Arbeitgeber GmbH',
       receiver: 'Max Mustermann',
       subject: 'Gehaltszahlung August',
       type: 'inbound',
       iban: 'DE1234567890',
       value: 3500,
-      bucketId: null,
       assignmentSource: 'unassigned',
     };
 
@@ -41,17 +37,13 @@ describe('finance domain helpers', () => {
 
     const txOutbound: Transaction = {
       id: 'tx-124',
-      accountId: 'acc-ing',
       date: '2026-09-02',
-      valueDate: '2026-09-02',
-      bookingDate: '2026-09-02',
       issuer: 'Max Mustermann',
       receiver: 'REWE Markt GmbH',
       subject: 'Kartenzahlung',
       type: 'outbound',
       iban: 'DE9876543210',
       value: -42.5,
-      bucketId: null,
       assignmentSource: 'unassigned',
     };
 
@@ -59,60 +51,48 @@ describe('finance domain helpers', () => {
     expect(compoundOutbound).toBe('[Ausgang] REWE Markt GmbH: Kartenzahlung (DE9876543210)');
   });
 
-  it('sorts transactions by date descending and preserves CSV importIndex order for same date', () => {
+  it('sorts transactions by date descending and preserves CSV dayIndex order for same date', () => {
     const tx1: Transaction = {
       id: 'tx-1',
-      accountId: 'acc-1',
       date: '2026-08-10',
-      valueDate: '2026-08-10',
-      bookingDate: '2026-08-10',
       issuer: 'Rewe',
       receiver: 'Me',
       subject: 'Einkauf',
       type: 'outbound',
       iban: '',
       value: -20,
-      bucketId: null,
       assignmentSource: 'unassigned',
-      importIndex: 0,
+      dayIndex: 0,
       importFilename: 'statement.csv',
       importedAt: '2026-09-01T10:00:00.000Z',
     };
 
     const tx2: Transaction = {
       id: 'tx-2',
-      accountId: 'acc-1',
       date: '2026-08-10',
-      valueDate: '2026-08-10',
-      bookingDate: '2026-08-10',
       issuer: 'Apotheke',
       receiver: 'Me',
       subject: 'Medikamente',
       type: 'outbound',
       iban: '',
       value: -15,
-      bucketId: null,
       assignmentSource: 'unassigned',
-      importIndex: 1,
+      dayIndex: 1,
       importFilename: 'statement.csv',
       importedAt: '2026-09-01T10:00:00.000Z',
     };
 
     const tx3: Transaction = {
       id: 'tx-3',
-      accountId: 'acc-1',
       date: '2026-08-20',
-      valueDate: '2026-08-20',
-      bookingDate: '2026-08-20',
       issuer: 'Gehalt',
       receiver: 'Me',
       subject: 'Lohn',
       type: 'inbound',
       iban: '',
       value: 3000,
-      bucketId: null,
       assignmentSource: 'unassigned',
-      importIndex: 2,
+      dayIndex: 2,
       importFilename: 'statement.csv',
       importedAt: '2026-09-01T10:00:00.000Z',
     };
@@ -120,7 +100,7 @@ describe('finance domain helpers', () => {
     const sorted = sortTransactionsDesc([tx2, tx1, tx3]);
     // Neuestes Datum zuerst
     expect(sorted[0].id).toBe('tx-3');
-    // Am gleichen Tag: importIndex 0 vor importIndex 1
+    // Am gleichen Tag: dayIndex 0 vor dayIndex 1
     expect(sorted[1].id).toBe('tx-1');
     expect(sorted[2].id).toBe('tx-2');
   });
@@ -128,69 +108,53 @@ describe('finance domain helpers', () => {
   it('places split child transactions directly adjacent to their parent transaction', () => {
     const parentTx: Transaction = {
       id: 'tx-parent',
-      accountId: 'acc-1',
       date: '2026-07-20',
-      valueDate: '2026-07-20',
-      bookingDate: '2026-07-20',
       issuer: 'Supermarkt',
       receiver: 'Me',
       subject: 'Einkauf Rest',
       type: 'outbound',
       iban: '',
       value: -36.29,
-      bucketId: null,
       assignmentSource: 'unassigned',
-      importIndex: 0,
+      dayIndex: 0,
     };
 
     const unrelatedTx1: Transaction = {
       id: 'tx-unrelated-1',
-      accountId: 'acc-1',
       date: '2026-07-20',
-      valueDate: '2026-07-20',
-      bookingDate: '2026-07-20',
       issuer: 'Café',
       receiver: 'Me',
       subject: 'Kaffee',
       type: 'outbound',
       iban: '',
       value: -28.33,
-      bucketId: null,
       assignmentSource: 'unassigned',
-      importIndex: 1,
+      dayIndex: 1,
     };
 
     const unrelatedTx2: Transaction = {
       id: 'tx-unrelated-2',
-      accountId: 'acc-1',
       date: '2026-07-20',
-      valueDate: '2026-07-20',
-      bookingDate: '2026-07-20',
       issuer: 'Strandcafé',
       receiver: 'Me',
       subject: 'Snack',
       type: 'outbound',
       iban: '',
       value: -14.0,
-      bucketId: null,
       assignmentSource: 'unassigned',
-      importIndex: 2,
+      dayIndex: 2,
     };
 
     const splitChildTx: Transaction = {
       id: 'tx-split-child',
       splitFromId: 'tx-parent',
-      accountId: 'acc-1',
       date: '2026-07-20',
-      valueDate: '2026-07-20',
-      bookingDate: '2026-07-20',
       issuer: 'Supermarkt',
       receiver: 'Me',
       subject: 'Einkauf Teilbetrag',
       type: 'outbound',
       iban: '',
       value: -80.0,
-      bucketId: null,
       assignmentSource: 'unassigned',
     };
 
@@ -204,48 +168,36 @@ describe('finance domain helpers', () => {
   it('sorts orphaned split child chronologically when parent is missing/deleted', () => {
     const tx1: Transaction = {
       id: 'tx-1',
-      accountId: 'acc-1',
       date: '2026-09-03',
-      valueDate: '2026-09-03',
-      bookingDate: '2026-09-03',
       issuer: 'A',
       receiver: 'B',
       subject: 'Newest',
       type: 'outbound',
       iban: '',
       value: -10,
-      bucketId: null,
       assignmentSource: 'unassigned',
     };
     const orphanChild: Transaction = {
       id: 'tx-orphan',
       splitFromId: 'tx-deleted-parent',
-      accountId: 'acc-1',
       date: '2026-09-02',
-      valueDate: '2026-09-02',
-      bookingDate: '2026-09-02',
       issuer: 'A',
       receiver: 'B',
       subject: 'Middle',
       type: 'outbound',
       iban: '',
       value: -20,
-      bucketId: null,
       assignmentSource: 'unassigned',
     };
     const tx3: Transaction = {
       id: 'tx-3',
-      accountId: 'acc-1',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: 'A',
       receiver: 'B',
       subject: 'Oldest',
       type: 'outbound',
       iban: '',
       value: -30,
-      bucketId: null,
       assignmentSource: 'unassigned',
     };
 
@@ -290,14 +242,10 @@ describe('finance domain helpers', () => {
 
     const modifiedTx: Transaction = {
       id: 'tx-override-1',
-      accountId: 'acc-2',
-      originalAccountId: 'acc-1',
+      accountIban: 'DE2222',
+      originalAccountIban: 'DE1111',
       date: '2026-08-15',
       originalDate: '2026-08-10',
-      valueDate: '2026-08-15',
-      originalValueDate: '2026-08-10',
-      bookingDate: '2026-08-15',
-      originalBookingDate: '2026-08-10',
       issuer: 'Manuell Sender',
       originalIssuer: 'Bank Sender',
       receiver: 'Manuell Empfänger',
@@ -309,7 +257,6 @@ describe('finance domain helpers', () => {
       value: -100,
       originalValue: -50,
       categoryId: 'cat-1',
-      bucketId: 'cat-1',
       assignmentSource: 'manual',
       origin: 'imported',
       splitFromId: 'tx-parent',
@@ -321,17 +268,14 @@ describe('finance domain helpers', () => {
     const restored = resetTransactionToOriginal(modifiedTx);
 
     expect(restored.id).toBe('tx-override-1');
-    expect(restored.accountId).toBe('acc-1');
+    expect(restored.accountIban).toBe('DE1111');
     expect(restored.date).toBe('2026-08-10');
-    expect(restored.valueDate).toBe('2026-08-10');
-    expect(restored.bookingDate).toBe('2026-08-10');
     expect(restored.issuer).toBe('Bank Sender');
     expect(restored.receiver).toBe('Bank Empfänger');
     expect(restored.subject).toBe('Bank Verwendungszweck');
     expect(restored.iban).toBe('DE1111');
     expect(restored.value).toBe(-50);
     expect(restored.categoryId).toBeNull();
-    expect(restored.bucketId).toBeNull();
     expect(restored.assignmentSource).toBe('unassigned');
     expect(restored.splitFromId).toBeUndefined();
     expect(restored.deletedAt).toBeUndefined();
@@ -374,10 +318,8 @@ describe('finance domain helpers', () => {
     // 1. Umbuchung von Girokonto auf Tagesgeld
     const transferTx: Transaction = {
       id: 'tx-transfer',
-      accountId: 'acc-giro',
+      accountIban: 'DE1111',
       date: '2026-08-10',
-      valueDate: '2026-08-10',
-      bookingDate: '2026-08-10',
       issuer: 'Martin',
       receiver: 'Tagesgeld',
       subject: 'Umbuchung Tagesgeld',
@@ -400,10 +342,8 @@ describe('finance domain helpers', () => {
     // 2. Buchung auf Girokonto, die zum virtuellen Unterkonto Urlaubstopf gehört
     const vacationTx: Transaction = {
       id: 'tx-vacation',
-      accountId: 'acc-giro',
+      accountIban: 'DE1111',
       date: '2026-08-12',
-      valueDate: '2026-08-12',
-      bookingDate: '2026-08-12',
       issuer: 'Martin',
       receiver: 'Lufthansa',
       subject: 'Flugticket',
@@ -429,8 +369,6 @@ describe('finance domain helpers', () => {
       id: 'tx-no-account-id',
       accountIban: 'DE1111',
       date: '2026-08-15',
-      valueDate: '2026-08-15',
-      bookingDate: '2026-08-15',
       issuer: 'Martin',
       receiver: 'Hotel Strandlust',
       subject: 'Urlaub Übernachtung',
@@ -504,8 +442,6 @@ describe('finance domain helpers', () => {
         accountIban: 'DE1111',
         iban: 'DE2222',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeldkonto',
         subject: 'Monatliches Sparen',
@@ -544,8 +480,6 @@ describe('finance domain helpers', () => {
         accountIban: 'DE3333',
         iban: 'DE9999',
         date: '2026-08-11',
-        valueDate: '2026-08-11',
-        bookingDate: '2026-08-11',
         issuer: 'Martin',
         receiver: 'Hotel Roma',
         subject: 'Hotel',
@@ -584,8 +518,6 @@ describe('finance domain helpers', () => {
         accountIban: 'DE1111',
         iban: 'DE2222',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',
         subject: 'Sparen',
@@ -605,7 +537,6 @@ describe('finance domain helpers', () => {
       const splitChildTx: Transaction = {
         id: 'tx-split-1',
         splitFromId: 'tx-parent',
-        valueDate: '2026-03-01',
         value: -20,
       } as any;
 
@@ -615,7 +546,6 @@ describe('finance domain helpers', () => {
     it('returns "override" when transaction is manually overridden or has legacy manual origin', () => {
       const overriddenTx: Transaction = {
         id: 'tx-overridden',
-        valueDate: '2026-03-01',
         value: -50,
         subject: 'Neuer Zweck',
         originalSubject: 'Alter Bank-Zweck',
@@ -626,16 +556,14 @@ describe('finance domain helpers', () => {
 
       const legacyManualTx: Transaction = {
         id: 'tx-legacy-man',
-        valueDate: '2026-03-01',
         value: -30,
-        origin: 'manual',
+        origin: 'override',
       } as any;
 
       expect(getTransactionOrigin(legacyManualTx)).toBe('override');
 
       const explicitOverrideTx: Transaction = {
         id: 'tx-override-explicit',
-        valueDate: '2026-03-01',
         value: -30,
         origin: 'override',
       } as any;
@@ -646,7 +574,6 @@ describe('finance domain helpers', () => {
     it('returns "imported" for unaltered bank transactions', () => {
       const importedTx: Transaction = {
         id: 'tx-imported',
-        valueDate: '2026-03-01',
         value: -100,
         subject: 'REWE Markt',
         origin: 'imported',
@@ -661,8 +588,6 @@ describe('finance domain helpers', () => {
       const txDay0: Transaction = {
         id: 'tx-d0',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         value: -10,
         dayIndex: 0,
       } as any;
@@ -670,8 +595,6 @@ describe('finance domain helpers', () => {
       const txDay1: Transaction = {
         id: 'tx-d1',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         value: -20,
         dayIndex: 1,
       } as any;
@@ -679,8 +602,6 @@ describe('finance domain helpers', () => {
       const txDay2: Transaction = {
         id: 'tx-d2',
         date: '2026-08-10',
-        valueDate: '2026-08-10',
-        bookingDate: '2026-08-10',
         value: -30,
         dayIndex: 2,
       } as any;
@@ -688,8 +609,6 @@ describe('finance domain helpers', () => {
       const txYesterday: Transaction = {
         id: 'tx-yesterday',
         date: '2026-08-09',
-        valueDate: '2026-08-09',
-        bookingDate: '2026-08-09',
         value: -50,
         dayIndex: 0,
       } as any;

@@ -11,7 +11,7 @@ describe('CsvImportModal', () => {
       <CsvImportModal
         isOpen={true}
         onClose={handleClose}
-        accounts={[{ id: 'acc-1', name: 'Girokonto', bucketIds: [], balanceEntries: [] }]}
+        accounts={[{ id: 'acc-1', name: 'Girokonto', balanceEntries: [] }]}
         onImport={handleImport}
       />
     );
@@ -32,7 +32,6 @@ describe('CsvImportModal', () => {
         name: 'Girokonto Hauptkonto',
         accountType: 'real' as const,
         iban: 'DE11 2233 4455',
-        bucketIds: [],
         balanceEntries: [],
       },
       {
@@ -40,7 +39,6 @@ describe('CsvImportModal', () => {
         name: 'Tagesgeldkonto',
         accountType: 'real' as const,
         iban: 'DE99 8877 6655',
-        bucketIds: [],
         balanceEntries: [],
       },
       {
@@ -48,7 +46,6 @@ describe('CsvImportModal', () => {
         name: 'Urlaubspuffer (Virtuell)',
         accountType: 'virtual' as const,
         parentAccountId: 'acc-real-1',
-        bucketIds: [],
         balanceEntries: [],
       },
     ];

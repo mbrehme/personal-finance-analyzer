@@ -53,10 +53,7 @@ describe('regexMatcher Engine', () => {
   it('matches transaction based on subject/receiver via regex', () => {
     const tx: Transaction = {
       id: 'tx-1',
-      accountId: 'acc-1',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: 'Me',
       receiver: 'Rewe Filiale 1234',
       subject: 'Kartenzahlung',
@@ -75,10 +72,7 @@ describe('regexMatcher Engine', () => {
   it('matches compound field with [Eingang] and subject', () => {
     const tx: Transaction = {
       id: 'tx-2',
-      accountId: 'acc-ing-giro',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: 'Tech Corp',
       receiver: 'Me',
       subject: 'Gehaltsabrechnung',
@@ -97,10 +91,7 @@ describe('regexMatcher Engine', () => {
   it('prioritizes manual assignment via category.manualTransactionIds', () => {
     const tx: Transaction = {
       id: 'tx-manual-special',
-      accountId: 'acc-1',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: 'Rewe', // Wäre eigentlich b-groceries
       receiver: 'Me',
       subject: 'Einkauf',
@@ -120,10 +111,7 @@ describe('regexMatcher Engine', () => {
     const transactions: Transaction[] = [
       {
         id: 'tx-manual-locked',
-        accountId: 'acc-1',
         date: '2026-09-01',
-        valueDate: '2026-09-01',
-        bookingDate: '2026-09-01',
         issuer: 'Me',
         receiver: 'Rewe',
         subject: 'Einkauf',
@@ -135,10 +123,7 @@ describe('regexMatcher Engine', () => {
       },
       {
         id: 'tx-auto',
-        accountId: 'acc-1',
         date: '2026-09-01',
-        valueDate: '2026-09-01',
-        bookingDate: '2026-09-01',
         issuer: 'Me',
         receiver: 'Edeka',
         subject: 'Einkauf',
@@ -175,10 +160,7 @@ describe('regexMatcher Engine', () => {
 
     const giftTx: Transaction = {
       id: 'tx-gift',
-      accountId: 'acc-1',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: 'Me',
       receiver: 'Amazon',
       subject: 'Geschenke Geburtstag',
@@ -191,10 +173,7 @@ describe('regexMatcher Engine', () => {
 
     const pocketTx: Transaction = {
       id: 'tx-pocket',
-      accountId: 'acc-1',
       date: '2026-09-01',
-      valueDate: '2026-09-01',
-      bookingDate: '2026-09-01',
       issuer: 'Me',
       receiver: 'Denise Gül Brehme',
       subject: 'Monatliches Taschengeld',

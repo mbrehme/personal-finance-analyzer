@@ -21,13 +21,6 @@ const mockResult: CashflowAnalysisResult = {
         color: '#10b981',
         icon: 'Wallet',
       },
-      bucket: {
-        id: 'cat-income',
-        name: 'Gehalt',
-        parentId: null,
-        color: '#10b981',
-        icon: 'Wallet',
-      },
       depth: 0,
       hasChildren: false,
       periods: {
@@ -40,13 +33,6 @@ const mockResult: CashflowAnalysisResult = {
     },
     {
       category: {
-        id: 'cat-food',
-        name: 'Lebensmittel',
-        parentId: null,
-        color: '#f59e0b',
-        icon: 'Utensils',
-      },
-      bucket: {
         id: 'cat-food',
         name: 'Lebensmittel',
         parentId: null,

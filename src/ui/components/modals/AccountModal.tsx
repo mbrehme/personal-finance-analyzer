@@ -31,8 +31,6 @@ export interface AccountModalProps {
   existingCategories?: Category[];
   existingAccounts?: Account[];
   initialParentAccountId?: string | null;
-  /** @deprecated Verwende existingCategories */
-  existingBuckets?: Category[];
 }
 
 export const AccountModal: React.FC<AccountModalProps> = ({
@@ -40,13 +38,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   onClose,
   onSave,
   account,
-  existingCategories: propExistingCategories,
+  existingCategories = [],
   existingAccounts = [],
   initialParentAccountId,
-  existingBuckets: propExistingBuckets,
 }) => {
-  const existingCategories = propExistingCategories ?? propExistingBuckets ?? [];
-
   const [accountType, setAccountType] = useState<AccountType>('real');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -74,7 +69,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       setIcon(account.icon || 'Landmark');
       setIban(account.iban || '');
       setParentAccountId(account.parentAccountId || null);
-      const cats = account.categoryIds || account.bucketIds || [];
+      const cats = account.categoryIds || [];
       setCategoryIds(cats);
       setBalanceEntries(account.balanceEntries || []);
     } else {
@@ -138,7 +133,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         iban: accountType === 'real' ? normalizeIban(iban) || undefined : undefined,
         parentAccountId: accountType === 'virtual' ? parentAccountId : null,
         categoryIds: accountType === 'virtual' ? categoryIds : [],
-        bucketIds: accountType === 'virtual' ? categoryIds : [],
         balanceEntries,
       });
       onClose();

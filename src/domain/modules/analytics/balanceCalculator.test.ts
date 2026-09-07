@@ -303,9 +303,9 @@ describe('balanceCalculator', () => {
     expect(giroRow?.periods['2026-08'].cashflow).toBe(-500);
     expect(giroRow?.periods['2026-08'].endBalance).toBe(1500);
 
-    // Tagesgeld als echtes Bankkonto: Berechnet sich rein auf eigenen Transaktionen (keine Phantom-Umbuchung)
-    expect(tgRow?.periods['2026-08'].cashflow).toBe(0);
-    expect(tgRow?.periods['2026-08'].endBalance).toBe(1000);
+    // Tagesgeld als echtes Bankkonto: Berechnet sich aus Buchungen, bei denen es Empfänger war (+500 €)
+    expect(tgRow?.periods['2026-08'].cashflow).toBe(500);
+    expect(tgRow?.periods['2026-08'].endBalance).toBe(1500);
 
     // Virtuelles Unterkonto unter Tagesgeld: Start 500 + 500 = 1000 (die -200 der Kreditkarte werden ignoriert!)
     expect(savingsRow?.periods['2026-08'].cashflow).toBe(500);

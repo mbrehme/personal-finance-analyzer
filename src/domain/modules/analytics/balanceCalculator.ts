@@ -83,7 +83,12 @@ export function calculateBalanceTimeline(
   const relevantTxsWithDeltas: { tx: Transaction; delta: number }[] = [];
 
   transactions.forEach((tx) => {
-    const delta = getTransactionEffectiveValueForAccount(tx, targetAcc, contextAccounts!);
+    const delta = getTransactionEffectiveValueForAccount(
+      tx,
+      targetAcc,
+      contextAccounts!,
+      transactions
+    );
     if (delta !== null) {
       relevantTxsWithDeltas.push({ tx, delta });
     }

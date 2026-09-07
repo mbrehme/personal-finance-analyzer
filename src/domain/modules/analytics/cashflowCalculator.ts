@@ -12,7 +12,6 @@ import {
   Transaction,
   isTransactionMatchingAccount,
   getTransactionEffectiveValueForAccount,
-  getTransactionAccountInfo,
 } from '@/types/finance';
 import {
   fillPeriodKeyRange,
@@ -203,7 +202,12 @@ export function calculateCashflowMatrix(
 
   const getEffectiveValue = (tx: Transaction): number => {
     if (targetAccount && options?.accounts) {
-      const eff = getTransactionEffectiveValueForAccount(tx, targetAccount, options.accounts);
+      const eff = getTransactionEffectiveValueForAccount(
+        tx,
+        targetAccount,
+        options.accounts,
+        filteredTx
+      );
       if (eff !== null) return eff;
     }
     return tx.value;
@@ -612,37 +616,21 @@ export function calculateAccountCashflowMatrix(
 
   // 4. Cashflow für jede Zeile berechnen
   rows.forEach((row) => {
-    const isVirtual = row.account.accountType === 'virtual';
-
     filteredTx.forEach((tx) => {
       const txDate = tx.date || '';
       const pKey = getPeriodKey(txDate, granularity);
       const p = row.periods[pKey];
       if (!p) return;
 
-      if (!isVirtual) {
-        // Echtes Bankkonto: Transaktion direkt auf diesem Konto
-        const info = getTransactionAccountInfo(tx, accounts);
-        if (info.primaryAccount?.id === row.account.id) {
-          if (tx.value >= 0) {
-            p.inbound += tx.value;
-            row.totalInbound += tx.value;
-          } else {
-            p.outbound += tx.value;
-            row.totalOutbound += tx.value;
-          }
-        }
-      } else {
-        // Virtuelles Unterkonto: Auswertung via getTransactionEffectiveValueForAccount
-        const eff = getTransactionEffectiveValueForAccount(tx, row.account, accounts);
-        if (eff !== null) {
-          if (eff >= 0) {
-            p.inbound += eff;
-            row.totalInbound += eff;
-          } else {
-            p.outbound += eff;
-            row.totalOutbound += eff;
-          }
+      // Auswertung des effektiven Betrags (berücksichtigt Buchungskonto, Gegenkonto bei Umbuchungen und Unterkonten)
+      const eff = getTransactionEffectiveValueForAccount(tx, row.account, accounts, transactions);
+      if (eff !== null) {
+        if (eff >= 0) {
+          p.inbound += eff;
+          row.totalInbound += eff;
+        } else {
+          p.outbound += eff;
+          row.totalOutbound += eff;
         }
       }
     });

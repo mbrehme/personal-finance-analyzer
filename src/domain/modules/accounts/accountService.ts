@@ -67,15 +67,30 @@ export function getTransactionAccountInfo(
     }
   }
 
-  const counterAccount =
+  let counterAccount =
     primaryAccount && (normTxIban || tx.iban)
       ? accounts.find(
           (a) =>
-            a.id !== primaryAccount.id &&
+            a.id !== primaryAccount!.id &&
             a.accountType !== 'virtual' &&
             Boolean((a.iban && normalizeIban(a.iban) === normTxIban) || a.id === tx.iban)
         )
       : undefined;
+
+  // Ergänzend: Gegenkonto anhand von Empfänger / Sender (tx.receiver / tx.issuer) zuordnen, falls IBAN fehlt
+  if (!counterAccount && primaryAccount) {
+    const normReceiver = (tx.receiver || '').trim().toLowerCase();
+    const normIssuer = (tx.issuer || '').trim().toLowerCase();
+
+    if (normReceiver || normIssuer) {
+      counterAccount = accounts.find((a) => {
+        if (a.id === primaryAccount!.id || a.accountType === 'virtual') return false;
+        const normName = a.name.trim().toLowerCase();
+        if (!normName) return false;
+        return normName === normReceiver || normName === normIssuer;
+      });
+    }
+  }
 
   const txCatId = tx.categoryId ?? null;
   const virtualAccounts = accounts.filter((a) => {
@@ -115,17 +130,68 @@ export function getTransactionAccountInfo(
 }
 
 /**
+ * Prüft, ob in der Transaktionsliste bereits eine eigenständige Gegenbuchung existiert.
+ * Dies verhindert Doppelzählungen, wenn für beide an einer Umbuchung beteiligten Konten
+ * eigene Kontoauszüge importiert wurden.
+ *
+ * @param {Transaction} tx - Die Ausgangsbuchung
+ * @param {Account} primaryAccount - Das primäre Buchungskonto der Ausgangsbuchung
+ * @param {Account} counterAccount - Das Gegenkonto
+ * @param {Transaction[]} allTransactions - Alle Transaktionen
+ * @param {Account[]} accounts - Alle Konten
+ * @returns {boolean} true, wenn eine eigenständige Gegenbuchung existiert
+ */
+export function hasDirectCounterpart(
+  tx: Transaction,
+  primaryAccount: Account,
+  counterAccount: Account,
+  allTransactions: Transaction[],
+  accounts: Account[]
+): boolean {
+  const txTime = new Date(tx.date).getTime();
+
+  return allTransactions.some((other) => {
+    if (other.id === tx.id) return false;
+    if (other.value !== -tx.value) return false;
+
+    // Datumstoleranz von bis zu 4 Tagen für bankübliche Wertstellungs-Laufzeiten
+    const otherTime = new Date(other.date).getTime();
+    if (!isNaN(txTime) && !isNaN(otherTime)) {
+      if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
+    }
+
+    const otherInfo = getTransactionAccountInfo(other, accounts);
+    return (
+      otherInfo.primaryAccount?.id === counterAccount.id &&
+      (otherInfo.counterAccount?.id === primaryAccount.id ||
+        (primaryAccount.iban && normalizeIban(other.iban) === normalizeIban(primaryAccount.iban)))
+    );
+  });
+}
+
+/**
  * Ermittelt den effektiven Betrag einer Transaktion aus Sicht eines bestimmten Kontos.
+ *
+ * Für echte Konten:
+ * - Wenn das Konto primäres Buchungskonto ist: direkter Betrag (`tx.value`)
+ * - Wenn das Konto Gegenkonto (Empfänger / Sender einer Umbuchung) ist: invertierter Betrag (`-tx.value`),
+ *   sofern nicht bereits ein eigener Kontoauszug mit der direkten Gegenbuchung existiert (Doppelzählungsvermeidung).
+ *
+ * Für virtuelle Unterkonten:
+ * - Auswertung anhand zugeordneter Kategorien unter dem primären Konto (`tx.value`)
+ *   oder als Ziel-Unterkonto einer Umbuchung auf das Gegenkonto (`-tx.value`).
  *
  * @param {Transaction} tx - Die Transaktion
  * @param {Account} targetAccount - Das Zielkonto
  * @param {Account[]} accounts - Alle Konten
+ * @param {Transaction[]} [allTransactions] - Alle Transaktionen (zur Erkennung von Gegenbuchungen)
  * @returns {number | null} Effektiver Betrag oder null
  */
 export function getTransactionEffectiveValueForAccount(
   tx: Transaction,
   targetAccount: Account,
-  accounts: Account[]
+  accounts: Account[],
+  allTransactions?: Transaction[]
 ): number | null {
   const info = getTransactionAccountInfo(tx, accounts);
 
@@ -139,8 +205,21 @@ export function getTransactionEffectiveValueForAccount(
     return tx.value;
   }
 
+  // 1. Direktes Buchungskonto (Hauptkonto)
   if (info.primaryAccount && info.primaryAccount.id === targetAccount.id) {
     return tx.value;
+  }
+
+  // 2. Gegenkonto (Hauptkonto war Sender oder Empfänger einer Umbuchung)
+  if (info.counterAccount && info.counterAccount.id === targetAccount.id) {
+    if (
+      allTransactions &&
+      info.primaryAccount &&
+      hasDirectCounterpart(tx, info.primaryAccount, info.counterAccount, allTransactions, accounts)
+    ) {
+      return null;
+    }
+    return -tx.value;
   }
 
   return null;

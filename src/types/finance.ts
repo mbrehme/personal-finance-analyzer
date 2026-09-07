@@ -12,6 +12,7 @@ export {
   normalizeIban,
   getTransactionAccountInfo,
   getTransactionEffectiveValueForAccount,
+  hasDirectCounterpart,
   isTransactionMatchingAccount,
 } from '@/domain/modules/accounts/accountService';
 

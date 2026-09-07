@@ -95,6 +95,9 @@ describe('Balances Page', () => {
     expect(giroCell?.className).toContain('sticky');
     expect(giroCell?.className).toContain('left-0');
 
+    // "Aktueller Stand" Spalte existiert nicht mehr
+    expect(screen.queryByText('Aktueller Stand')).not.toBeInTheDocument();
+
     vi.restoreAllMocks();
   });
 });

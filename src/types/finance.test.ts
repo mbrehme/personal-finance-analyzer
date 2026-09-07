@@ -435,7 +435,7 @@ describe('finance domain helpers', () => {
 
     const allAccounts = [giroAcc, tagesgeldAcc, creditCardAcc, savingsPot, vacationPotOnGiro];
 
-    it('inverts sign on transfer receipt for virtual accounts while real accounts only count direct bookings', () => {
+    it('inverts sign on transfer receipt for recipient real account and its virtual accounts, but avoids double-counting if direct statement exists', () => {
       // Überweisung von Girokonto auf Tagesgeld für Kategorie "Sparen"
       const transferTx: Transaction = {
         id: 'tx-transfer-savings',
@@ -454,9 +454,28 @@ describe('finance domain helpers', () => {
       expect(getTransactionEffectiveValueForAccount(transferTx, giroAcc, allAccounts)).toBe(-500);
 
       // 2. Für Tagesgeld (Empfänger/Gegenkonto als echtes Bankkonto):
-      // Keine Phantom-Projektion auf echte Konten, um Doppelzählung bei importierten Auszügen zu vermeiden!
+      // Erhält +500 €, wenn kein eigener Auszug mit direkter Buchung vorliegt
+      expect(getTransactionEffectiveValueForAccount(transferTx, tagesgeldAcc, allAccounts)).toBe(
+        500
+      );
+
+      // Falls ein eigener Tagesgeld-Auszug vorliegt: Doppelzählung verhindern
+      const directTgTx: Transaction = {
+        id: 'tx-tg-direct',
+        accountIban: 'DE2222',
+        iban: 'DE1111',
+        date: '2026-08-10',
+        issuer: 'Martin',
+        receiver: 'Tagesgeldkonto',
+        subject: 'Monatliches Sparen',
+        value: 500,
+        assignmentSource: 'unassigned',
+      };
       expect(
-        getTransactionEffectiveValueForAccount(transferTx, tagesgeldAcc, allAccounts)
+        getTransactionEffectiveValueForAccount(transferTx, tagesgeldAcc, allAccounts, [
+          transferTx,
+          directTgTx,
+        ])
       ).toBeNull();
 
       // 3. Für Virtuelles Konto "Sparen Topf" unter Tagesgeld: Positiver Eingang +500 €

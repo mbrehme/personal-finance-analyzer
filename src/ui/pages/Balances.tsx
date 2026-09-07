@@ -77,9 +77,6 @@ export const Balances: React.FC = () => {
                     {formatPeriodLabel(pKey, granularity)}
                   </th>
                 ))}
-                <th className="min-w-[140px] bg-slate-100/70 px-4 py-3.5 text-right">
-                  Aktueller Stand
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -149,18 +146,13 @@ export const Balances: React.FC = () => {
                           </td>
                         );
                       })}
-
-                      {/* Aktueller Stand */}
-                      <td className="whitespace-nowrap bg-slate-50/50 px-4 py-3 text-right font-mono text-sm font-bold text-slate-900">
-                        {formatMoney(row.latestBalance)}
-                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
                   <td
-                    colSpan={balanceMatrix.periodKeys.length + 2}
+                    colSpan={balanceMatrix.periodKeys.length + 1}
                     className="py-12 text-center text-sm text-slate-400"
                   >
                     Keine Konten konfiguriert.
@@ -186,9 +178,6 @@ export const Balances: React.FC = () => {
                       </td>
                     );
                   })}
-                  <td className="bg-slate-200/60 px-4 py-3.5 text-right font-mono text-sm font-extrabold text-slate-900">
-                    {formatMoney(balanceMatrix.totalRow.latestBalance)}
-                  </td>
                 </tr>
               </tfoot>
             )}

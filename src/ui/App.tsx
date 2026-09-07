@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
 import { Header } from '@/ui/components/Header';
 import { Home } from '@/ui/pages/Home';
 import { ConfigurationLayout, CategoriesConfig, AccountsConfig } from '@/ui/pages/configuration';

@@ -1,7 +1,7 @@
 /**
  * @file cashflowCalculator.test.ts
  * @description Unit-Tests für die Cashflow-Berechnungs-Engine.
- * @module services/analytics/cashflowCalculator.test
+ * @module domain/modules/analytics/cashflowCalculator.test
  */
 
 import {

@@ -18,12 +18,14 @@ Kurze Beschreibung des Features oder der Änderung: Welches Problem wird gelöst
 
 ## 3. Technische Konzeption & Betroffene Komponenten
 
-- **UI / Komponenten (`src/components/`, `src/pages/`):**
-  - Welche Komponenten werden neu erstellt oder modifiziert?
-- **Services & State (`src/services/`):**
-  - Welche Schnittstellen, Typen oder Mock-Funktionen werden benötigt?
-- **Routing (`src/App.tsx`):**
-  - Werden neue Routen oder Navigationselemente hinzugefügt?
+- **Typen (`src/types/`):**
+  - Welche Typen oder Interfaces werden neu erstellt oder modifiziert?
+- **Repository (`src/repository/`):**
+  - Welche Verträge oder Persistenzadapter sind betroffen?
+- **Domain & State (`src/domain/`):**
+  - Welche Geschäftslogik, Services oder State-Module werden benötigt?
+- **UI & Pages (`src/ui/`):**
+  - Welche Komponenten, Pages oder Modals werden neu erstellt oder modifiziert?
 
 ## 4. Schrittweiser Umsetzungsplan
 

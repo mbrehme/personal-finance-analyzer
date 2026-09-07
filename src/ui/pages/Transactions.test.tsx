@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Transactions } from './Transactions';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
 
 describe('Transactions Page', () => {
   it('renders transactions page with filters, category options and import button', async () => {
@@ -69,7 +69,7 @@ describe('Transactions Page', () => {
   it('filters transactions by origin (Overrides vs. Importiert)', async () => {
     const { userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
-    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+    const FinanceContextModule = await import('@/domain');
 
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Girokonto', color: '#000', icon: 'Wallet' }] as any,
@@ -202,7 +202,7 @@ describe('Transactions Page', () => {
   it('filters transactions using the hierarchical CategoryFilterDropdown', async () => {
     const { userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
-    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+    const FinanceContextModule = await import('@/domain');
 
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Girokonto', color: '#000', icon: 'Wallet' }] as any,
@@ -325,7 +325,7 @@ describe('Transactions Page', () => {
   });
 
   it('renders "Geändert" badge only for modified columns when only date is changed', async () => {
-    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+    const FinanceContextModule = await import('@/domain');
 
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [{ id: 'acc-1', name: 'Haupt-Girokonto', color: '#000', icon: 'Wallet' }] as any,
@@ -382,7 +382,7 @@ describe('Transactions Page', () => {
   });
 
   it('renders multiple accounts for transfers between real accounts and virtual subaccounts', async () => {
-    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+    const FinanceContextModule = await import('@/domain');
 
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [
@@ -484,7 +484,7 @@ describe('Transactions Page', () => {
   it('opens transaction detail modal with compound search string when clicking a row', async () => {
     const { userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
-    const FinanceContextModule = await import('@/services/storage/FinanceContext');
+    const FinanceContextModule = await import('@/domain');
 
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
       accounts: [

@@ -2,7 +2,7 @@
  * @file db.ts
  * @description Local-First IndexedDB Speicher-Layer für Konten, Buckets und Transaktionen.
  * Sämtliche Daten verbleiben zu 100% lokal im Browser des Nutzers.
- * @module services/storage/db
+ * @module repository/indexeddb/db
  */
 
 import {

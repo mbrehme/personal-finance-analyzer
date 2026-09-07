@@ -7,8 +7,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Balances } from './Balances';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
-import * as FinanceContextModule from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
+import * as FinanceContextModule from '@/domain';
 
 describe('Balances Page', () => {
   it('renders balances page with account summaries', async () => {

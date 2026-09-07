@@ -2,7 +2,7 @@
  * @file csvParser.ts
  * @description Universeller CSV-Parser für Bank- und Finanzexporte mit intelligenter Trennzeichen-
  * und Spaltenerkennung sowie typsicherer Datums- und Betragskonvertierung.
- * @module services/csv/csvParser
+ * @module domain/modules/csv/csvParser
  */
 
 import { ISODateString, Transaction, getTransactionType, normalizeIban } from '@/types/finance';

@@ -1,7 +1,7 @@
 /**
  * @file regexMatcher.test.ts
  * @description Unit-Tests für die Regex-Matching Engine.
- * @module services/matcher/regexMatcher.test
+ * @module domain/modules/matcher/regexMatcher.test
  */
 
 import { describe, it, expect } from 'vitest';

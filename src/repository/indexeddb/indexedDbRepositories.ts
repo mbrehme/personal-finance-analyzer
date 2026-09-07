@@ -16,7 +16,7 @@ import { AccountRepository } from '../contracts/accountRepository';
 import { CategoryRepository } from '../contracts/categoryRepository';
 import { TransactionRepository } from '../contracts/transactionRepository';
 import { MetaRepository } from '../contracts/metaRepository';
-import { financeDB } from '@/services/storage/db';
+import { financeDB } from './db';
 
 export class IndexedDbAccountRepository implements AccountRepository {
   async findAll(): Promise<Account[]> {

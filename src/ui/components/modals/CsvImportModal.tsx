@@ -13,7 +13,7 @@ import {
   parseCurrencyValue,
   CsvColumnMapping,
   CsvParseResult,
-} from '@/services/csv/csvParser';
+} from '@/domain';
 import { formatMoney } from '@/utils/moneyUtils';
 import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, Landmark } from 'lucide-react';
 

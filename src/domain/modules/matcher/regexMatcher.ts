@@ -2,7 +2,7 @@
  * @file regexMatcher.ts
  * @description Intelligente Matching-Engine zur automatischen Zuordnung von Transaktionen
  * zu Kategorien basierend auf manuellen Overrides und regulären Ausdrücken gegen das Compound Search Field.
- * @module services/matcher/regexMatcher
+ * @module domain/modules/matcher/regexMatcher
  */
 
 import {

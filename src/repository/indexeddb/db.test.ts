@@ -1,7 +1,7 @@
 /**
  * @file db.test.ts
  * @description Unit-Tests für den IndexedDB/Memory Storage Layer db.ts.
- * @module services/storage/db.test
+ * @module repository/indexeddb/db.test
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

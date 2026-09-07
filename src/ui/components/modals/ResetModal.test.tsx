@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ResetModal } from './ResetModal';
-import * as FinanceContextModule from '@/services/storage/FinanceContext';
+import * as FinanceContextModule from '@/domain';
 
 describe('ResetModal', () => {
   const mockResetWorkspace = vi.fn().mockResolvedValue(undefined);

@@ -1,7 +1,7 @@
 /**
  * @file balanceCalculator.test.ts
  * @description Unit-Tests für die Salden-Berechnungs-Engine.
- * @module services/analytics/balanceCalculator.test
+ * @module domain/modules/analytics/balanceCalculator.test
  */
 
 import { describe, it, expect } from 'vitest';

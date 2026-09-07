@@ -6,14 +6,14 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { useFinance } from '@/services/storage/FinanceContext';
 import {
+  useFinance,
   calculateCashflowMatrix,
   calculateAccountCashflowMatrix,
   convertAccountResultToCashflowResult,
   CategoryCashflowRow,
   AccountCashflowRow,
-} from '@/services/analytics/cashflowCalculator';
+} from '@/domain';
 import { StackedCategoryBarChart } from '@/ui/components/analytics/StackedCategoryBarChart';
 import { IconRenderer } from '@/ui/components/IconRenderer';
 import {

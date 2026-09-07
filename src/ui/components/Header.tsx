@@ -7,7 +7,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useFinance } from '@/services/storage/FinanceContext';
+import { useFinance } from '@/domain';
 import { ExportModal } from '@/ui/components/modals/ExportModal';
 import { ResetModal } from '@/ui/components/modals/ResetModal';
 import {

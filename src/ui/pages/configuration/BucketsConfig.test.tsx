@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BucketsConfig } from './BucketsConfig';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
 
 describe('BucketsConfig Alias', () => {
   it('renders category tree table via alias', async () => {

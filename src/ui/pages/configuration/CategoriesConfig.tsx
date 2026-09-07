@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useFinance } from '@/services/storage/FinanceContext';
+import { useFinance } from '@/domain';
 import { Category } from '@/types/finance';
 import { normalizeBudgetToGranularity } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';

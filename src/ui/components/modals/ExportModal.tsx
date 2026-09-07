@@ -7,7 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import { useFinance } from '@/services/storage/FinanceContext';
+import { useFinance } from '@/domain';
 import { ExportOptions, DEFAULT_EXPORT_OPTIONS, isTransactionOverridden } from '@/types/finance';
 import { Download, X, Landmark, Layers, Receipt, Edit3, Trash2 } from 'lucide-react';
 

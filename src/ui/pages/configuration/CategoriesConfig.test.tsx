@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CategoriesConfig } from './CategoriesConfig';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
 
 describe('CategoriesConfig Subpage', () => {
   it('renders category tree table and drag handles', async () => {

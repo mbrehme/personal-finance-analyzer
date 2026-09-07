@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
 import { AnalyticsLayout, ANALYTICS_GRANULARITY_KEY } from './AnalyticsLayout';
 import { useAnalyticsFilter } from './AnalyticsContext';
 

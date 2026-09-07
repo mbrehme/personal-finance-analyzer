@@ -16,8 +16,8 @@ import {
   CASHFLOW_END_DATE_KEY,
 } from './Cashflow';
 import { AnalyticsLayout } from '@/ui/pages/analytics';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
-import * as FinanceContextModule from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
+import * as FinanceContextModule from '@/domain';
 import { getCurrentPeriodKey } from '@/utils/dateUtils';
 
 const renderInAnalytics = (ui: React.ReactElement = <Cashflow />) => {

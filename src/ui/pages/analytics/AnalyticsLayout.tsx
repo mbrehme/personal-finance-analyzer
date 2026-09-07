@@ -7,7 +7,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useFinance } from '@/services/storage/FinanceContext';
+import { useFinance } from '@/domain';
 import { ISODateString, PeriodGranularity } from '@/types/finance';
 import { PeriodSelector } from '@/ui/components/PeriodSelector';
 import { DateRangePicker } from '@/ui/components/DateRangePicker';

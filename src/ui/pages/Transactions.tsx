@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useFinance } from '@/services/storage/FinanceContext';
+import { useFinance } from '@/domain';
 import {
   TransactionType,
   ISODateString,

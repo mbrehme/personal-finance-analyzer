@@ -10,7 +10,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { PeriodGranularity } from '@/types/finance';
-import { CashflowAnalysisResult } from '@/services/analytics/cashflowCalculator';
+import { CashflowAnalysisResult } from '@/domain';
 import { formatPeriodLabel } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/ui/components/IconRenderer';

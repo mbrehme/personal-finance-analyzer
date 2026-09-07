@@ -2,7 +2,7 @@
  * @file balanceCalculator.ts
  * @description Berechnungs-Engine für historische und prognostizierte Kontostand-Entwicklungen
  * basierend auf hinterlegten Stichtags-Salden (Checkpoints) und Transaktions-Cashflows.
- * @module services/analytics/balanceCalculator
+ * @module domain/modules/analytics/balanceCalculator
  */
 
 import {

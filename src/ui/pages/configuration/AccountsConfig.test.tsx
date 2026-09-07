@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AccountsConfig } from './AccountsConfig';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
 
 describe('AccountsConfig Subpage', () => {
   it('renders managed accounts and drag handles', async () => {

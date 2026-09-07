@@ -1,13 +1,13 @@
 /**
- * @file FinanceContext.test.tsx
- * @description Unit-Tests für FinanceContext State Management.
- * @module services/storage/FinanceContext.test
+ * @file FinanceProvider.test.tsx
+ * @description Unit-Tests für FinanceProvider State Management.
+ * @module domain/modules/finance/FinanceProvider.test
  */
 
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { FinanceProvider, useFinance } from './FinanceContext';
+import { FinanceProvider, useFinance } from './index';
 import { Transaction } from '@/types/finance';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -198,7 +198,7 @@ describe('FinanceContext', () => {
     expect(origAfterSplit?.value).toBe(-70);
     expect(splitPart?.value).toBe(-30);
     expect(splitPart?.subject).toBe('Drogerieartikel');
-    expect(splitPart?.origin).toBe('manual');
+    expect(splitPart?.origin).toBe('split');
 
     // 4. Split-Validierung: Split >= Originalbetrag muss Fehler werfen
     await expect(

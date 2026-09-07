@@ -2,7 +2,7 @@
  * @file cashflowCalculator.ts
  * @description Analyse- und Aggregations-Engine für Cashflow-Matrizen über konfigurierbare
  * Zeitperioden (Monat, Quartal, Halbjahr, Jahr) mit hierarchischem Roll-Up und Soll-Ist-Vergleich.
- * @module services/analytics/cashflowCalculator
+ * @module domain/modules/analytics/cashflowCalculator
  */
 
 import {

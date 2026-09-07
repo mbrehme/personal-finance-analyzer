@@ -25,8 +25,7 @@ Als Kernanforderung gilt: Sämtliche Finanzdaten verbleiben zu 100% lokal im Bro
 
 Es wurde **Option B** gewählt mit folgenden Kernprinzipien:
 
-1. **Speicher-Layer (`src/services/storage/`):**
-   - Verwendung der nativen `IndexedDB` API mit `MemoryStorage`-Fallback für Tests.
+1. **Speicher-Layer (`src/repository/indexeddb/`):**
 2. **Typsicherheit mit `ISODateString`:**
    - Alle Datumsangaben (`valueDate`, `bookingDate`, `BalanceEntry.date`) sind streng typisiert als `${number}-${string}-${string}` (`YYYY-MM-DD`).
 3. **Generische visuelle Metadaten (`EntityVisualMetadata`):**

@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useFinance } from '@/services/storage/FinanceContext';
+import { useFinance } from '@/domain';
 import { Layers, Landmark } from 'lucide-react';
 
 export const ConfigurationLayout: React.FC = () => {

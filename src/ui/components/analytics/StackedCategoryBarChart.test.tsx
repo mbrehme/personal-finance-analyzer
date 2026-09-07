@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StackedCategoryBarChart } from './StackedCategoryBarChart';
-import { CashflowAnalysisResult } from '@/services/analytics/cashflowCalculator';
+import { CashflowAnalysisResult } from '@/domain';
 
 const mockResult: CashflowAnalysisResult = {
   periodKeys: ['2026-01', '2026-02'],

@@ -6,8 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { useFinance } from '@/services/storage/FinanceContext';
-import { calculateAllBalances } from '@/services/analytics/balanceCalculator';
+import { useFinance, calculateAllBalances } from '@/domain';
 import { IconRenderer } from '@/ui/components/IconRenderer';
 import { formatPeriodLabel } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';

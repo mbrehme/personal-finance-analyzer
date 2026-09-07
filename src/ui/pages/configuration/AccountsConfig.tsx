@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useFinance } from '@/services/storage/FinanceContext';
+import { useFinance } from '@/domain';
 import { Account } from '@/types/finance';
 import { formatDate } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';

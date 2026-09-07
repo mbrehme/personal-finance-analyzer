@@ -1,11 +1,11 @@
 /**
- * @file FinanceContext.tsx
+ * @file FinanceProvider.tsx
  * @description Zentraler React Context State für Konten, Kategorien und Transaktionen
  * mit persistenter IndexedDB-Synchronisation und automatischem Matching.
- * @module services/storage/FinanceContext
+ * @module domain/modules/finance/FinanceProvider
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useEffect, useState, useCallback } from 'react';
 import {
   Account,
   BalanceEntry,
@@ -21,7 +21,7 @@ import {
   resetTransactionToOriginal,
   CategoryAssignmentSource,
 } from '@/types/finance';
-import { financeDB } from '@/services/storage/db';
+import { financeDB } from '@/repository/indexeddb/db';
 import { matchTransaction, reMatchAllTransactions } from '../matcher/regexMatcher';
 
 export interface SplitPartInput {
@@ -1374,13 +1374,4 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 };
 
-/**
- * Hook zum Zugriff auf den globalen Finance-State.
- */
-export function useFinance(): FinanceContextType {
-  const context = useContext(FinanceContext);
-  if (!context) {
-    throw new Error('useFinance muss innerhalb eines FinanceProvider verwendet werden.');
-  }
-  return context;
-}
+export { useFinance } from './useFinance';

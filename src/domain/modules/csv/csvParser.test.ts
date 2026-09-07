@@ -1,7 +1,7 @@
 /**
  * @file csvParser.test.ts
  * @description Unit-Tests für den universellen CSV-Parser.
- * @module services/csv/csvParser.test
+ * @module domain/modules/csv/csvParser.test
  */
 
 import { describe, it, expect } from 'vitest';

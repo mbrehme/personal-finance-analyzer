@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ConfigurationLayout } from './ConfigurationLayout';
-import { FinanceProvider } from '@/services/storage/FinanceContext';
+import { FinanceProvider } from '@/domain';
 
 describe('ConfigurationLayout', () => {
   it('renders header, export/import buttons and subpage tabs', async () => {

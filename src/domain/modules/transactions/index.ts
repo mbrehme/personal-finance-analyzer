@@ -5,4 +5,5 @@
  */
 
 export * from './transactionService';
+export * from './transactionDeduplication';
 export * from './useTransactions';

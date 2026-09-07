@@ -725,4 +725,98 @@ describe('FinanceContext', () => {
     expect(txOverrideRestored?.subject).toBe('Fachbuch');
     expect(txOverrideRestored?.assignmentSource).not.toBe('manual');
   });
+
+  it('deduplicates internal transfers when importing from the second account and preserves assigned categories', async () => {
+    const { result } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Konten anlegen
+    await act(async () => {
+      await result.current.addAccount({
+        name: 'Haupt-Girokonto',
+        iban: 'DE89120300001083850147',
+        categoryIds: [],
+        balanceEntries: [],
+      });
+      await result.current.addAccount({
+        name: 'Rücklagen',
+        iban: 'DE80120300001027106861',
+        categoryIds: [],
+        balanceEntries: [],
+      });
+    });
+
+    // 1. Erster Import: Übertrag von Rücklagen auf Girokonto aus Sicht des Girokontos (+2.500 €)
+    await act(async () => {
+      await result.current.importTransactions([
+        {
+          id: 'tx-giro-inflow',
+          date: '2024-01-30',
+          amount: 2500,
+          value: 2500,
+          type: 'inbound',
+          accountIban: 'DE89120300001083850147',
+          senderIban: 'DE80120300001027106861',
+          receiverIban: 'DE89120300001083850147',
+          sender: 'Denise Gül Brehme',
+          receiver: 'Denise Gül Brehme',
+          issuer: '',
+          subject: 'Elternzeit Ausgleichsbudget',
+          iban: 'DE80120300001027106861',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+        },
+      ]);
+    });
+
+    expect(
+      result.current.transactions.filter((t) => t.subject === 'Elternzeit Ausgleichsbudget')
+    ).toHaveLength(1);
+
+    // 2. Nutzer weist eine Kategorie manuell zu
+    const targetCat = result.current.categories[0];
+    await act(async () => {
+      await result.current.assignTransactionCategory('tx-giro-inflow', targetCat.id);
+    });
+
+    const categorizedTx = result.current.transactions.find((t) => t.id === 'tx-giro-inflow');
+    expect(categorizedTx?.categoryId).toBe(targetCat.id);
+    expect(categorizedTx?.assignmentSource).toBe('manual');
+
+    // 3. Zweiter Import: Dieselbe Buchung aus Sicht des Rücklagenkontos (-2.500 €)
+    await act(async () => {
+      const insertedCount = await result.current.importTransactions([
+        {
+          id: 'tx-tg-outflow',
+          date: '2024-01-30',
+          amount: 2500,
+          value: -2500,
+          type: 'outbound',
+          accountIban: 'DE80120300001027106861',
+          senderIban: 'DE80120300001027106861',
+          receiverIban: 'DE89120300001083850147',
+          sender: 'Denise Gül Brehme',
+          receiver: 'Denise Gül Brehme',
+          issuer: '',
+          subject: 'Elternzeit Ausgleichsbudget',
+          iban: 'DE89120300001083850147',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+        },
+      ]);
+
+      // Darf keine neue Zeile anlegen!
+      expect(insertedCount).toBe(0);
+    });
+
+    // 4. Prüfen: Es existiert weiterhin exakt 1 Transaktion und die Kategorie ist geschützt!
+    const matchingTxs = result.current.transactions.filter(
+      (t) => t.subject === 'Elternzeit Ausgleichsbudget'
+    );
+    expect(matchingTxs).toHaveLength(1);
+    expect(matchingTxs[0].categoryId).toBe(targetCat.id);
+    expect(matchingTxs[0].assignmentSource).toBe('manual');
+    expect(matchingTxs[0].senderIban).toBe('DE80120300001027106861');
+    expect(matchingTxs[0].receiverIban).toBe('DE89120300001083850147');
+  });
 });

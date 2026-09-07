@@ -785,16 +785,25 @@ export const Transactions: React.FC = () => {
                   const isSplitPart = isSplitParent || isSplitChild;
                   const isTransfer =
                     Boolean(accountInfo.counterAccount) || isInternalTransfer(tx, accounts);
-                  const fromAccount = isTransfer
-                    ? isOutbound
-                      ? accountInfo.primaryAccount
-                      : accountInfo.counterAccount
-                    : accountInfo.primaryAccount;
-                  const toAccount = isTransfer
-                    ? isOutbound
-                      ? accountInfo.counterAccount
-                      : accountInfo.primaryAccount
-                    : undefined;
+                  const isDirectedInternal = Boolean(
+                    accountInfo.primaryAccount &&
+                    accountInfo.counterAccount &&
+                    isInternalTransfer(tx, accounts)
+                  );
+                  const fromAccount = isDirectedInternal
+                    ? accountInfo.primaryAccount
+                    : isTransfer
+                      ? isOutbound
+                        ? accountInfo.primaryAccount
+                        : accountInfo.counterAccount
+                      : accountInfo.primaryAccount;
+                  const toAccount = isDirectedInternal
+                    ? accountInfo.counterAccount
+                    : isTransfer
+                      ? isOutbound
+                        ? accountInfo.counterAccount
+                        : accountInfo.primaryAccount
+                      : undefined;
 
                   const fromVirtualAccounts = fromAccount
                     ? accountInfo.virtualAccounts.filter(

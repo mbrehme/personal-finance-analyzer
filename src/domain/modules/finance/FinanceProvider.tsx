@@ -23,6 +23,10 @@ import {
 } from '@/types/finance';
 import { financeDB } from '@/repository/indexeddb/db';
 import { matchTransaction, reMatchAllTransactions } from '../matcher/regexMatcher';
+import {
+  findMatchingTransaction,
+  mergeTransactions,
+} from '../transactions/transactionDeduplication';
 
 export interface SplitPartInput {
   id?: string;
@@ -312,42 +316,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const idsToDelete: string[] = [];
 
       for (const tx of migrated) {
-        const counterpartEntry = Array.from(uniqueTxMap.values()).find((existing) => {
-          if (existing.amount !== tx.amount) return false;
-          const diffDays =
-            Math.abs(new Date(existing.date).getTime() - new Date(tx.date).getTime()) /
-            (24 * 3600 * 1000);
-          if (diffDays > 4) return false;
+        const matchResult = findMatchingTransaction(
+          tx,
+          Array.from(uniqueTxMap.values()),
+          loadedAccounts
+        );
 
-          const matchSameDirected = Boolean(
-            existing.senderIban &&
-            tx.senderIban &&
-            existing.receiverIban &&
-            tx.receiverIban &&
-            existing.senderIban === tx.senderIban &&
-            existing.receiverIban === tx.receiverIban
-          );
-
-          const matchOppositeSigned = Boolean(
-            existing.value === -tx.value &&
-            ((existing.accountIban && tx.iban && existing.accountIban === tx.iban) ||
-              (existing.iban && tx.accountIban && existing.iban === tx.accountIban))
-          );
-
-          return matchSameDirected || matchOppositeSigned;
-        });
-
-        if (counterpartEntry) {
-          if (!counterpartEntry.categoryId && tx.categoryId) {
-            counterpartEntry.categoryId = tx.categoryId;
-            counterpartEntry.assignmentSource = tx.assignmentSource;
-          }
+        if (matchResult) {
+          const merged = mergeTransactions(matchResult.matchedTx, tx);
+          uniqueTxMap.set(merged.id, merged);
           idsToDelete.push(tx.id);
           needsTxMigrationSave = true;
           continue;
         }
 
-        uniqueTxMap.set(tx.rawFingerprint || tx.id, tx);
+        uniqueTxMap.set(tx.id, tx);
       }
 
       if (needsTxMigrationSave) {
@@ -867,34 +850,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const importTransactions = async (newTransactions: Transaction[]): Promise<number> => {
-    // 1. Bereits vorhandene IDs & Fingerabdrücke sammeln
-    const existingIds = new Set(transactions.map((t) => t.id));
-    const existingFingerprints = new Set(
-      transactions.map((t) => t.rawFingerprint).filter(Boolean) as string[]
-    );
-
     // Gelöschte Transaktionen (Tombstones) laden
     const deletedList = await financeDB.getDeletedTransactions();
-    const deletedIds = new Set(deletedList.map((t) => t.id));
-    const deletedFingerprints = new Set(
-      deletedList.map((t) => t.rawFingerprint).filter(Boolean) as string[]
-    );
 
+    const matchedActiveIds = new Set<string>();
     const toInsert: Transaction[] = [];
+    const toUpdate: Transaction[] = [];
 
     for (const rawTx of newTransactions) {
-      // 2. Duplikatsprüfung: ID oder rawFingerprint bereits aktiv vorhanden?
-      if (existingIds.has(rawTx.id)) {
+      // 1. Duplikatsprüfung gegen gelöschte Transaktionen (Tombstones)
+      const deletedMatch = findMatchingTransaction(rawTx, deletedList, accounts);
+      if (deletedMatch) {
         continue;
       }
-      if (rawTx.rawFingerprint && existingFingerprints.has(rawTx.rawFingerprint)) {
-        continue;
-      }
-      // Gelöschte Buchungen ignorieren (Tombstone)
-      if (deletedIds.has(rawTx.id)) {
-        continue;
-      }
-      if (rawTx.rawFingerprint && deletedFingerprints.has(rawTx.rawFingerprint)) {
+
+      // 2. Semantische Prüfung gegen bestehende aktive Transaktionen
+      const activeMatch = findMatchingTransaction(rawTx, transactions, accounts, matchedActiveIds);
+      if (activeMatch) {
+        matchedActiveIds.add(activeMatch.matchedTx.id);
+        const merged = mergeTransactions(activeMatch.matchedTx, rawTx);
+        toUpdate.push(merged);
         continue;
       }
 
@@ -909,9 +884,20 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       toInsert.push(preparedTx);
     }
 
+    if (toUpdate.length > 0) {
+      await financeDB.saveTransactions(toUpdate);
+    }
+
     if (toInsert.length > 0) {
       await financeDB.saveTransactions(toInsert);
-      setTransactions((prev) => sortTransactionsDesc([...prev, ...toInsert]));
+    }
+
+    if (toUpdate.length > 0 || toInsert.length > 0) {
+      setTransactions((prev) => {
+        const updateMap = new Map(toUpdate.map((t) => [t.id, t]));
+        const updatedList = prev.map((t) => updateMap.get(t.id) || t);
+        return sortTransactionsDesc([...updatedList, ...toInsert]);
+      });
     }
 
     return toInsert.length;

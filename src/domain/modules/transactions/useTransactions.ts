@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Transaction, Category, CategoryAssignmentSource } from '@/types';
+import { Account, Transaction, Category, CategoryAssignmentSource } from '@/types';
 import { TransactionRepository, CategoryRepository } from '@/repository';
 import {
   calculateSingleSplit,
@@ -14,6 +14,7 @@ import {
   sortTransactionsDesc,
   SplitInput,
 } from './transactionService';
+import { findMatchingTransaction, mergeTransactions } from './transactionDeduplication';
 import { matchTransaction } from '../categories/categoryService';
 
 export interface UseTransactionsResult {
@@ -47,7 +48,11 @@ export interface UseTransactionsResult {
     transactionIds: string[],
     targetCategoryId: string | null
   ) => Promise<void>;
-  importTransactions: (newTransactions: Transaction[], categories: Category[]) => Promise<number>;
+  importTransactions: (
+    newTransactions: Transaction[],
+    categories: Category[],
+    accounts?: Account[]
+  ) => Promise<number>;
 }
 
 export function useTransactions(
@@ -435,29 +440,28 @@ export function useTransactions(
 
   const importTransactions = async (
     newTransactions: Transaction[],
-    currentCategories: Category[]
+    currentCategories: Category[],
+    accounts: Account[] = []
   ): Promise<number> => {
-    const existingIds = new Set(transactions.map((t) => t.id));
-    const existingFingerprints = new Map<string, Transaction>();
-    transactions.forEach((t) => {
-      if (t.rawFingerprint) {
-        existingFingerprints.set(t.rawFingerprint, t);
-      }
-    });
-
-    const deletedIds = new Set(deletedTransactions.map((t) => t.id));
-    const deletedFingerprints = new Set(
-      deletedTransactions.filter((t) => t.rawFingerprint).map((t) => t.rawFingerprint as string)
-    );
-
+    const matchedActiveIds = new Set<string>();
     const toInsert: Transaction[] = [];
+    const toUpdate: Transaction[] = [];
 
     for (const rawTx of newTransactions) {
-      if (existingIds.has(rawTx.id)) continue;
-      if (rawTx.rawFingerprint && existingFingerprints.has(rawTx.rawFingerprint)) continue;
-      if (deletedIds.has(rawTx.id)) continue;
-      if (rawTx.rawFingerprint && deletedFingerprints.has(rawTx.rawFingerprint)) continue;
+      // 1. Prüfung gegen gelöschte Transaktionen (Tombstones)
+      const deletedMatch = findMatchingTransaction(rawTx, deletedTransactions, accounts);
+      if (deletedMatch) continue;
 
+      // 2. Semantische Prüfung gegen bestehende aktive Transaktionen
+      const activeMatch = findMatchingTransaction(rawTx, transactions, accounts, matchedActiveIds);
+      if (activeMatch) {
+        matchedActiveIds.add(activeMatch.matchedTx.id);
+        const merged = mergeTransactions(activeMatch.matchedTx, rawTx);
+        toUpdate.push(merged);
+        continue;
+      }
+
+      // 3. Neu einzufügende Transaktion vorbereiten (Auto-Matching gegen Kategorien)
       const match = matchTransaction(rawTx, currentCategories);
       const preparedTx: Transaction = {
         ...rawTx,
@@ -468,9 +472,20 @@ export function useTransactions(
       toInsert.push(preparedTx);
     }
 
+    if (toUpdate.length > 0) {
+      await transactionRepo.saveAll(toUpdate);
+    }
+
     if (toInsert.length > 0) {
       await transactionRepo.saveAll(toInsert);
-      setTransactions((prev) => sortTransactionsDesc([...prev, ...toInsert]));
+    }
+
+    if (toUpdate.length > 0 || toInsert.length > 0) {
+      setTransactions((prev) => {
+        const updateMap = new Map(toUpdate.map((t) => [t.id, t]));
+        const updatedList = prev.map((t) => updateMap.get(t.id) || t);
+        return sortTransactionsDesc([...updatedList, ...toInsert]);
+      });
     }
 
     return toInsert.length;

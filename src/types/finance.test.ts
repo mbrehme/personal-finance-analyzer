@@ -335,8 +335,8 @@ describe('finance domain helpers', () => {
     expect(transferInfo.allAccounts).toHaveLength(2);
 
     expect(isTransactionMatchingAccount(transferTx, 'acc-giro', accounts)).toBe(true);
-    // Echtes Konto matcht nur eigene Buchungen (keine Gegenkonto-Dopplungen)
-    expect(isTransactionMatchingAccount(transferTx, 'acc-tagesgeld', accounts)).toBe(false);
+    // Gegenkonto matcht auch (Eingänge / Übertrag aus Sicht des Zielkontos im Transaktions-Filter)
+    expect(isTransactionMatchingAccount(transferTx, 'acc-tagesgeld', accounts)).toBe(true);
     expect(isTransactionMatchingAccount(transferTx, 'acc-sub-urlaub', accounts)).toBe(false);
 
     // 2. Buchung auf Girokonto, die zum virtuellen Unterkonto Urlaubstopf gehört

@@ -84,7 +84,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
       setImporting(true);
       setError(null);
       const targetAccount = realAccounts.find((a) => a.id === selectedAccountId);
-      const targetIban = targetAccount?.iban || '';
+      const targetIban = targetAccount?.iban || targetAccount?.id || '';
       const transactions = convertRowsToTransactions(
         parseResult.rows,
         mapping,

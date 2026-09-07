@@ -531,4 +531,87 @@ describe('Transactions Page', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('filters transactions dynamically when selecting an account from the account dropdown', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        {
+          id: 'acc-giro',
+          name: 'Girokonto',
+          iban: 'DE1111',
+          color: '#000',
+          icon: 'Wallet',
+          accountType: 'real',
+        },
+        {
+          id: 'acc-tagesgeld',
+          name: 'Tagesgeld',
+          iban: 'DE2222',
+          color: '#111',
+          icon: 'Wallet',
+          accountType: 'real',
+        },
+      ] as any,
+      categories: [] as any,
+      transactions: [
+        {
+          id: 'tx-giro',
+          accountIban: 'DE1111',
+          date: '2026-03-01',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Giro Einkauf',
+          type: 'outbound',
+          iban: 'DE999',
+          value: -45,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-tg',
+          accountIban: 'DE2222',
+          date: '2026-03-02',
+          issuer: 'Bank',
+          receiver: 'Ich',
+          subject: 'Zinsen Tagesgeld',
+          type: 'inbound',
+          iban: '',
+          value: 15,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ] as any,
+      deletedTransactions: [],
+      loading: false,
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Initially both transactions are visible
+    expect(await screen.findByText('Giro Einkauf')).toBeInTheDocument();
+    expect(screen.getByText('Zinsen Tagesgeld')).toBeInTheDocument();
+
+    // Select "Tagesgeld" from the account dropdown
+    const accountSelect = screen.getByLabelText(/Konto filtern/i);
+    await user.selectOptions(accountSelect, 'acc-tagesgeld');
+
+    // Only Tagesgeld transaction should remain, Giro should be filtered out
+    expect(screen.getByText('Zinsen Tagesgeld')).toBeInTheDocument();
+    expect(screen.queryByText('Giro Einkauf')).not.toBeInTheDocument();
+
+    // Switch back to "Alle Konten"
+    await user.selectOptions(accountSelect, 'all');
+    expect(screen.getByText('Giro Einkauf')).toBeInTheDocument();
+    expect(screen.getByText('Zinsen Tagesgeld')).toBeInTheDocument();
+
+    vi.restoreAllMocks();
+  });
 });

@@ -343,7 +343,7 @@ export const Transactions: React.FC = () => {
     });
 
     return sortTransactionsDesc(matches);
-  }, [transactions, deletedTransactions, appliedFilters]);
+  }, [transactions, deletedTransactions, appliedFilters, accounts]);
 
   // Reset Lazy Loading wenn angewandte Filter geändert werden
   useEffect(() => {
@@ -389,6 +389,20 @@ export const Transactions: React.FC = () => {
   const handleCategoryChange = (ids: string[] | null) => {
     setInputCategoryIds(ids);
     setAppliedFilters((prev) => ({ ...prev, categoryIds: ids }));
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  // Konto-Auswahl ändern (wendet direkt an für flüssige Bedienung)
+  const handleAccountChange = (id: string) => {
+    setInputAccountId(id);
+    setAppliedFilters((prev) => ({ ...prev, accountId: id }));
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  // Typ-Auswahl ändern (wendet direkt an für flüssige Bedienung)
+  const handleTypeChange = (val: TransactionType | 'all') => {
+    setInputType(val);
+    setAppliedFilters((prev) => ({ ...prev, type: val }));
     setVisibleCount(PAGE_SIZE);
   };
 
@@ -593,8 +607,9 @@ export const Transactions: React.FC = () => {
           <div className="relative min-w-0">
             <select
               value={inputAccountId}
-              onChange={(e) => setInputAccountId(e.target.value)}
+              onChange={(e) => handleAccountChange(e.target.value)}
               className="h-9 w-full appearance-none truncate rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Konto filtern"
             >
               <option value="all">Alle Konten</option>
               {accounts.map((a) => (
@@ -625,8 +640,9 @@ export const Transactions: React.FC = () => {
           <div className="relative min-w-0">
             <select
               value={inputType}
-              onChange={(e) => setInputType(e.target.value as TransactionType | 'all')}
+              onChange={(e) => handleTypeChange(e.target.value as TransactionType | 'all')}
               className="h-9 w-full appearance-none rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Buchungstyp filtern"
             >
               <option value="all">Typ: Alle</option>
               <option value="inbound">Einnahmen (+)</option>

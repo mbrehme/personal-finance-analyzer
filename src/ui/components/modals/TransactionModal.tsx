@@ -216,7 +216,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     try {
       setSaving(true);
       const selectedAcc = accounts.find((a) => a.id === accountId);
-      const accountIban = selectedAcc?.iban || '';
+      const accountIban = selectedAcc?.iban || selectedAcc?.id || '';
 
       if (mode === 'create') {
         await onSave({

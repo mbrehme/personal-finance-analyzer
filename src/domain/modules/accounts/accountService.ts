@@ -40,24 +40,40 @@ export function getTransactionAccountInfo(
   const normTxIban = normalizeIban(tx.iban);
 
   let primaryAccount: Account | undefined;
-  if (normAccountIban) {
+  if (normAccountIban || tx.accountIban) {
     primaryAccount = accounts.find(
-      (a) => a.accountType !== 'virtual' && a.iban && normalizeIban(a.iban) === normAccountIban
+      (a) =>
+        a.accountType !== 'virtual' &&
+        Boolean((a.iban && normalizeIban(a.iban) === normAccountIban) || a.id === tx.accountIban)
     );
   }
-  if (!primaryAccount && normTxIban) {
+  if (!primaryAccount && (normTxIban || tx.iban)) {
     primaryAccount = accounts.find(
-      (a) => a.accountType !== 'virtual' && a.iban && normalizeIban(a.iban) === normTxIban
+      (a) =>
+        a.accountType !== 'virtual' &&
+        Boolean((a.iban && normalizeIban(a.iban) === normTxIban) || a.id === tx.iban)
     );
   }
 
+  // Falls tx.accountIban die ID eines virtuellen Unterkontos ist, Hauptkonto über parentAccountId ermitteln
+  if (!primaryAccount && (normAccountIban || tx.accountIban)) {
+    const matchedVirtual = accounts.find(
+      (a) =>
+        a.accountType === 'virtual' &&
+        Boolean(a.id === tx.accountIban || (a.iban && normalizeIban(a.iban) === normAccountIban))
+    );
+    if (matchedVirtual && matchedVirtual.parentAccountId) {
+      primaryAccount = accounts.find((a) => a.id === matchedVirtual.parentAccountId);
+    }
+  }
+
   const counterAccount =
-    normTxIban && primaryAccount
+    primaryAccount && (normTxIban || tx.iban)
       ? accounts.find(
           (a) =>
             a.id !== primaryAccount.id &&
             a.accountType !== 'virtual' &&
-            Boolean(a.iban && normalizeIban(a.iban) === normTxIban)
+            Boolean((a.iban && normalizeIban(a.iban) === normTxIban) || a.id === tx.iban)
         )
       : undefined;
 
@@ -74,6 +90,16 @@ export function getTransactionAccountInfo(
     }
     return false;
   });
+
+  // Falls tx.accountIban direkt die ID eines virtuellen Unterkontos ist, dieses zu virtualAccounts ergänzen
+  if (tx.accountIban) {
+    const directVirtual = accounts.find(
+      (a) => a.accountType === 'virtual' && a.id === tx.accountIban
+    );
+    if (directVirtual && !virtualAccounts.some((v) => v.id === directVirtual.id)) {
+      virtualAccounts.push(directVirtual);
+    }
+  }
 
   const accountMap = new Map<string, Account>();
   if (primaryAccount) accountMap.set(primaryAccount.id, primaryAccount);
@@ -135,9 +161,35 @@ export function isTransactionMatchingAccount(
 ): boolean {
   if (accountId === 'all') return true;
   const targetAcc = accounts.find((a) => a.id === accountId);
-  if (targetAcc) {
-    return getTransactionEffectiveValueForAccount(tx, targetAcc, accounts) !== null;
+  if (!targetAcc) {
+    const info = getTransactionAccountInfo(tx, accounts);
+    return info.allAccounts.some((a) => a.id === accountId);
   }
+
+  // 1. Direktes Matching über den effektiven Kontowert (deckt virtuelle Unterkonten und direkte Hauptkontobuchungen ab)
+  if (getTransactionEffectiveValueForAccount(tx, targetAcc, accounts) !== null) {
+    return true;
+  }
+
   const info = getTransactionAccountInfo(tx, accounts);
-  return info.allAccounts.some((a) => a.id === accountId);
+
+  // 2. Gegenkonto bei Umbuchungen (Eingänge / Übertrag von anderem Konto)
+  if (info.counterAccount) {
+    if (info.counterAccount.id === targetAcc.id) {
+      return true;
+    }
+    if (
+      targetAcc.accountType !== 'virtual' &&
+      info.counterAccount.parentAccountId === targetAcc.id
+    ) {
+      return true;
+    }
+  }
+
+  // 3. Echtes Hauptkonto matcht auch alle Transaktionen, die seinen virtuellen Unterkonten zugeordnet sind
+  if (targetAcc.accountType !== 'virtual') {
+    return info.virtualAccounts.some((v) => v.parentAccountId === targetAcc.id);
+  }
+
+  return false;
 }

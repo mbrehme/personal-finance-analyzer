@@ -6,7 +6,12 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams, useInRouterContext } from 'react-router-dom';
+import {
+  useSearchParams,
+  useInRouterContext,
+  useNavigate,
+  NavigateFunction,
+} from 'react-router-dom';
 import { useFinance } from '@/domain';
 import {
   TransactionType,
@@ -176,6 +181,42 @@ export function serializeTransactionFiltersToParams(
   }
 
   return params;
+}
+
+/**
+ * Erstellt eine Deep-Link-URL auf die Buchungsseite (`/transactions`) basierend auf optionalen Filterkriterien.
+ *
+ * @param {Partial<TransactionFiltersState>} filters - Partielle Filterkriterien (z. B. categoryIds, startDate, endDate, accountId)
+ * @returns {string} Die vollständige URL (z. B. '/transactions?category=cat-1&startDate=2024-04-01&endDate=2024-04-30')
+ * @example
+ * const url = buildTransactionsUrl({ categoryIds: ['__uncategorized__'], startDate: '2024-04-01', endDate: '2024-04-30' });
+ * // '/transactions?category=__uncategorized__&startDate=2024-04-01&endDate=2024-04-30'
+ */
+export function buildTransactionsUrl(filters: Partial<TransactionFiltersState>): string {
+  const merged: TransactionFiltersState = {
+    ...DEFAULT_TRANSACTION_FILTERS,
+    ...filters,
+  };
+  const params = serializeTransactionFiltersToParams(merged);
+  const qs = params.toString();
+  return `/transactions${qs ? `?${qs}` : ''}`;
+}
+
+/**
+ * Hook zum sicheren Navigieren per useNavigate().
+ * Fällt außerhalb eines <Router>-Kontexts auf eine No-Op-Funktion zurück,
+ * damit isolierte Tests ohne MemoryRouter/Router nicht fehlschlagen.
+ *
+ * @returns {NavigateFunction} Die Navigationsfunktion
+ */
+export function useSafeNavigate(): NavigateFunction {
+  const inRouter = useInRouterContext();
+  if (inRouter) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const navigate = useNavigate();
+    return navigate;
+  }
+  return (() => {}) as unknown as NavigateFunction;
 }
 
 /**

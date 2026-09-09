@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import {
   Cashflow,
   CASHFLOW_ACCOUNT_FILTER_KEY,
@@ -18,7 +18,7 @@ import {
 import { AnalyticsLayout } from '@/ui/pages/analytics';
 import { FinanceProvider } from '@/domain';
 import * as FinanceContextModule from '@/domain';
-import { getCurrentPeriodKey } from '@/utils/dateUtils';
+import { getCurrentPeriodKey, getPeriodDateRange, formatPeriodLabel } from '@/utils/dateUtils';
 
 const renderInAnalytics = (ui: React.ReactElement = <Cashflow />) => {
   return render(
@@ -577,5 +577,128 @@ describe('Cashflow Page', () => {
     expect(screen.getByRole('columnheader', { name: /Kategorie/i })).toBeInTheDocument();
     const categoriesTable = screen.getByRole('table');
     expect(within(categoriesTable).getByText('Lebensmittel')).toBeInTheDocument();
+  });
+
+  describe('Cashflow Table Deep Links', () => {
+    const LocationWatcher: React.FC = () => {
+      const location = useLocation();
+      return <div data-testid="test-location">{location.pathname + location.search}</div>;
+    };
+
+    it('navigates to /transactions with category and date range on cell click', async () => {
+      const user = userEvent.setup();
+      const currentMonthKey = getCurrentPeriodKey('monthly');
+      const currentRange = getPeriodDateRange(currentMonthKey, 'monthly');
+      const currentLabel = formatPeriodLabel(currentMonthKey, 'monthly');
+
+      vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+        accounts: [{ id: 'acc-1', name: 'Girokonto' }] as any,
+        categories: [{ id: 'cat-groceries', name: 'Lebensmittel', parentId: null }] as any,
+        transactions: [
+          {
+            id: 'tx-1',
+            accountId: 'acc-1',
+            date: `${currentMonthKey}-15`,
+            bookingDate: `${currentMonthKey}-15`,
+            issuer: 'Supermarkt',
+            receiver: 'Ich',
+            subject: 'Einkauf',
+            type: 'outbound',
+            value: -75,
+            categoryId: 'cat-groceries',
+            bucketId: 'cat-groceries',
+          },
+        ] as any,
+        loading: false,
+        error: null,
+      } as any);
+
+      render(
+        <MemoryRouter
+          initialEntries={['/analytics/cashflow']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <Routes>
+            <Route path="/analytics" element={<AnalyticsLayout />}>
+              <Route path="cashflow" element={<Cashflow />} />
+            </Route>
+            <Route
+              path="/transactions"
+              element={<div data-testid="transactions-page">Transactions Page</div>}
+            />
+          </Routes>
+          <LocationWatcher />
+        </MemoryRouter>
+      );
+
+      const cell = await screen.findByTitle(
+        `Buchungen für "Lebensmittel" im Zeitraum ${currentLabel} anzeigen`
+      );
+      expect(cell).toBeInTheDocument();
+
+      await user.click(cell);
+
+      expect(screen.getByTestId('test-location')).toHaveTextContent(
+        `/transactions?category=cat-groceries&startDate=${currentRange.startDate}&endDate=${currentRange.endDate}`
+      );
+    });
+
+    it('navigates to /transactions with __uncategorized__ on uncategorized cell click', async () => {
+      const user = userEvent.setup();
+      const currentMonthKey = getCurrentPeriodKey('monthly');
+      const currentRange = getPeriodDateRange(currentMonthKey, 'monthly');
+      const currentLabel = formatPeriodLabel(currentMonthKey, 'monthly');
+
+      vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+        accounts: [{ id: 'acc-1', name: 'Girokonto' }] as any,
+        categories: [{ id: 'cat-groceries', name: 'Lebensmittel', parentId: null }] as any,
+        transactions: [
+          {
+            id: 'tx-uncat',
+            accountId: 'acc-1',
+            date: `${currentMonthKey}-15`,
+            bookingDate: `${currentMonthKey}-15`,
+            issuer: 'Unbekannt',
+            receiver: 'Ich',
+            subject: 'Unklar',
+            type: 'outbound',
+            value: -30,
+            categoryId: null,
+            bucketId: null,
+          },
+        ] as any,
+        loading: false,
+        error: null,
+      } as any);
+
+      render(
+        <MemoryRouter
+          initialEntries={['/analytics/cashflow']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <Routes>
+            <Route path="/analytics" element={<AnalyticsLayout />}>
+              <Route path="cashflow" element={<Cashflow />} />
+            </Route>
+            <Route
+              path="/transactions"
+              element={<div data-testid="transactions-page">Transactions Page</div>}
+            />
+          </Routes>
+          <LocationWatcher />
+        </MemoryRouter>
+      );
+
+      const uncatCell = await screen.findByTitle(
+        `Nicht kategorisierte Buchungen im Zeitraum ${currentLabel} anzeigen`
+      );
+      expect(uncatCell).toBeInTheDocument();
+
+      await user.click(uncatCell);
+
+      expect(screen.getByTestId('test-location')).toHaveTextContent(
+        `/transactions?category=__uncategorized__&startDate=${currentRange.startDate}&endDate=${currentRange.endDate}`
+      );
+    });
   });
 });

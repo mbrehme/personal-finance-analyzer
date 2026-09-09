@@ -19,10 +19,13 @@ import { IconRenderer } from '@/ui/components/IconRenderer';
 import {
   getCurrentPeriodKey,
   getYearFromPeriodKey,
+  formatPeriodLabel,
   formatSubPeriodLabel,
   normalizeBudgetToGranularity,
+  getPeriodDateRange,
 } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
+import { buildTransactionsUrl, useSafeNavigate } from '@/ui/pages/Transactions';
 import {
   useAnalyticsFilter,
   ANALYTICS_ACCOUNT_KEY as CASHFLOW_ACCOUNT_FILTER_KEY,
@@ -78,6 +81,7 @@ export const Cashflow: React.FC = () => {
   const { categories, transactions, accounts } = useFinance();
   const { granularity, selectedAccountId, startDate, endDate, selectedCategoryIds } =
     useAnalyticsFilter();
+  const navigate = useSafeNavigate();
 
   const [viewMode, setViewModeState] = useState<CashflowViewMode>(() => {
     const saved = localStorage.getItem(CASHFLOW_VIEW_MODE_KEY);
@@ -450,10 +454,36 @@ export const Cashflow: React.FC = () => {
                   ? 'bg-slate-50 font-medium'
                   : '';
 
+              const cellDateRange =
+                col.type === 'period'
+                  ? getPeriodDateRange(col.id, granularity)
+                  : { startDate: `${col.year}-01-01`, endDate: `${col.year}-12-31` };
+              const cellUrl = buildTransactionsUrl({
+                categoryIds: [row.category.id],
+                startDate: cellDateRange.startDate,
+                endDate: cellDateRange.endDate,
+                accountId:
+                  selectedAccountId && selectedAccountId !== 'all' ? selectedAccountId : undefined,
+              });
+
+              const periodDesc =
+                col.type === 'period'
+                  ? `im Zeitraum ${formatPeriodLabel(col.id, granularity)}`
+                  : `im Jahr ${col.year}`;
+
               return (
                 <td
                   key={col.id}
-                  className={`whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors ${borderRight} ${bgHighlight}`}
+                  className={`cursor-pointer whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors hover:bg-blue-100/60 focus:bg-blue-100/60 focus:outline-none ${borderRight} ${bgHighlight}`}
+                  tabIndex={0}
+                  title={`Buchungen für "${row.category.name}" ${periodDesc} anzeigen`}
+                  onClick={() => navigate(cellUrl)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(cellUrl);
+                    }
+                  }}
                 >
                   {net !== 0 ? (
                     <div>
@@ -626,10 +656,34 @@ export const Cashflow: React.FC = () => {
                   ? 'bg-slate-50 font-medium'
                   : '';
 
+              const cellDateRange =
+                col.type === 'period'
+                  ? getPeriodDateRange(col.id, granularity)
+                  : { startDate: `${col.year}-01-01`, endDate: `${col.year}-12-31` };
+              const cellUrl = buildTransactionsUrl({
+                accountId: row.account.id,
+                startDate: cellDateRange.startDate,
+                endDate: cellDateRange.endDate,
+              });
+
+              const periodDesc =
+                col.type === 'period'
+                  ? `im Zeitraum ${formatPeriodLabel(col.id, granularity)}`
+                  : `im Jahr ${col.year}`;
+
               return (
                 <td
                   key={col.id}
-                  className={`whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors ${borderRight} ${bgHighlight}`}
+                  className={`cursor-pointer whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors hover:bg-purple-100/60 focus:bg-purple-100/60 focus:outline-none ${borderRight} ${bgHighlight}`}
+                  tabIndex={0}
+                  title={`Buchungen für "${row.account.name}" ${periodDesc} anzeigen`}
+                  onClick={() => navigate(cellUrl)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(cellUrl);
+                    }
+                  }}
                 >
                   {net !== 0 ? (
                     <span
@@ -722,10 +776,36 @@ export const Cashflow: React.FC = () => {
               ? 'bg-slate-50 font-medium'
               : '';
 
+          const cellDateRange =
+            col.type === 'period'
+              ? getPeriodDateRange(col.id, granularity)
+              : { startDate: `${col.year}-01-01`, endDate: `${col.year}-12-31` };
+          const cellUrl = buildTransactionsUrl({
+            categoryIds: ['__uncategorized__'],
+            startDate: cellDateRange.startDate,
+            endDate: cellDateRange.endDate,
+            accountId:
+              selectedAccountId && selectedAccountId !== 'all' ? selectedAccountId : undefined,
+          });
+
+          const periodDesc =
+            col.type === 'period'
+              ? `im Zeitraum ${formatPeriodLabel(col.id, granularity)}`
+              : `im Jahr ${col.year}`;
+
           return (
             <td
               key={col.id}
-              className={`whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors ${borderRight} ${bgHighlight}`}
+              className={`cursor-pointer whitespace-nowrap border-b border-slate-100 px-3 py-3 text-right font-mono transition-colors hover:bg-amber-100/60 focus:bg-amber-100/60 focus:outline-none ${borderRight} ${bgHighlight}`}
+              tabIndex={0}
+              title={`Nicht kategorisierte Buchungen ${periodDesc} anzeigen`}
+              onClick={() => navigate(cellUrl)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(cellUrl);
+                }
+              }}
             >
               {net !== 0 ? (
                 <span className={`font-bold ${net < 0 ? 'text-slate-900' : 'text-emerald-600'}`}>
@@ -837,7 +917,14 @@ export const Cashflow: React.FC = () => {
       </div>
 
       {/* Gestapeltes Balkendiagramm */}
-      <StackedCategoryBarChart result={chartResult} granularity={granularity} mode={viewMode} />
+      <StackedCategoryBarChart
+        result={chartResult}
+        granularity={granularity}
+        mode={viewMode}
+        selectedAccountId={selectedAccountId || undefined}
+        startDate={startDate || undefined}
+        endDate={endDate || undefined}
+      />
 
       {/* Matrix Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

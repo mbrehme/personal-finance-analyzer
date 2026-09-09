@@ -11,9 +11,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { PeriodGranularity } from '@/types/finance';
 import { CashflowAnalysisResult } from '@/domain';
-import { formatPeriodLabel } from '@/utils/dateUtils';
+import { formatPeriodLabel, getPeriodDateRange } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/ui/components/IconRenderer';
+import { buildTransactionsUrl, useSafeNavigate } from '@/ui/pages/Transactions';
 import { BarChart3, PieChart as PieChartIcon, ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface StackedCategoryBarChartProps {
@@ -25,6 +26,12 @@ export interface StackedCategoryBarChartProps {
   className?: string;
   /** Anzeigemodus: Nach Kategorien oder Konten gruppiert (Standard: 'categories') */
   mode?: 'categories' | 'accounts';
+  /** Optionaler Filter für das aktuell ausgewählte Konto (für Deep Links) */
+  selectedAccountId?: string;
+  /** Optionales Startdatum des Gesamtzeitraums (für Donut-Deep-Links) */
+  startDate?: string;
+  /** Optionales Enddatum des Gesamtzeitraums (für Donut-Deep-Links) */
+  endDate?: string;
 }
 
 interface CategorySliceInfo {
@@ -122,22 +129,6 @@ export function toExpenseRedVariant(color: string): string {
 }
 
 /**
- * Erzeugt eine gerundete, lesbare Schrittweite für die Y-Achse.
- */
-function getNiceStep(maxValue: number, tickCount = 3): number {
-  if (maxValue <= 0) return 100;
-  const roughStep = maxValue / tickCount;
-  const power = Math.pow(10, Math.floor(Math.log10(roughStep)));
-  const normalized = roughStep / power;
-  let niceFactor = 1;
-  if (normalized > 5) niceFactor = 10;
-  else if (normalized > 2) niceFactor = 5;
-  else if (normalized > 1) niceFactor = 2;
-
-  return niceFactor * power;
-}
-
-/**
  * Berechnet den SVG-Pfad eines Donut-Slices (Ring-Segment).
  */
 function describeDonutSlice(
@@ -187,7 +178,57 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
   granularity,
   className = '',
   mode = 'categories',
+  selectedAccountId,
+  startDate,
+  endDate,
 }) => {
+  const navigate = useSafeNavigate();
+
+  const handleBarSliceClick = (periodKey: string, sliceId: string) => {
+    const range = getPeriodDateRange(periodKey, granularity);
+    const url = buildTransactionsUrl({
+      categoryIds: mode === 'categories' ? [sliceId] : null,
+      accountId:
+        mode === 'accounts'
+          ? sliceId
+          : selectedAccountId && selectedAccountId !== 'all'
+            ? selectedAccountId
+            : 'all',
+      startDate: range.startDate,
+      endDate: range.endDate,
+    });
+    navigate(url);
+  };
+
+  const handleDonutSliceClick = (sliceId: string) => {
+    let start = startDate;
+    let end = endDate;
+    if (!start && result.periodKeys.length > 0) {
+      const firstRange = getPeriodDateRange(result.periodKeys[0], granularity);
+      start = firstRange.startDate;
+    }
+    if (!end && result.periodKeys.length > 0) {
+      const lastRange = getPeriodDateRange(
+        result.periodKeys[result.periodKeys.length - 1],
+        granularity
+      );
+      end = lastRange.endDate;
+    }
+
+    const url = buildTransactionsUrl({
+      categoryIds: mode === 'categories' ? [sliceId] : null,
+      accountId:
+        mode === 'accounts'
+          ? sliceId
+          : selectedAccountId && selectedAccountId !== 'all'
+            ? selectedAccountId
+            : 'all',
+      startDate: start,
+      endDate: end,
+    });
+    navigate(url);
+  };
+
   // Ein-/Ausklapp-Zustand (gemerkt in localStorage)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem(STORAGE_COLLAPSED_KEY) === 'true';
@@ -478,13 +519,13 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
   const chartHeight = 260;
   const marginTop = 20;
   const marginBottom = 34;
-  const marginLeft = 65;
+  const marginLeft = 80;
   const marginRight = 20;
 
   const innerHeight = chartHeight - marginTop - marginBottom;
   const totalPeriods = barChartData.periodsData.length;
 
-  const minBarSlotWidth = 44;
+  const minBarSlotWidth = 56;
   const minRequiredWidth = marginLeft + marginRight + totalPeriods * minBarSlotWidth;
   const barChartWidth = Math.max(containerWidth || 0, minRequiredWidth, 500);
 
@@ -495,41 +536,52 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
   const maxNegative = barChartData.maxNegative;
   const isBarChartEmpty = maxPositive === 0 && maxNegative === 0;
 
-  const positiveStep = getNiceStep(maxPositive, 3);
-  const negativeStep = getNiceStep(maxNegative, 3);
+  // Maximalausprägung der Y-Achse: Volle Höhe für maximale Ausprägung von Einnahmen und Ausgaben nutzen
+  const domainMaxPositive = maxPositive > 0 ? maxPositive : 0;
+  const domainMaxNegative = maxNegative > 0 ? maxNegative : 0;
+  const totalRange = domainMaxPositive + domainMaxNegative;
 
-  const roundedMaxPositive = Math.max(
-    positiveStep,
-    Math.ceil(maxPositive / positiveStep) * positiveStep
-  );
-  const roundedMaxNegative = Math.max(
-    negativeStep,
-    Math.ceil(maxNegative / negativeStep) * negativeStep
-  );
-
-  const totalRange = roundedMaxPositive + roundedMaxNegative;
-  const yZero = marginTop + (roundedMaxPositive / totalRange) * innerHeight;
+  const yZero =
+    totalRange > 0
+      ? marginTop + (domainMaxPositive / totalRange) * innerHeight
+      : marginTop + innerHeight / 2;
 
   const getYCoord = (val: number): number => {
     if (val >= 0) {
-      return yZero - (val / roundedMaxPositive) * (yZero - marginTop);
+      return domainMaxPositive > 0
+        ? yZero - (val / domainMaxPositive) * (yZero - marginTop)
+        : yZero;
     }
-    return yZero + (Math.abs(val) / roundedMaxNegative) * (chartHeight - marginBottom - yZero);
+    return domainMaxNegative > 0
+      ? yZero + (Math.abs(val) / domainMaxNegative) * (chartHeight - marginBottom - yZero)
+      : yZero;
   };
 
   const yTicks = useMemo(() => {
-    const ticks: number[] = [];
     if (isBarChartEmpty) return [0];
 
-    for (let v = positiveStep; v <= roundedMaxPositive; v += positiveStep) {
-      ticks.push(v);
+    const ticks: number[] = [0];
+    const positiveHeight = yZero - marginTop;
+    const negativeHeight = chartHeight - marginBottom - yZero;
+
+    // Obere Maximalausprägung der Y-Achse
+    if (domainMaxPositive > 0) {
+      ticks.push(domainMaxPositive);
+      if (positiveHeight >= 70) {
+        ticks.push(Math.round(domainMaxPositive / 2));
+      }
     }
-    ticks.push(0);
-    for (let v = negativeStep; v <= roundedMaxNegative; v += negativeStep) {
-      ticks.push(-v);
+
+    // Untere Maximalausprägung der Y-Achse
+    if (domainMaxNegative > 0) {
+      ticks.push(-domainMaxNegative);
+      if (negativeHeight >= 70) {
+        ticks.push(-Math.round(domainMaxNegative / 2));
+      }
     }
+
     return ticks.sort((a, b) => b - a);
-  }, [positiveStep, negativeStep, roundedMaxPositive, roundedMaxNegative, isBarChartEmpty]);
+  }, [domainMaxPositive, domainMaxNegative, yZero, isBarChartEmpty]);
 
   return (
     <div
@@ -634,10 +686,10 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
 
                         // 1. Positive Slices (Einnahmen, stack up from yZero)
                         let currentPosY = yZero;
-                        const renderedPositive = pd.positiveSlices.map((slice, sIdx) => {
+                        const renderedPositive = pd.positiveSlices.map((slice) => {
                           const sliceHeight =
-                            roundedMaxPositive > 0
-                              ? (slice.amount / roundedMaxPositive) * (yZero - marginTop)
+                            domainMaxPositive > 0
+                              ? (slice.amount / domainMaxPositive) * (yZero - marginTop)
                               : 0;
                           const sliceY = currentPosY - sliceHeight;
                           currentPosY = sliceY;
@@ -647,8 +699,6 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                             hoveredSlice?.categoryId === slice.id &&
                             hoveredSlice?.type === 'inbound';
 
-                          const isTopSlice = sIdx === pd.positiveSlices.length - 1;
-
                           return (
                             <rect
                               key={`pos-${slice.id}`}
@@ -657,9 +707,18 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                               width={barWidth}
                               height={Math.max(sliceHeight, 1)}
                               fill={slice.color}
-                              rx={isTopSlice ? 3 : 0}
-                              ry={isTopSlice ? 3 : 0}
-                              className="cursor-pointer transition-all duration-150"
+                              stroke="#ffffff"
+                              strokeWidth={1}
+                              className="cursor-pointer transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              tabIndex={0}
+                              aria-label={`Buchungen für ${slice.fullName} im Zeitraum ${pd.label} anzeigen`}
+                              onClick={() => handleBarSliceClick(pd.pKey, slice.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleBarSliceClick(pd.pKey, slice.id);
+                                }
+                              }}
                               style={{
                                 opacity: isHovered ? 1 : 0.92,
                                 filter: isHovered
@@ -692,10 +751,10 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
 
                         // 2. Negative Slices (Ausgaben, stack down from yZero)
                         let currentNegY = yZero;
-                        const renderedNegative = pd.negativeSlices.map((slice, sIdx) => {
+                        const renderedNegative = pd.negativeSlices.map((slice) => {
                           const sliceHeight =
-                            roundedMaxNegative > 0
-                              ? (slice.amount / roundedMaxNegative) *
+                            domainMaxNegative > 0
+                              ? (slice.amount / domainMaxNegative) *
                                 (chartHeight - marginBottom - yZero)
                               : 0;
                           const sliceY = currentNegY;
@@ -706,8 +765,6 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                             hoveredSlice?.categoryId === slice.id &&
                             hoveredSlice?.type === 'outbound';
 
-                          const isBottomSlice = sIdx === pd.negativeSlices.length - 1;
-
                           return (
                             <rect
                               key={`neg-${slice.id}`}
@@ -716,9 +773,18 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                               width={barWidth}
                               height={Math.max(sliceHeight, 1)}
                               fill={slice.color}
-                              rx={isBottomSlice ? 3 : 0}
-                              ry={isBottomSlice ? 3 : 0}
-                              className="cursor-pointer transition-all duration-150"
+                              stroke="#ffffff"
+                              strokeWidth={1}
+                              className="cursor-pointer transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              tabIndex={0}
+                              aria-label={`Buchungen für ${slice.fullName} im Zeitraum ${pd.label} anzeigen`}
+                              onClick={() => handleBarSliceClick(pd.pKey, slice.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleBarSliceClick(pd.pKey, slice.id);
+                                }
+                              }}
                               style={{
                                 opacity: isHovered ? 1 : 0.92,
                                 filter: isHovered
@@ -837,6 +903,11 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                             {formatMoney(hoveredSlice.periodNet)}
                           </span>
                         </div>
+
+                        <div className="mt-2 flex items-center justify-center gap-1 border-t border-slate-100 pt-1.5 text-[10px] font-semibold text-blue-600">
+                          <span>Klicken für Buchungsdetails</span>
+                          <span aria-hidden="true">&rarr;</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -889,7 +960,17 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                               fill={slice.color}
                               stroke="#ffffff"
                               strokeWidth="1.5"
-                              className="cursor-pointer transition-all duration-150"
+                              className="cursor-pointer transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Buchungen für ${slice.name} im Zeitraum anzeigen`}
+                              onClick={() => handleDonutSliceClick(slice.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleDonutSliceClick(slice.id);
+                                }
+                              }}
                               style={{
                                 filter: isHovered
                                   ? 'brightness(1.15) drop-shadow(0 2px 5px rgba(0,0,0,0.25))'
@@ -980,6 +1061,11 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                                 {formatMoney(hoveredDonutSlice.totalAmount)}
                               </span>
                             </div>
+
+                            <div className="mt-2 flex items-center justify-center gap-1 border-t border-slate-100 pt-1.5 text-[10px] font-semibold text-blue-600">
+                              <span>Klicken für Buchungsdetails</span>
+                              <span aria-hidden="true">&rarr;</span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -995,9 +1081,19 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                         return (
                           <div
                             key={`legend-${slice.id}`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleDonutSliceClick(slice.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleDonutSliceClick(slice.id);
+                              }
+                            }}
                             onMouseEnter={() => setActiveDonutId(slice.id)}
                             onMouseLeave={() => setActiveDonutId(null)}
-                            className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors ${
+                            title={`Buchungen für "${slice.fullName}" im Zeitraum anzeigen`}
+                            className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors focus:outline-none focus:ring-1 focus:ring-blue-400 ${
                               isActive ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-slate-50'
                             }`}
                           >

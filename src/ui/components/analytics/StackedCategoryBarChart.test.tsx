@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { StackedCategoryBarChart, toExpenseRedVariant } from './StackedCategoryBarChart';
 import { CashflowAnalysisResult } from '@/domain';
 
@@ -239,6 +240,113 @@ describe('StackedCategoryBarChart', () => {
     it('handles 3-digit hex and fallback for invalid values', () => {
       expect(toExpenseRedVariant('#fff')).toMatch(/^#[0-9a-f]{6}$/i);
       expect(toExpenseRedVariant('invalid')).toBe('#f43f5e');
+    });
+  });
+
+  describe('Deep Linking & Navigation', () => {
+    const LocationWatcher: React.FC = () => {
+      const location = useLocation();
+      return <div data-testid="test-location">{location.pathname + location.search}</div>;
+    };
+
+    it('navigates to /transactions with category and date range on clicking a bar slice', async () => {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter
+          initialEntries={['/analytics/cashflow']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <StackedCategoryBarChart
+            result={mockResult}
+            granularity="monthly"
+            selectedAccountId="acc-main"
+          />
+          <LocationWatcher />
+        </MemoryRouter>
+      );
+
+      // Finde das Slice für Lebensmittel (negatives Slice in 2026-01)
+      const foodSlice = screen.getByLabelText(
+        'Buchungen für Lebensmittel im Zeitraum Jan 2026 anzeigen'
+      );
+      expect(foodSlice).toBeInTheDocument();
+
+      await user.click(foodSlice);
+
+      expect(screen.getByTestId('test-location')).toHaveTextContent(
+        '/transactions?account=acc-main&category=cat-food&startDate=2026-01-01&endDate=2026-01-31'
+      );
+    });
+
+    it('navigates to /transactions with keyboard Enter on a bar slice', async () => {
+      render(
+        <MemoryRouter
+          initialEntries={['/analytics/cashflow']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <StackedCategoryBarChart result={mockResult} granularity="monthly" />
+          <LocationWatcher />
+        </MemoryRouter>
+      );
+
+      const incomeSlice = screen.getByLabelText(
+        'Buchungen für Gehalt im Zeitraum Jan 2026 anzeigen'
+      );
+      fireEvent.keyDown(incomeSlice, { key: 'Enter', code: 'Enter' });
+
+      expect(screen.getByTestId('test-location')).toHaveTextContent(
+        '/transactions?category=cat-income&startDate=2026-01-01&endDate=2026-01-31'
+      );
+    });
+
+    it('navigates to /transactions on clicking a donut slice or legend item', async () => {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter
+          initialEntries={['/analytics/cashflow']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <StackedCategoryBarChart
+            result={mockResult}
+            granularity="monthly"
+            startDate="2026-01-01"
+            endDate="2026-02-28"
+          />
+          <LocationWatcher />
+        </MemoryRouter>
+      );
+
+      // Klick auf Donut-Legenden-Item
+      const legendItem = screen.getByTitle('Buchungen für "Lebensmittel" im Zeitraum anzeigen');
+      await user.click(legendItem);
+
+      expect(screen.getByTestId('test-location')).toHaveTextContent(
+        '/transactions?category=cat-food&startDate=2026-01-01&endDate=2026-02-28'
+      );
+    });
+
+    it('renders category slices with crisp stroke border and no border radius', () => {
+      render(<StackedCategoryBarChart result={mockResult} granularity="monthly" />);
+
+      const barSlices = document.querySelectorAll('svg[data-testid="chart-svg"] rect');
+      expect(barSlices.length).toBeGreaterThan(0);
+
+      barSlices.forEach((rect) => {
+        expect(rect).toHaveAttribute('stroke', '#ffffff');
+        expect(rect).toHaveAttribute('stroke-width', '1');
+        expect(rect).not.toHaveAttribute('rx');
+        expect(rect).not.toHaveAttribute('ry');
+      });
+    });
+
+    it('utilizes maximal values for Y-axis scale ticks', () => {
+      render(<StackedCategoryBarChart result={mockResult} granularity="monthly" />);
+
+      // mockResult: maxPositive = 3200 (Feb 2026), maxNegative = 500 (Feb 2026)
+      // Skala soll die Maximalausprägung widerspiegeln
+      expect(screen.getByText('3.200,00 €')).toBeInTheDocument();
+      expect(screen.getByText('-500,00 €')).toBeInTheDocument();
+      expect(screen.getByText('0,00 €')).toBeInTheDocument();
     });
   });
 });

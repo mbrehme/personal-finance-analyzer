@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { StackedCategoryBarChart } from './StackedCategoryBarChart';
+import { StackedCategoryBarChart, toExpenseRedVariant } from './StackedCategoryBarChart';
 import { CashflowAnalysisResult } from '@/domain';
 
 const mockResult: CashflowAnalysisResult = {
@@ -156,5 +156,89 @@ describe('StackedCategoryBarChart', () => {
     const tooltip = await screen.findByTestId('donut-slice-tooltip');
     expect(tooltip).toBeInTheDocument();
     expect(screen.getByText(/Ø pro Monat:/i)).toBeInTheDocument();
+  });
+
+  it('renders both inbound (above) and outbound (below) for the same category in one column', async () => {
+    const mixedResult: CashflowAnalysisResult = {
+      periodKeys: ['2026-01'],
+      rows: [
+        {
+          category: {
+            id: 'cat-mixed',
+            name: 'Freizeit & Erstattung',
+            parentId: null,
+            color: '#8b5cf6',
+            icon: 'Activity',
+          },
+          depth: 0,
+          hasChildren: false,
+          periods: {
+            '2026-01': { inbound: 150, outbound: -450, net: -300 },
+          },
+          totalInbound: 150,
+          totalOutbound: -450,
+          totalNet: -300,
+        },
+      ],
+      uncategorizedRow: {
+        periods: {
+          '2026-01': { inbound: 0, outbound: 0, net: 0 },
+        },
+        totalInbound: 0,
+        totalOutbound: 0,
+        totalNet: 0,
+      },
+      totalRow: {
+        periods: {
+          '2026-01': { inbound: 150, outbound: -450, net: -300 },
+        },
+        totalInbound: 150,
+        totalOutbound: -450,
+        totalNet: -300,
+      },
+    };
+
+    render(<StackedCategoryBarChart result={mixedResult} granularity="monthly" />);
+
+    // In the single period column, there must be 2 rects: one for positive (inbound), one for negative (outbound)
+    const rects = document.querySelectorAll('rect');
+    expect(rects.length).toBe(2);
+
+    // Hover over the first rect (positive / Einnahmen)
+    fireEvent.mouseEnter(rects[0]);
+    expect(await screen.findByText('Einnahmen')).toBeInTheDocument();
+    // Das positive Element hat die Originalfarbe
+    expect(rects[0].getAttribute('fill')).toBe('#8b5cf6');
+
+    // Hover over the second rect (negative / Ausgaben)
+    fireEvent.mouseEnter(rects[1]);
+    expect(await screen.findByText('Ausgaben')).toBeInTheDocument();
+    // Das negative Element hat eine rötlich transformierte Variante
+    expect(rects[1].getAttribute('fill')).toBe(toExpenseRedVariant('#8b5cf6'));
+    expect(rects[1].getAttribute('fill')).not.toBe('#8b5cf6');
+  });
+
+  describe('toExpenseRedVariant', () => {
+    it('transforms various colors into distinct reddish variants', () => {
+      const blueRed = toExpenseRedVariant('#3b82f6');
+      const greenRed = toExpenseRedVariant('#10b981');
+      const amberRed = toExpenseRedVariant('#f59e0b');
+
+      // Alle transformierten Farben müssen unterschiedlich sein (Differenzierung bleibt erhalten)
+      expect(blueRed).not.toBe(greenRed);
+      expect(blueRed).not.toBe(amberRed);
+      expect(greenRed).not.toBe(amberRed);
+
+      // Jede Farbe hat einen hohen Rot-Wert (> 150)
+      const parseR = (hex: string) => parseInt(hex.slice(1, 3), 16);
+      expect(parseR(blueRed)).toBeGreaterThanOrEqual(155);
+      expect(parseR(greenRed)).toBeGreaterThanOrEqual(155);
+      expect(parseR(amberRed)).toBeGreaterThanOrEqual(155);
+    });
+
+    it('handles 3-digit hex and fallback for invalid values', () => {
+      expect(toExpenseRedVariant('#fff')).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(toExpenseRedVariant('invalid')).toBe('#f43f5e');
+    });
   });
 });

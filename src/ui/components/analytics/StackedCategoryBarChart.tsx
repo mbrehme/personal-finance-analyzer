@@ -35,6 +35,7 @@ interface CategorySliceInfo {
   icon?: string;
   amount: number; // positiver Betrag für die Skalierung
   net: number; // echter vorzeichenbehafteter Betrag
+  type: 'inbound' | 'outbound';
 }
 
 interface HoveredSlice {
@@ -46,6 +47,7 @@ interface HoveredSlice {
   categoryIcon?: string;
   amount: number;
   net: number;
+  type: 'inbound' | 'outbound';
   sharePercent: number;
   periodTotal: number;
   periodNet: number;
@@ -83,6 +85,41 @@ interface HoveredDonutSlice {
 const STORAGE_COLLAPSED_KEY = 'cashflow_chart_collapsed';
 const UNCATEGORIZED_ID = '__uncategorized__';
 const UNCATEGORIZED_COLOR = '#94a3b8'; // slate-400
+
+/**
+ * Konvertiert eine beliebige HEX-Kategoriefarbe in eine rötlich getönte Ausgaben-Variante.
+ * Erhält die individuelle Farbnuance der Kategorie (für klare Differenzierung im Stapel),
+ * signalisiert aber durch die Rot-Verschiebung sofort, dass es sich um eine Ausgabe handelt.
+ *
+ * @param color HEX-Farbcode (z. B. "#3b82f6" oder "#10b981")
+ * @returns Rötlich transformierter HEX-Farbcode
+ * @example
+ * toExpenseRedVariant('#3b82f6') // Blauer Farbton -> Rötlich-beeriger Ton
+ */
+export function toExpenseRedVariant(color: string): string {
+  let hex = color.replace('#', '').trim();
+  if (hex.length === 3) {
+    hex = hex
+      .split('')
+      .map((c) => c + c)
+      .join('');
+  }
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return '#f43f5e'; // Fallback: Rose-500
+  }
+
+  const num = parseInt(hex, 16);
+  const origR = (num >> 16) & 255;
+  const origG = (num >> 8) & 255;
+  const origB = num & 255;
+
+  // R-Kanal deutlich anheben (Mindest-Rotanteil), G- und B-Kanal dämpfen
+  const r = Math.min(255, Math.round(origR * 0.38 + 155));
+  const g = Math.min(255, Math.round(origG * 0.35 + 20));
+  const b = Math.min(255, Math.round(origB * 0.38 + 35));
+
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
 
 /**
  * Erzeugt eine gerundete, lesbare Schrittweite für die Y-Achse.
@@ -217,64 +254,76 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
       let positiveSum = 0;
       let negativeSum = 0;
 
-      // Einzelne Kategorien verarbeiten
+      // Einzelne Kategorien verarbeiten (Einnahmen oben, Ausgaben unten)
       individualCategoryRows.forEach((r) => {
         const p = r.periods[pKey];
-        if (!p || p.net === 0) return;
+        if (!p) return;
 
         const parentName = parentMap.get(r.category.id);
         const fullName = parentName ? `${parentName} > ${r.category.name}` : r.category.name;
 
-        if (p.net > 0) {
+        // Einnahmen: über der Nulllinie
+        if (p.inbound > 0) {
           positiveSlices.push({
             id: r.category.id,
             name: r.category.name,
             fullName,
             color: r.category.color || '#3b82f6',
-            icon: r.category.icon || 'Folder',
-            amount: p.net,
-            net: p.net,
+            icon: r.category.icon || (mode === 'accounts' ? 'Landmark' : 'Folder'),
+            amount: p.inbound,
+            net: p.inbound,
+            type: 'inbound',
           });
-          positiveSum += p.net;
-        } else {
-          const absAmount = Math.abs(p.net);
+          positiveSum += p.inbound;
+        }
+
+        // Ausgaben: unter der Nulllinie (mit rötlicher Farbvariante zur klaren Unterscheidung)
+        if (p.outbound < 0) {
+          const absAmount = Math.abs(p.outbound);
+          const baseColor = r.category.color || '#3b82f6';
+          const expenseColor = toExpenseRedVariant(baseColor);
           negativeSlices.push({
             id: r.category.id,
             name: r.category.name,
             fullName,
-            color: r.category.color || '#3b82f6',
-            icon: r.category.icon || 'Folder',
+            color: expenseColor,
+            icon: r.category.icon || (mode === 'accounts' ? 'Landmark' : 'Folder'),
             amount: absAmount,
-            net: p.net,
+            net: p.outbound,
+            type: 'outbound',
           });
           negativeSum += absAmount;
         }
       });
 
-      // Unkategorisiert verarbeiten
-      const u = result.uncategorizedRow.periods[pKey];
-      if (u && u.net !== 0) {
-        if (u.net > 0) {
+      // Unkategorisiert verarbeiten (Einnahmen oben, Ausgaben unten)
+      const u = result.uncategorizedRow?.periods?.[pKey];
+      if (u) {
+        if (u.inbound > 0) {
           positiveSlices.push({
             id: UNCATEGORIZED_ID,
             name: 'Nicht kategorisiert',
             fullName: 'Nicht kategorisiert',
             color: UNCATEGORIZED_COLOR,
             icon: 'HelpCircle',
-            amount: u.net,
-            net: u.net,
+            amount: u.inbound,
+            net: u.inbound,
+            type: 'inbound',
           });
-          positiveSum += u.net;
-        } else {
-          const absAmount = Math.abs(u.net);
+          positiveSum += u.inbound;
+        }
+        if (u.outbound < 0) {
+          const absAmount = Math.abs(u.outbound);
+          const expenseColor = toExpenseRedVariant(UNCATEGORIZED_COLOR);
           negativeSlices.push({
             id: UNCATEGORIZED_ID,
             name: 'Nicht kategorisiert',
             fullName: 'Nicht kategorisiert',
-            color: UNCATEGORIZED_COLOR,
+            color: expenseColor,
             icon: 'HelpCircle',
             amount: absAmount,
-            net: u.net,
+            net: u.outbound,
+            type: 'outbound',
           });
           negativeSum += absAmount;
         }
@@ -498,8 +547,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
               Cashflow & Ø Verteilung nach {mode === 'accounts' ? 'Konten' : 'Kategorien'}
             </h2>
             <p className="text-xs text-slate-400">
-              Gestapelter Verlauf über/unter der Nulllinie und durchschnittliche Verteilung pro{' '}
-              {granularityLabel}
+              Einnahmen über der Nulllinie und Ausgaben darunter pro {granularityLabel}
             </p>
           </div>
         </div>
@@ -596,7 +644,8 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
 
                           const isHovered =
                             hoveredSlice?.periodKey === pd.pKey &&
-                            hoveredSlice?.categoryId === slice.id;
+                            hoveredSlice?.categoryId === slice.id &&
+                            hoveredSlice?.type === 'inbound';
 
                           const isTopSlice = sIdx === pd.positiveSlices.length - 1;
 
@@ -628,6 +677,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                                   categoryIcon: slice.icon,
                                   amount: slice.amount,
                                   net: slice.net,
+                                  type: 'inbound',
                                   sharePercent:
                                     pd.positiveSum > 0 ? (slice.amount / pd.positiveSum) * 100 : 0,
                                   periodTotal: pd.positiveSum,
@@ -653,7 +703,8 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
 
                           const isHovered =
                             hoveredSlice?.periodKey === pd.pKey &&
-                            hoveredSlice?.categoryId === slice.id;
+                            hoveredSlice?.categoryId === slice.id &&
+                            hoveredSlice?.type === 'outbound';
 
                           const isBottomSlice = sIdx === pd.negativeSlices.length - 1;
 
@@ -685,6 +736,7 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                                   categoryIcon: slice.icon,
                                   amount: slice.amount,
                                   net: slice.net,
+                                  type: 'outbound',
                                   sharePercent:
                                     pd.negativeSum > 0 ? (slice.amount / pd.negativeSum) * 100 : 0,
                                   periodTotal: pd.negativeSum,
@@ -727,8 +779,17 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                       }}
                       data-testid="chart-slice-tooltip"
                     >
-                      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {hoveredSlice.periodLabel}
+                      <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        <span>{hoveredSlice.periodLabel}</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                            hoveredSlice.type === 'inbound'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-rose-50 text-rose-700'
+                          }`}
+                        >
+                          {hoveredSlice.type === 'inbound' ? 'Einnahmen' : 'Ausgaben'}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -748,7 +809,9 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                           <span className="text-slate-500">Betrag:</span>
                           <span
                             className={`font-bold ${
-                              hoveredSlice.net >= 0 ? 'text-emerald-600' : 'text-slate-900'
+                              hoveredSlice.type === 'inbound'
+                                ? 'text-emerald-600'
+                                : 'text-slate-900'
                             }`}
                           >
                             {formatMoney(hoveredSlice.net)}
@@ -756,7 +819,9 @@ export const StackedCategoryBarChart: React.FC<StackedCategoryBarChartProps> = (
                         </div>
 
                         <div className="flex justify-between gap-4 text-[11px] text-slate-500">
-                          <span>Anteil an {hoveredSlice.net >= 0 ? 'Einnahmen' : 'Ausgaben'}:</span>
+                          <span>
+                            Anteil an {hoveredSlice.type === 'inbound' ? 'Einnahmen' : 'Ausgaben'}:
+                          </span>
                           <span className="font-medium text-slate-700">
                             {hoveredSlice.sharePercent.toFixed(1)}%
                           </span>

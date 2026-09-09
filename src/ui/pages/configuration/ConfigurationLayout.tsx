@@ -5,16 +5,27 @@
  * @module pages/configuration/ConfigurationLayout
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useFinance } from '@/domain';
 import { Layers, Landmark } from 'lucide-react';
+
+export const CONFIGURATION_LAST_SUBPAGE_KEY = 'configuration_last_subpage';
 
 export const ConfigurationLayout: React.FC = () => {
   const { categories, accounts } = useFinance();
 
   const location = useLocation();
   const isAccounts = location.pathname.includes('/accounts');
+
+  // Zuletzt besuchte Subpage im Konfigurations-Bereich speichern
+  useEffect(() => {
+    if (location.pathname.includes('/accounts')) {
+      localStorage.setItem(CONFIGURATION_LAST_SUBPAGE_KEY, 'accounts');
+    } else if (location.pathname.includes('/categories')) {
+      localStorage.setItem(CONFIGURATION_LAST_SUBPAGE_KEY, 'categories');
+    }
+  }, [location.pathname]);
 
   return (
     <div className="space-y-6">

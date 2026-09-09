@@ -5,7 +5,7 @@
  * @module pages/Cashflow
  */
 
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import {
   useFinance,
   calculateCashflowMatrix,
@@ -288,7 +288,7 @@ export const Cashflow: React.FC = () => {
     return cols;
   }, [yearGroups, granularity, currentPeriodKey]);
 
-  // Automatisches und manuelles Scrollen zum aktuellen Zeitraum
+  // Automatisches und manuelles Scrollen zum aktuellen Zeitraum (ohne Animation für ruhiges Laden)
   const scrollToCurrentPeriod = useCallback(() => {
     if (!tableContainerRef.current) return;
 
@@ -302,7 +302,7 @@ export const Cashflow: React.FC = () => {
       const scrollLeft = Math.max(0, targetLeft - containerWidth / 2 + targetWidth / 2);
 
       if (typeof container.scrollTo === 'function') {
-        container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+        container.scrollTo({ left: scrollLeft, behavior: 'auto' });
       } else {
         container.scrollLeft = scrollLeft;
       }
@@ -316,18 +316,15 @@ export const Cashflow: React.FC = () => {
     ) {
       const scrollLeft = container.scrollWidth;
       if (typeof container.scrollTo === 'function') {
-        container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+        container.scrollTo({ left: scrollLeft, behavior: 'auto' });
       } else {
         container.scrollLeft = scrollLeft;
       }
     }
   }, [currentPeriodKey, activePeriodKeys]);
 
-  useEffect(() => {
-    const frameId = requestAnimationFrame(() => {
-      scrollToCurrentPeriod();
-    });
-    return () => cancelAnimationFrame(frameId);
+  useLayoutEffect(() => {
+    scrollToCurrentPeriod();
   }, [scrollToCurrentPeriod]);
 
   // Rekursives Rendern der Zeilen unter Beachtung des Collapse-States für Kategorien
@@ -844,7 +841,7 @@ export const Cashflow: React.FC = () => {
 
       {/* Matrix Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div ref={tableContainerRef} className="no-scrollbar overflow-x-auto scroll-smooth">
+        <div ref={tableContainerRef} className="no-scrollbar overflow-x-auto">
           <table className="w-full border-separate border-spacing-0 text-left">
             <colgroup>
               <col className="w-[240px] min-w-[240px] max-w-[240px]" style={{ width: '240px' }} />

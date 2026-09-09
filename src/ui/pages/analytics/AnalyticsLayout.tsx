@@ -20,6 +20,7 @@ export const ANALYTICS_GRANULARITY_KEY = 'analytics_granularity';
 export const ANALYTICS_START_DATE_KEY = 'analytics_filter_start_date';
 export const ANALYTICS_END_DATE_KEY = 'analytics_filter_end_date';
 export const ANALYTICS_CATEGORIES_KEY = 'analytics_selected_categories';
+export const ANALYTICS_LAST_SUBPAGE_KEY = 'analytics_last_subpage';
 
 // Abwärtskompatible Fallback-Keys
 const LEGACY_ACCOUNT_KEY = 'cashflow_account';
@@ -32,6 +33,15 @@ export const AnalyticsLayout: React.FC = () => {
   const { accounts, categories } = useFinance();
   const location = useLocation();
   const isBalances = location.pathname.includes('/balances');
+
+  // Zuletzt besuchte Subpage im Analytics-Bereich speichern
+  React.useEffect(() => {
+    if (location.pathname.includes('/balances')) {
+      localStorage.setItem(ANALYTICS_LAST_SUBPAGE_KEY, 'balances');
+    } else if (location.pathname.includes('/cashflow')) {
+      localStorage.setItem(ANALYTICS_LAST_SUBPAGE_KEY, 'cashflow');
+    }
+  }, [location.pathname]);
 
   // 1. Konto-Auswahl (persisted)
   const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(() => {

@@ -5,10 +5,10 @@
  * @module pages/Balances
  */
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFinance, calculateAllBalances } from '@/domain';
 import { IconRenderer } from '@/ui/components/IconRenderer';
-import { formatPeriodLabel } from '@/utils/dateUtils';
+import { formatPeriodLabel, getCurrentPeriodKey } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { useAnalyticsFilter } from '@/ui/pages/analytics';
 import { Wallet, Landmark, ShieldCheck, Calendar, CornerDownRight } from 'lucide-react';
@@ -16,6 +16,11 @@ import { Wallet, Landmark, ShieldCheck, Calendar, CornerDownRight } from 'lucide
 export const Balances: React.FC = () => {
   const { accounts, transactions } = useFinance();
   const { granularity, selectedAccountId, startDate, endDate } = useAnalyticsFilter();
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const currentPeriodHeaderRef = useRef<HTMLTableCellElement>(null);
+
+  const currentPeriodKey = useMemo(() => getCurrentPeriodKey(granularity), [granularity]);
 
   const balanceMatrix = useMemo(() => {
     return calculateAllBalances(
@@ -29,6 +34,45 @@ export const Balances: React.FC = () => {
       }
     );
   }, [accounts, transactions, granularity, selectedAccountId, startDate, endDate]);
+
+  // Automatisches Scrollen zum aktuellen Zeitraum (ohne Animation für ruhiges Laden)
+  const scrollToCurrentPeriod = useCallback(() => {
+    if (!tableContainerRef.current) return;
+
+    const container = tableContainerRef.current;
+    const targetEl = currentPeriodHeaderRef.current;
+
+    if (targetEl) {
+      const targetLeft = targetEl.offsetLeft;
+      const targetWidth = targetEl.offsetWidth;
+      const containerWidth = container.clientWidth;
+      const scrollLeft = Math.max(0, targetLeft - containerWidth / 2 + targetWidth / 2);
+
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ left: scrollLeft, behavior: 'auto' });
+      } else {
+        container.scrollLeft = scrollLeft;
+      }
+      return;
+    }
+
+    // Fallback: Wenn heutiger Zeitraum jünger als alle Daten ist, zum neuesten Zeitraum scrollen
+    if (
+      balanceMatrix.periodKeys.length > 0 &&
+      currentPeriodKey > balanceMatrix.periodKeys[balanceMatrix.periodKeys.length - 1]
+    ) {
+      const scrollLeft = container.scrollWidth;
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ left: scrollLeft, behavior: 'auto' });
+      } else {
+        container.scrollLeft = scrollLeft;
+      }
+    }
+  }, [currentPeriodKey, balanceMatrix.periodKeys]);
+
+  useLayoutEffect(() => {
+    scrollToCurrentPeriod();
+  }, [scrollToCurrentPeriod]);
 
   return (
     <div className="space-y-6">
@@ -65,18 +109,35 @@ export const Balances: React.FC = () => {
 
       {/* Salden-Matrix Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        <div ref={tableContainerRef} className="no-scrollbar overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
                 <th className="sticky left-0 z-30 w-[240px] min-w-[240px] max-w-[240px] border-b-2 border-r-2 border-slate-300 bg-slate-200 px-4 py-3.5 text-left text-slate-900 shadow-[4px_0_12px_-2px_rgba(0,0,0,0.15)]">
                   Konto
                 </th>
-                {balanceMatrix.periodKeys.map((pKey) => (
-                  <th key={pKey} className="min-w-[140px] px-4 py-3.5 text-right">
-                    {formatPeriodLabel(pKey, granularity)}
-                  </th>
-                ))}
+                {balanceMatrix.periodKeys.map((pKey) => {
+                  const isCurrent = pKey === currentPeriodKey;
+                  return (
+                    <th
+                      key={pKey}
+                      ref={isCurrent ? currentPeriodHeaderRef : undefined}
+                      data-testid={isCurrent ? 'current-period-header' : undefined}
+                      className={`min-w-[140px] px-4 py-3.5 text-right transition-colors ${
+                        isCurrent ? 'bg-blue-100/90 font-extrabold text-blue-950 shadow-inner' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>{formatPeriodLabel(pKey, granularity)}</span>
+                        {isCurrent && (
+                          <span className="shadow-xs inline-flex items-center rounded bg-blue-600 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">
+                            Aktuell
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -120,6 +181,7 @@ export const Balances: React.FC = () => {
 
                       {/* Perioden Salden */}
                       {balanceMatrix.periodKeys.map((pKey) => {
+                        const isCurrent = pKey === currentPeriodKey;
                         const pData = row.periods[pKey] || {
                           startBalance: 0,
                           cashflow: 0,
@@ -129,7 +191,9 @@ export const Balances: React.FC = () => {
                         return (
                           <td
                             key={pKey}
-                            className="whitespace-nowrap px-4 py-3 text-right font-mono"
+                            className={`whitespace-nowrap px-4 py-3 text-right font-mono transition-colors ${
+                              isCurrent ? 'bg-blue-50/60 font-semibold text-blue-950' : ''
+                            }`}
                           >
                             <div className="font-bold text-slate-900">
                               {formatMoney(pData.endBalance)}
@@ -168,11 +232,16 @@ export const Balances: React.FC = () => {
                     Gesamtvermögen
                   </td>
                   {balanceMatrix.periodKeys.map((pKey) => {
+                    const isCurrent = pKey === currentPeriodKey;
                     const endBal = balanceMatrix.totalRow.periods[pKey]?.endBalance || 0;
                     return (
                       <td
                         key={pKey}
-                        className="px-4 py-3.5 text-right font-mono font-bold text-slate-900"
+                        className={`px-4 py-3.5 text-right font-mono font-bold transition-colors ${
+                          isCurrent
+                            ? 'bg-blue-100/90 font-extrabold text-blue-950'
+                            : 'text-slate-900'
+                        }`}
                       >
                         {formatMoney(endBal)}
                       </td>

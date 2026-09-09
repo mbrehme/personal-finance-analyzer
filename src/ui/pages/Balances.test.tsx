@@ -98,6 +98,10 @@ describe('Balances Page', () => {
     // "Aktueller Stand" Spalte existiert nicht mehr
     expect(screen.queryByText('Aktueller Stand')).not.toBeInTheDocument();
 
+    // Verify current period header and badge
+    expect(screen.getByTestId('current-period-header')).toBeInTheDocument();
+    expect(screen.getByText('Aktuell')).toBeInTheDocument();
+
     vi.restoreAllMocks();
   });
 });

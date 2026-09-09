@@ -9,11 +9,36 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { FinanceProvider } from '@/domain';
 import { Header } from '@/ui/components/Header';
 import { Home } from '@/ui/pages/Home';
-import { ConfigurationLayout, CategoriesConfig, AccountsConfig } from '@/ui/pages/configuration';
-import { AnalyticsLayout } from '@/ui/pages/analytics';
+import {
+  ConfigurationLayout,
+  CategoriesConfig,
+  AccountsConfig,
+  CONFIGURATION_LAST_SUBPAGE_KEY,
+} from '@/ui/pages/configuration';
+import { AnalyticsLayout, ANALYTICS_LAST_SUBPAGE_KEY } from '@/ui/pages/analytics';
 import { Transactions } from '@/ui/pages/Transactions';
 import { Cashflow } from '@/ui/pages/Cashflow';
 import { Balances } from '@/ui/pages/Balances';
+
+/**
+ * Leitet /analytics auf die zuletzt angeschaute Subpage (oder default Cashflow) weiter.
+ */
+const AnalyticsIndexRedirect: React.FC = () => {
+  const lastSubpage =
+    typeof window !== 'undefined' ? localStorage.getItem(ANALYTICS_LAST_SUBPAGE_KEY) : null;
+  const target = lastSubpage === 'balances' ? 'balances' : 'cashflow';
+  return <Navigate to={target} replace />;
+};
+
+/**
+ * Leitet /configuration auf die zuletzt angeschaute Subpage (oder default Categories) weiter.
+ */
+const ConfigurationIndexRedirect: React.FC = () => {
+  const lastSubpage =
+    typeof window !== 'undefined' ? localStorage.getItem(CONFIGURATION_LAST_SUBPAGE_KEY) : null;
+  const target = lastSubpage === 'accounts' ? 'accounts' : 'categories';
+  return <Navigate to={target} replace />;
+};
 
 export const App: React.FC = () => {
   return (
@@ -25,7 +50,7 @@ export const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/configuration" element={<ConfigurationLayout />}>
-                <Route index element={<Navigate to="categories" replace />} />
+                <Route index element={<ConfigurationIndexRedirect />} />
                 <Route path="categories" element={<CategoriesConfig />} />
                 <Route
                   path="buckets"
@@ -34,10 +59,10 @@ export const App: React.FC = () => {
                 <Route path="accounts" element={<AccountsConfig />} />
               </Route>
               <Route path="/transactions" element={<Transactions />} />
-              <Route path="/cashflow" element={<Cashflow />} />
-              <Route path="/balances" element={<Balances />} />
+              <Route path="/cashflow" element={<Navigate to="/analytics/cashflow" replace />} />
+              <Route path="/balances" element={<Navigate to="/analytics/balances" replace />} />
               <Route path="/analytics" element={<AnalyticsLayout />}>
-                <Route index element={<Navigate to="cashflow" replace />} />
+                <Route index element={<AnalyticsIndexRedirect />} />
                 <Route path="cashflow" element={<Cashflow />} />
                 <Route path="balances" element={<Balances />} />
               </Route>

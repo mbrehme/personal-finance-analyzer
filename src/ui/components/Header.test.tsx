@@ -76,6 +76,30 @@ describe('Header', () => {
     expect(rematchBtn).toHaveAttribute('data-status', 'has_progressed');
   });
 
+  it('links to remembered subpages for Konfiguration and Analyse', () => {
+    localStorage.setItem('configuration_last_subpage', 'accounts');
+    localStorage.setItem('analytics_last_subpage', 'balances');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      ...baseMockFinance,
+    });
+
+    render(
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Header />
+      </BrowserRouter>
+    );
+
+    expect(screen.getByRole('link', { name: /Konfiguration/i })).toHaveAttribute(
+      'href',
+      '/configuration/accounts'
+    );
+    expect(screen.getByRole('link', { name: /Analyse/i })).toHaveAttribute(
+      'href',
+      '/analytics/balances'
+    );
+  });
+
   it('renders highlighted button when needs_reprogress and triggers rematch on click', async () => {
     const user = userEvent.setup();
     vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({

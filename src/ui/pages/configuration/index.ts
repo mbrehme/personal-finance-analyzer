@@ -4,6 +4,6 @@
  * @module pages/configuration
  */
 
-export { ConfigurationLayout } from './ConfigurationLayout';
+export { ConfigurationLayout, CONFIGURATION_LAST_SUBPAGE_KEY } from './ConfigurationLayout';
 export { CategoriesConfig } from './CategoriesConfig';
 export { AccountsConfig } from './AccountsConfig';

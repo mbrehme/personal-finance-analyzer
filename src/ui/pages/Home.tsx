@@ -46,7 +46,7 @@ export const Home: React.FC = () => {
             <Button
               size="lg"
               variant="primary"
-              onClick={() => navigate('/cashflow')}
+              onClick={() => navigate('/analytics/cashflow')}
               icon={<ArrowRight className="h-5 w-5" />}
             >
               Zur Cashflow-Matrix
@@ -101,7 +101,7 @@ export const Home: React.FC = () => {
 
           {/* Modul 3: Cashflow */}
           <div
-            onClick={() => navigate('/cashflow')}
+            onClick={() => navigate('/analytics/cashflow')}
             className="group cursor-pointer rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:border-blue-400 hover:shadow-md"
           >
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-600 transition-transform group-hover:scale-110">
@@ -115,7 +115,7 @@ export const Home: React.FC = () => {
 
           {/* Modul 4: Balances */}
           <div
-            onClick={() => navigate('/balances')}
+            onClick={() => navigate('/analytics/balances')}
             className="group cursor-pointer rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:border-blue-400 hover:shadow-md"
           >
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 text-purple-600 transition-transform group-hover:scale-110">

@@ -74,4 +74,24 @@ describe('AnalyticsLayout', () => {
     expect(screen.getByTestId('current-granularity')).toHaveTextContent('quarterly');
     expect(localStorage.getItem(ANALYTICS_GRANULARITY_KEY)).toBe('quarterly');
   });
+
+  it('persists last visited subpage in localStorage', () => {
+    render(
+      <FinanceProvider>
+        <MemoryRouter
+          initialEntries={['/analytics/balances']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <Routes>
+            <Route path="/analytics" element={<AnalyticsLayout />}>
+              <Route path="cashflow" element={<DummyChild />} />
+              <Route path="balances" element={<div>Balances Content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </FinanceProvider>
+    );
+
+    expect(localStorage.getItem('analytics_last_subpage')).toBe('balances');
+  });
 });

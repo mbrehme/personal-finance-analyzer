@@ -6,8 +6,10 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useFinance } from '@/domain';
+import { ANALYTICS_LAST_SUBPAGE_KEY } from '@/ui/pages/analytics';
+import { CONFIGURATION_LAST_SUBPAGE_KEY } from '@/ui/pages/configuration';
 import { ExportModal } from '@/ui/components/modals/ExportModal';
 import { ResetModal } from '@/ui/components/modals/ResetModal';
 import {
@@ -79,6 +81,17 @@ export const Header: React.FC = () => {
         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
     }`;
 
+  const location = useLocation();
+
+  const lastConfigSubpage =
+    typeof window !== 'undefined'
+      ? localStorage.getItem(CONFIGURATION_LAST_SUBPAGE_KEY) || 'categories'
+      : 'categories';
+  const lastAnalyticsSubpage =
+    typeof window !== 'undefined'
+      ? localStorage.getItem(ANALYTICS_LAST_SUBPAGE_KEY) || 'cashflow'
+      : 'cashflow';
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur-md">
@@ -99,7 +112,14 @@ export const Header: React.FC = () => {
 
           {/* Navigation Links */}
           <nav className="flex items-center gap-1.5 overflow-x-auto py-1">
-            <NavLink to="/configuration" className={navLinkClass}>
+            <NavLink
+              to={`/configuration/${lastConfigSubpage}`}
+              className={({ isActive }) =>
+                navLinkClass({
+                  isActive: isActive || location.pathname.startsWith('/configuration'),
+                })
+              }
+            >
               <Layers className="h-4 w-4" />
               <span>Konfiguration</span>
             </NavLink>
@@ -109,7 +129,14 @@ export const Header: React.FC = () => {
               <span>Buchungen</span>
             </NavLink>
 
-            <NavLink to="/analytics" className={navLinkClass}>
+            <NavLink
+              to={`/analytics/${lastAnalyticsSubpage}`}
+              className={({ isActive }) =>
+                navLinkClass({
+                  isActive: isActive || location.pathname.startsWith('/analytics'),
+                })
+              }
+            >
               <BarChart3 className="h-4 w-4" />
               <span>Analyse</span>
             </NavLink>

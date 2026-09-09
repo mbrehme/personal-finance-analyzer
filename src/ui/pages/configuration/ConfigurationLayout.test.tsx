@@ -33,4 +33,25 @@ describe('ConfigurationLayout', () => {
     expect(screen.getByText(/Konten \(\d+\)/i)).toBeInTheDocument();
     expect(screen.getByText('Categories Content')).toBeInTheDocument();
   });
+
+  it('persists last visited subpage in localStorage', () => {
+    localStorage.clear();
+    render(
+      <MemoryRouter
+        initialEntries={['/configuration/accounts']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <FinanceProvider>
+          <Routes>
+            <Route path="/configuration" element={<ConfigurationLayout />}>
+              <Route path="categories" element={<div>Categories Content</div>} />
+              <Route path="accounts" element={<div>Accounts Content</div>} />
+            </Route>
+          </Routes>
+        </FinanceProvider>
+      </MemoryRouter>
+    );
+
+    expect(localStorage.getItem('configuration_last_subpage')).toBe('accounts');
+  });
 });

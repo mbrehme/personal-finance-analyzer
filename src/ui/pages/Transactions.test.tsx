@@ -1059,4 +1059,105 @@ describe('Transactions Page', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('displays Umbuchung badge and correct directional amount when filtering by virtual or real parent account', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    const giroAcc = {
+      id: 'acc-giro',
+      name: 'Haupt-Girokonto',
+      iban: 'DE11112222',
+      accountType: 'real',
+      color: '#3b82f6',
+      icon: 'Landmark',
+      categoryIds: [],
+    };
+    const ruecklagenAcc = {
+      id: 'acc-ruecklagen',
+      name: 'Rücklagen',
+      iban: 'DE22223333',
+      accountType: 'real',
+      color: '#10b981',
+      icon: 'Landmark',
+      categoryIds: [],
+    };
+    const urlaubVirtAcc = {
+      id: 'acc-urlaub',
+      name: 'Urlaub',
+      accountType: 'virtual',
+      parentAccountId: 'acc-ruecklagen',
+      color: '#8b5cf6',
+      icon: 'FolderTree',
+      categoryIds: ['cat-urlaub'],
+    };
+
+    const transferTx = {
+      id: 'tx-transfer-urlaub',
+      date: '2026-07-06',
+      accountIban: 'DE11112222',
+      iban: 'DE22223333',
+      senderIban: 'DE11112222',
+      receiverIban: 'DE22223333',
+      issuer: 'Martin',
+      receiver: 'Umbuchung Urlaub',
+      subject: 'Spartopf Sommer',
+      value: -250,
+      amount: 250,
+      categoryId: 'cat-urlaub',
+      type: 'outbound',
+      origin: 'imported',
+      assignmentSource: 'manual',
+    };
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [giroAcc, ruecklagenAcc, urlaubVirtAcc] as any,
+      categories: [{ id: 'cat-urlaub', name: 'Urlaub', color: '#8b5cf6', icon: 'Sun' }] as any,
+      transactions: [transferTx] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategoryBatch: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      deleteTransaction: vi.fn(),
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // 1. Alle Konten: Transaktion sichtbar mit "Umbuchung" Badge und ungerichtetem Betrag
+    expect(screen.getByText('Spartopf Sommer')).toBeInTheDocument();
+    expect(screen.getByText('Umbuchung')).toBeInTheDocument();
+    expect(screen.getByText('250,00 €')).toBeInTheDocument();
+
+    const accountSelect = screen.getByLabelText('Konto filtern');
+
+    // 2. Filter auf virtuelles Unterkonto "Urlaub"
+    await user.selectOptions(accountSelect, 'acc-urlaub');
+    expect(screen.getByText('Spartopf Sommer')).toBeInTheDocument();
+    // Umbuchung Badge muss AUCH mit Kontofilter sichtbar bleiben!
+    expect(screen.getByText('Umbuchung')).toBeInTheDocument();
+    // Aus Sicht von Urlaub ist es ein Zugang (+250,00 €)
+    expect(screen.getAllByText('+250,00 €').length).toBeGreaterThanOrEqual(1);
+
+    // 3. Filter auf reales Hauptkonto "Rücklagen"
+    await user.selectOptions(accountSelect, 'acc-ruecklagen');
+    // Transaktion MUSS auch unter Rücklagen gefunden werden!
+    expect(screen.getByText('Spartopf Sommer')).toBeInTheDocument();
+    expect(screen.getByText('Umbuchung')).toBeInTheDocument();
+    // Aus Sicht des Rücklagenkontos ist es ein Zugang (+250,00 €)
+    expect(screen.getAllByText('+250,00 €').length).toBeGreaterThanOrEqual(1);
+
+    // 4. Filter auf Senderkonto "Haupt-Girokonto"
+    await user.selectOptions(accountSelect, 'acc-giro');
+    expect(screen.getByText('Spartopf Sommer')).toBeInTheDocument();
+    expect(screen.getByText('Umbuchung')).toBeInTheDocument();
+    // Aus Sicht des Girokontos ist es ein Abgang (-250,00 €)
+    expect(screen.getAllByText('-250,00 €').length).toBeGreaterThanOrEqual(1);
+
+    vi.restoreAllMocks();
+  });
 });

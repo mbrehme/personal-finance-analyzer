@@ -429,6 +429,47 @@ describe('accountService', () => {
       // Unbeteiligtes Konto matcht nicht
       expect(isTransactionMatchingAccount(transferTx, 'acc-cash', allAccounts)).toBe(false);
     });
+
+    it('matches real parent account when transaction is an internal transfer to its virtual sub-account', () => {
+      const bufferTransferTx: Transaction = {
+        id: 'tx-buffer-transfer',
+        accountIban: 'DE44500105175407324900', // Girokonto
+        date: '2026-08-10',
+        issuer: 'Martin',
+        receiver: 'Tagesgeld',
+        subject: 'Umbuchung Rücklage',
+        iban: 'DE44500105175407324995', // Tagesgeld IBAN
+        value: -250,
+        categoryId: 'cat-buffer', // gehört zu virtualBuffer unter acc-tagesgeld
+        assignmentSource: 'manual',
+      };
+
+      // Virtuelles Unterkonto matcht
+      expect(isTransactionMatchingAccount(bufferTransferTx, 'acc-virt-buffer', allAccounts)).toBe(
+        true
+      );
+      // Reales Hauptkonto des Unterkontos (Tagesgeld) matcht ebenfalls
+      expect(isTransactionMatchingAccount(bufferTransferTx, 'acc-tagesgeld', allAccounts)).toBe(
+        true
+      );
+      // Auch wenn allTransactions übergeben wird, matcht das Hauptkonto
+      expect(
+        isTransactionMatchingAccount(bufferTransferTx, 'acc-tagesgeld', allAccounts, [
+          bufferTransferTx,
+        ])
+      ).toBe(true);
+      // Girokonto matcht
+      expect(isTransactionMatchingAccount(bufferTransferTx, 'acc-giro', allAccounts)).toBe(true);
+
+      // Effektiver Wert aus Sicht von Tagesgeld (reales Hauptkonto) muss positiv (+250) sein
+      expect(
+        getTransactionEffectiveValueForAccount(bufferTransferTx, tagesgeldAccount, allAccounts)
+      ).toBe(250);
+      // Effektiver Wert aus Sicht des Unterkontos muss positiv (+250) sein
+      expect(
+        getTransactionEffectiveValueForAccount(bufferTransferTx, virtualBuffer, allAccounts)
+      ).toBe(250);
+    });
   });
 
   describe('Directed Money Flow helpers', () => {

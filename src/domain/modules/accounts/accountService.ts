@@ -194,6 +194,9 @@ export function hasDirectCounterpart(
       if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
     }
 
+    const otherInfo = getTransactionAccountInfo(other, accounts);
+    if (otherInfo.primaryAccount?.id !== counterAccount.id) return false;
+
     // Bei gerichteten Transaktionen: Absender & Empfänger identisch
     const normOtherSender = normalizeIban(other.senderIban);
     const normOtherReceiver = normalizeIban(other.receiverIban);
@@ -207,9 +210,6 @@ export function hasDirectCounterpart(
     ) {
       return true;
     }
-
-    const otherInfo = getTransactionAccountInfo(other, accounts);
-    if (otherInfo.primaryAccount?.id !== counterAccount.id) return false;
 
     // 1. Explizite Gegenkonto-Zuordnung
     if (otherInfo.counterAccount?.id === primaryAccount.id) return true;
@@ -565,6 +565,17 @@ export function getTransactionEffectiveValueForAccount(
     return -tx.value;
   }
 
+  // 4. Echtes Hauptkonto mit Buchung auf einem seiner virtuellen Unterkonten
+  if (info.virtualAccounts.some((v) => v.parentAccountId === targetAccount.id)) {
+    if (info.counterAccount && info.counterAccount.id === targetAccount.id) {
+      return amount;
+    }
+    if (info.primaryAccount && info.primaryAccount.id === targetAccount.id) {
+      return tx.value;
+    }
+    return tx.value < 0 ? amount : -amount;
+  }
+
   return null;
 }
 
@@ -590,35 +601,40 @@ export function isTransactionMatchingAccount(
     return info.allAccounts.some((a) => a.id === accountId);
   }
 
-  // 1. Direktes Matching über den effektiven Kontowert (deckt virtuelle Unterkonten und direkte Hauptkontobuchungen ab)
-  if (getTransactionEffectiveValueForAccount(tx, targetAcc, accounts, allTransactions) !== null) {
+  const info = getTransactionAccountInfo(tx, accounts);
+
+  // 1. Direktes Buchungskonto
+  if (info.primaryAccount?.id === targetAcc.id) {
     return true;
   }
 
-  // Wenn allTransactions übergeben wurde und getTransactionEffectiveValueForAccount null liefert,
-  // existiert für dieses Konto bereits eine eigenständige Buchung oder die Buchung betrifft das Konto nicht.
-  if (allTransactions) {
+  // 2. Gegenkonto bei Umbuchungen
+  if (info.counterAccount?.id === targetAcc.id) {
+    return true;
+  }
+
+  // 3. Virtuelles Unterkonto: matcht, wenn tx diesem Unterkonto zugeordnet ist
+  if (targetAcc.accountType === 'virtual') {
+    if (info.virtualAccounts.some((v) => v.id === targetAcc.id)) {
+      return true;
+    }
+    if (tx.senderIban === targetAcc.id || tx.receiverIban === targetAcc.id) {
+      return true;
+    }
     return false;
   }
 
-  const info = getTransactionAccountInfo(tx, accounts);
-
-  // 2. Gegenkonto bei Umbuchungen (Fallback wenn keine allTransactions Prüfung vorliegt)
-  if (info.counterAccount) {
-    if (info.counterAccount.id === targetAcc.id) {
-      return true;
-    }
-    if (
-      targetAcc.accountType !== 'virtual' &&
-      info.counterAccount.parentAccountId === targetAcc.id
-    ) {
-      return true;
-    }
+  // 4. Echtes Hauptkonto: matcht auch alle Transaktionen, die seinen virtuellen Unterkonten zugeordnet sind
+  if (info.virtualAccounts.some((v) => v.parentAccountId === targetAcc.id)) {
+    return true;
+  }
+  if (info.counterAccount && info.counterAccount.parentAccountId === targetAcc.id) {
+    return true;
   }
 
-  // 3. Echtes Hauptkonto matcht auch alle Transaktionen, die seinen virtuellen Unterkonten zugeordnet sind
-  if (targetAcc.accountType !== 'virtual') {
-    return info.virtualAccounts.some((v) => v.parentAccountId === targetAcc.id);
+  // 5. Direktes Matching über den effektiven Kontowert (Fallback)
+  if (getTransactionEffectiveValueForAccount(tx, targetAcc, accounts, allTransactions) !== null) {
+    return true;
   }
 
   return false;

@@ -305,10 +305,7 @@ export const Transactions: React.FC = () => {
       const txCatId = tx.categoryId ?? null;
 
       // 1. Account Filter (prüft Buchungskonto, Gegenkonto bei Umbuchung und virtuelle Unterkonten)
-      if (
-        accountId !== 'all' &&
-        !isTransactionMatchingAccount(tx, accountId, accounts, transactions)
-      ) {
+      if (accountId !== 'all' && !isTransactionMatchingAccount(tx, accountId, accounts)) {
         return false;
       }
 
@@ -384,8 +381,7 @@ export const Transactions: React.FC = () => {
 
     for (const tx of filteredTransactions) {
       const eff = selectedAccount
-        ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts, transactions) ??
-          tx.value)
+        ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts) ?? tx.value)
         : tx.value;
 
       total += eff;
@@ -401,7 +397,7 @@ export const Transactions: React.FC = () => {
       filteredInboundSum: roundToTwoDecimals(inbound),
       filteredOutboundSum: roundToTwoDecimals(outbound),
     };
-  }, [filteredTransactions, selectedAccount, accounts, transactions]);
+  }, [filteredTransactions, selectedAccount, accounts]);
 
   // Reset Lazy Loading wenn angewandte Filter geändert werden
   useEffect(() => {
@@ -905,12 +901,8 @@ export const Transactions: React.FC = () => {
                 displayedTransactions.map((tx) => {
                   const accountInfo = getTransactionAccountInfo(tx, accounts);
                   const effValue = selectedAccount
-                    ? (getTransactionEffectiveValueForAccount(
-                        tx,
-                        selectedAccount,
-                        accounts,
-                        transactions
-                      ) ?? tx.value)
+                    ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts) ??
+                      tx.value)
                     : tx.value;
                   const isOutbound = effValue < 0;
                   const isSplitParent = splitParentIds.has(tx.id);
@@ -1182,12 +1174,16 @@ export const Transactions: React.FC = () => {
                                 : 'text-emerald-600'
                           }
                         >
-                          {isTransfer && !selectedAccount ? (
+                          {isTransfer ? (
                             <span className="inline-flex items-center gap-1.5">
                               <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
                                 Umbuchung
                               </span>
-                              <span>{formatMoney(tx.amount ?? Math.abs(tx.value))}</span>
+                              <span>
+                                {selectedAccount
+                                  ? formatMoney(effValue, { signDisplay: 'always' })
+                                  : formatMoney(tx.amount ?? Math.abs(tx.value))}
+                              </span>
                             </span>
                           ) : (
                             formatMoney(effValue, { signDisplay: 'always' })

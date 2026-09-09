@@ -297,6 +297,21 @@ describe('dateUtils', () => {
         endDate: '2025-02-28',
       });
     });
+
+    it('allows open-ended date ranges when only startMonth or only endMonth is provided', () => {
+      expect(getMonthDateRange('2025-02', '')).toEqual({
+        startDate: '2025-02-01',
+        endDate: '',
+      });
+      expect(getMonthDateRange('', '2025-05')).toEqual({
+        startDate: '',
+        endDate: '2025-05-31',
+      });
+      expect(getMonthDateRange('', '')).toEqual({
+        startDate: '',
+        endDate: '',
+      });
+    });
   });
 
   describe('detectPresetForRange & formatDateRangeDisplay', () => {

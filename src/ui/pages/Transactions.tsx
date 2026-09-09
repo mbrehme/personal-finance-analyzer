@@ -29,7 +29,7 @@ import { TransactionModal } from '@/ui/components/modals/TransactionModal';
 import { TransactionDetailModal } from '@/ui/components/modals/TransactionDetailModal';
 import { CategoryFilterDropdown } from '@/ui/components/analytics/CategoryFilterDropdown';
 import { formatDate } from '@/utils/dateUtils';
-import { formatMoney } from '@/utils/moneyUtils';
+import { formatMoney, roundToTwoDecimals } from '@/utils/moneyUtils';
 import {
   Receipt,
   Search,
@@ -43,7 +43,6 @@ import {
   Loader2,
   Pencil,
   Scissors,
-  ArrowRight,
   FolderTree,
   CheckSquare,
   X,
@@ -370,6 +369,40 @@ export const Transactions: React.FC = () => {
     return sortTransactionsDesc(matches);
   }, [transactions, deletedTransactions, appliedFilters, accounts, categoryNameMap]);
 
+  // Aktives Filterkonto ermitteln (für korrekte Vorzeichenberechnung bei Umbuchungen)
+  const selectedAccount = useMemo(() => {
+    return appliedFilters.accountId !== 'all'
+      ? accounts.find((a) => a.id === appliedFilters.accountId)
+      : undefined;
+  }, [accounts, appliedFilters.accountId]);
+
+  // Summe aller gefilterten Buchungen (unter Berücksichtigung des gewählten Kontos)
+  const { filteredTotalSum, filteredInboundSum, filteredOutboundSum } = useMemo(() => {
+    let total = 0;
+    let inbound = 0;
+    let outbound = 0;
+
+    for (const tx of filteredTransactions) {
+      const eff = selectedAccount
+        ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts, transactions) ??
+          tx.value)
+        : tx.value;
+
+      total += eff;
+      if (eff > 0) {
+        inbound += eff;
+      } else if (eff < 0) {
+        outbound += eff;
+      }
+    }
+
+    return {
+      filteredTotalSum: roundToTwoDecimals(total),
+      filteredInboundSum: roundToTwoDecimals(inbound),
+      filteredOutboundSum: roundToTwoDecimals(outbound),
+    };
+  }, [filteredTransactions, selectedAccount, accounts, transactions]);
+
   // Reset Lazy Loading wenn angewandte Filter geändert werden
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -412,6 +445,22 @@ export const Transactions: React.FC = () => {
 
   // Bulk-Auswahl State (Mehrfachauswahl für Massenbearbeitung)
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
+
+  // Summe aller aktuell per Checkbox ausgewählten Buchungen
+  const selectedTotalSum = useMemo(() => {
+    if (selectedTxIds.size === 0) return 0;
+    let total = 0;
+    for (const tx of filteredTransactions) {
+      if (selectedTxIds.has(tx.id)) {
+        const eff = selectedAccount
+          ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts, transactions) ??
+            tx.value)
+          : tx.value;
+        total += eff;
+      }
+    }
+    return roundToTwoDecimals(total);
+  }, [selectedTxIds, filteredTransactions, selectedAccount, accounts, transactions]);
 
   // Prüfen, ob alle aktuell angezeigten Buchungen ausgewählt sind
   const isAllDisplayedSelected = useMemo(() => {
@@ -493,17 +542,42 @@ export const Transactions: React.FC = () => {
     setVisibleCount(PAGE_SIZE);
   };
 
-  // Manuelles Anwenden der Filter
-  const handleApplyFilters = () => {
-    setAppliedFilters({
-      searchTerm: inputSearchTerm,
-      accountId: inputAccountId,
-      categoryIds: inputCategoryIds,
-      type: inputType,
-      origin: inputOrigin,
-      startDate: inputStartDate,
-      endDate: inputEndDate,
-    });
+  // Volltextsuche anwenden (bei Enter oder Klick)
+  const handleSearchSubmit = () => {
+    setAppliedFilters((prev) => ({ ...prev, searchTerm: inputSearchTerm }));
+    setSelectedTxIds(new Set());
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  // Suche leeren
+  const handleClearSearch = () => {
+    setInputSearchTerm('');
+    setAppliedFilters((prev) => ({ ...prev, searchTerm: '' }));
+    setSelectedTxIds(new Set());
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  // Quelle-Auswahl ändern (wendet direkt an für flüssige Bedienung)
+  const handleOriginChange = (
+    val: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted'
+  ) => {
+    setInputOrigin(val);
+    setAppliedFilters((prev) => ({ ...prev, origin: val }));
+    setSelectedTxIds(new Set());
+    setVisibleCount(PAGE_SIZE);
+  };
+
+  // Datumsbereich ändern (wendet direkt an für flüssige Bedienung)
+  const handleDateRangeChange = ({
+    startDate,
+    endDate,
+  }: {
+    startDate: string;
+    endDate: string;
+  }) => {
+    setInputStartDate(startDate);
+    setInputEndDate(endDate);
+    setAppliedFilters((prev) => ({ ...prev, startDate, endDate }));
     setSelectedTxIds(new Set());
     setVisibleCount(PAGE_SIZE);
   };
@@ -529,23 +603,6 @@ export const Transactions: React.FC = () => {
     setSelectedTxIds(new Set());
     setVisibleCount(PAGE_SIZE);
   };
-
-  const isCategoryChanged =
-    inputCategoryIds === null
-      ? appliedFilters.categoryIds !== null
-      : appliedFilters.categoryIds === null
-        ? true
-        : inputCategoryIds.length !== appliedFilters.categoryIds.length ||
-          inputCategoryIds.some((id) => !appliedFilters.categoryIds!.includes(id));
-
-  const hasPendingChanges =
-    inputSearchTerm !== appliedFilters.searchTerm ||
-    inputAccountId !== appliedFilters.accountId ||
-    isCategoryChanged ||
-    inputType !== appliedFilters.type ||
-    inputOrigin !== appliedFilters.origin ||
-    inputStartDate !== appliedFilters.startDate ||
-    inputEndDate !== appliedFilters.endDate;
 
   const hasActiveFilters =
     appliedFilters.searchTerm !== '' ||
@@ -620,11 +677,11 @@ export const Transactions: React.FC = () => {
         </div>
       )}
 
-      {/* Filterleiste mit manuellem Anwenden */}
+      {/* Filterleiste mit Direktanwendung */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          handleApplyFilters();
+          handleSearchSubmit();
         }}
         className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       >
@@ -664,32 +721,37 @@ export const Transactions: React.FC = () => {
                 Zurücksetzen
               </button>
             )}
-
-            <button
-              type="submit"
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold normal-case shadow-sm transition-all ${
-                hasPendingChanges
-                  ? 'bg-blue-600 text-white ring-2 ring-blue-400/40 hover:bg-blue-700'
-                  : 'bg-slate-800 text-white hover:bg-slate-900'
-              }`}
-            >
-              <Search className="h-3.5 w-3.5" />
-              Filter anwenden
-            </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          {/* 1. Compound Freitext-Suche */}
+          {/* 1. Compound Freitext-Suche (Enter zum Suchen) */}
           <div className="relative flex min-w-0 items-center">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={inputSearchTerm}
               onChange={(e) => setInputSearchTerm(e.target.value)}
-              placeholder="Volltextsuche..."
-              className="h-9 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-xs shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearchSubmit();
+                }
+              }}
+              placeholder="Volltextsuche (Enter)..."
+              className="h-9 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-8 text-xs shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {inputSearchTerm && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                title="Suche leeren"
+                aria-label="Suche leeren"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* 2. Konto Filter */}
@@ -747,9 +809,7 @@ export const Transactions: React.FC = () => {
               onChange={(e) => {
                 const val = e.target.value as
                   'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
-                setInputOrigin(val);
-                setAppliedFilters((prev) => ({ ...prev, origin: val }));
-                setVisibleCount(PAGE_SIZE);
+                handleOriginChange(val);
               }}
               className="h-9 w-full appearance-none rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="Buchungsquelle filtern"
@@ -769,10 +829,7 @@ export const Transactions: React.FC = () => {
             <DateRangePicker
               startDate={inputStartDate}
               endDate={inputEndDate}
-              onChange={({ startDate, endDate }) => {
-                setInputStartDate(startDate);
-                setInputEndDate(endDate);
-              }}
+              onChange={handleDateRangeChange}
               className="w-full"
             />
           </div>
@@ -782,7 +839,16 @@ export const Transactions: React.FC = () => {
       {/* Transaktionstabelle */}
       <div className="space-y-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
+          <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-10" />
+              <col className="w-28" />
+              <col className="w-44 lg:w-52" />
+              <col />
+              <col className="w-32" />
+              <col className="w-40 lg:w-44" />
+              <col className="w-28" />
+            </colgroup>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-600">
                 <th className="w-10 px-3 py-3 text-center">
@@ -804,24 +870,40 @@ export const Transactions: React.FC = () => {
                     }
                   />
                 </th>
-                <th className="whitespace-nowrap px-4 py-3" title="Wertstellungsdatum (Valuta)">
+                <th
+                  className="w-28 whitespace-nowrap px-4 py-3"
+                  title="Wertstellungsdatum (Valuta)"
+                >
                   Datum
                 </th>
-                <th className="whitespace-nowrap px-4 py-3">Konto</th>
-                <th className="px-4 py-3">Empfänger / Sender & Text</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Betrag</th>
-                <th className="whitespace-nowrap px-4 py-3">Kategorie & Zuweisung</th>
-                <th className="whitespace-nowrap px-4 py-3 text-right">Aktionen</th>
+                <th className="w-44 whitespace-nowrap px-3 py-3 lg:w-52">Konto</th>
+                <th className="min-w-0 px-4 py-3">Empfänger / Sender & Text</th>
+                <th className="w-32 whitespace-nowrap px-4 py-3 text-right">
+                  <div className="flex flex-col items-end">
+                    <span>Betrag</span>
+                    <span
+                      className={`font-mono text-[11px] font-bold tracking-tight ${
+                        filteredTotalSum < 0
+                          ? 'text-slate-900'
+                          : filteredTotalSum > 0
+                            ? 'text-emerald-600'
+                            : 'text-slate-500'
+                      }`}
+                      title={`Summe aller ${filteredTransactions.length} gefilterten Buchungen`}
+                      data-testid="transactions-column-sum"
+                    >
+                      Σ {formatMoney(filteredTotalSum, { signDisplay: 'always' })}
+                    </span>
+                  </div>
+                </th>
+                <th className="w-40 whitespace-nowrap px-3 py-3 lg:w-44">Kategorie & Zuweisung</th>
+                <th className="w-28 whitespace-nowrap px-3 py-3 text-right">Aktionen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {displayedTransactions.length > 0 ? (
                 displayedTransactions.map((tx) => {
                   const accountInfo = getTransactionAccountInfo(tx, accounts);
-                  const selectedAccount =
-                    appliedFilters.accountId !== 'all'
-                      ? accounts.find((a) => a.id === appliedFilters.accountId)
-                      : undefined;
                   const effValue = selectedAccount
                     ? (getTransactionEffectiveValueForAccount(
                         tx,
@@ -947,11 +1029,11 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Konto */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <td className="w-44 whitespace-nowrap px-3 py-3 align-middle lg:w-52">
+                        <div className="flex flex-col gap-1">
                           {fromAccount ? (
                             <span
-                              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 font-medium ${
+                              className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 font-medium ${
                                 !isTransfer || isOutbound
                                   ? 'bg-slate-100 text-slate-800'
                                   : 'border border-blue-200 bg-blue-50 text-blue-900'
@@ -962,16 +1044,18 @@ export const Transactions: React.FC = () => {
                                 style={{ color: fromAccount.color }}
                                 className="h-3.5 w-3.5 shrink-0"
                               />
-                              <span>{fromAccount.name}</span>
+                              <span className="truncate" title={fromAccount.name}>
+                                {fromAccount.name}
+                              </span>
                               {fromVirtualAccounts.map((v) => (
                                 <React.Fragment key={v.id}>
                                   <ChevronRight className="h-3 w-3 shrink-0 text-slate-400" />
                                   <span
-                                    className="inline-flex items-center gap-1 font-semibold text-purple-700"
+                                    className="inline-flex min-w-0 items-center gap-1 font-semibold text-purple-700"
                                     title={`Virtuelles Unterkonto von ${fromAccount.name}: ${v.name}`}
                                   >
                                     <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
-                                    <span>{v.name}</span>
+                                    <span className="truncate">{v.name}</span>
                                   </span>
                                 </React.Fragment>
                               ))}
@@ -981,10 +1065,10 @@ export const Transactions: React.FC = () => {
                           )}
 
                           {isTransfer && toAccount && (
-                            <>
-                              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                            <div className="flex items-center gap-1 pl-1">
+                              <span className="text-xs font-semibold text-blue-500">↳</span>
                               <span
-                                className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 font-medium ${
+                                className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 font-medium ${
                                   isOutbound
                                     ? 'border border-blue-200 bg-blue-50 text-blue-900'
                                     : 'bg-slate-100 text-slate-800'
@@ -995,21 +1079,23 @@ export const Transactions: React.FC = () => {
                                   style={{ color: toAccount.color }}
                                   className="h-3.5 w-3.5 shrink-0"
                                 />
-                                <span>{toAccount.name}</span>
+                                <span className="truncate" title={toAccount.name}>
+                                  {toAccount.name}
+                                </span>
                                 {toVirtualAccounts.map((v) => (
                                   <React.Fragment key={v.id}>
                                     <ChevronRight className="h-3 w-3 shrink-0 text-blue-400" />
                                     <span
-                                      className="inline-flex items-center gap-1 font-semibold text-purple-700"
+                                      className="inline-flex min-w-0 items-center gap-1 font-semibold text-purple-700"
                                       title={`Virtuelles Unterkonto von ${toAccount.name}: ${v.name}`}
                                     >
                                       <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
-                                      <span>{v.name}</span>
+                                      <span className="truncate">{v.name}</span>
                                     </span>
                                   </React.Fragment>
                                 ))}
                               </span>
-                            </>
+                            </div>
                           )}
 
                           {hasModifiedAccount && (
@@ -1026,7 +1112,7 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Partner & Subject */}
-                      <td className="min-w-0 max-w-[200px] px-4 py-3 lg:max-w-xs">
+                      <td className="min-w-0 px-4 py-3 align-middle">
                         <div className="flex min-w-0 max-w-full items-center gap-1.5">
                           {(() => {
                             const effPartner = getEffectiveTransactionPartner(tx, selectedAccount);
@@ -1065,7 +1151,10 @@ export const Transactions: React.FC = () => {
                           })()}
                         </div>
                         <div className="mt-0.5 flex min-w-0 max-w-full items-center gap-1.5">
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-slate-500">
+                          <span
+                            className="min-w-0 flex-1 truncate text-[11px] text-slate-500"
+                            title={tx.subject}
+                          >
                             {tx.subject}
                           </span>
                           {tx.originalSubject !== undefined &&
@@ -1083,7 +1172,7 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Betrag */}
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-bold">
+                      <td className="w-32 whitespace-nowrap px-4 py-3 text-right align-middle font-mono font-bold">
                         <div
                           className={
                             isTransfer && !selectedAccount
@@ -1120,7 +1209,7 @@ export const Transactions: React.FC = () => {
 
                       {/* Kategorie Selector */}
                       <td
-                        className="whitespace-nowrap px-4 py-3"
+                        className="w-40 px-3 py-3 align-middle lg:w-44"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center gap-1.5">
@@ -1132,7 +1221,7 @@ export const Transactions: React.FC = () => {
                             uncategorizedLabel="(Keine Kategorie)"
                             selectedCategoryId={tx.categoryId ?? null}
                             onSelectCategory={(catId) => assignTransactionCategory(tx.id, catId)}
-                            className="w-36 max-w-[150px]"
+                            className="w-full"
                             dataTestId={`tx-category-picker-${tx.id}`}
                           />
 
@@ -1152,7 +1241,7 @@ export const Transactions: React.FC = () => {
 
                       {/* Aktionen */}
                       <td
-                        className="whitespace-nowrap px-4 py-3 text-right"
+                        className="w-28 whitespace-nowrap px-3 py-3 text-right align-middle"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-end gap-1">
@@ -1226,6 +1315,44 @@ export const Transactions: React.FC = () => {
                 </tr>
               )}
             </tbody>
+            {filteredTransactions.length > 0 && (
+              <tfoot
+                className="border-t-2 border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-700"
+                data-testid="transactions-table-footer"
+              >
+                <tr>
+                  <td colSpan={4} className="px-4 py-3 font-semibold text-slate-600">
+                    Summe ({filteredTransactions.length}{' '}
+                    {filteredTransactions.length === 1 ? 'Buchung' : 'Buchungen'})
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-bold">
+                    <div
+                      className={`text-sm ${
+                        filteredTotalSum < 0
+                          ? 'text-slate-900'
+                          : filteredTotalSum > 0
+                            ? 'text-emerald-600'
+                            : 'text-slate-500'
+                      }`}
+                      data-testid="transactions-footer-total-sum"
+                    >
+                      {formatMoney(filteredTotalSum, { signDisplay: 'always' })}
+                    </div>
+                    {filteredInboundSum > 0 && filteredOutboundSum < 0 && (
+                      <div
+                        className="mt-0.5 text-[10px] font-normal text-slate-500"
+                        data-testid="transactions-footer-breakdown"
+                      >
+                        <span className="text-emerald-600">+{formatMoney(filteredInboundSum)}</span>
+                        {' / '}
+                        <span className="text-slate-700">{formatMoney(filteredOutboundSum)}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td colSpan={2} className="px-4 py-3"></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 
@@ -1309,6 +1436,11 @@ export const Transactions: React.FC = () => {
             <CheckSquare className="h-4 w-4 text-blue-400" />
             <span>
               {selectedTxIds.size} {selectedTxIds.size === 1 ? 'Buchung' : 'Buchungen'} ausgewählt
+              {selectedTotalSum !== 0 && (
+                <span className="ml-1.5 font-mono text-blue-300" data-testid="bulk-selected-sum">
+                  (Σ {formatMoney(selectedTotalSum, { signDisplay: 'always' })})
+                </span>
+              )}
             </span>
           </div>
 

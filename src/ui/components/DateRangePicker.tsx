@@ -78,12 +78,16 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setStartMonth(startDate ? startDate.substring(0, 7) : '');
+        setEndMonth(endDate ? endDate.substring(0, 7) : '');
         setIsOpen(false);
       }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        setStartMonth(startDate ? startDate.substring(0, 7) : '');
+        setEndMonth(endDate ? endDate.substring(0, 7) : '');
         setIsOpen(false);
       }
     };
@@ -94,7 +98,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, startDate, endDate]);
 
   const handleSelectPreset = useCallback(
     (preset: DateRangePreset) => {
@@ -105,13 +109,15 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     [onChange]
   );
 
+  const handleCancel = useCallback(() => {
+    setStartMonth(startDate ? startDate.substring(0, 7) : '');
+    setEndMonth(endDate ? endDate.substring(0, 7) : '');
+    setIsOpen(false);
+  }, [startDate, endDate]);
+
   const handleApplyCustom = useCallback(() => {
-    if (!startMonth && !endMonth) {
-      onChange({ startDate: '', endDate: '' });
-    } else {
-      const range = getMonthDateRange(startMonth || endMonth, endMonth || startMonth);
-      onChange(range);
-    }
+    const range = getMonthDateRange(startMonth, endMonth);
+    onChange(range);
     setIsOpen(false);
   }, [startMonth, endMonth, onChange]);
 
@@ -265,6 +271,12 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                   type="month"
                   value={startMonth}
                   onChange={(e) => setStartMonth(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleApplyCustom();
+                    }
+                  }}
                   className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -277,6 +289,12 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                   type="month"
                   value={endMonth}
                   onChange={(e) => setEndMonth(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleApplyCustom();
+                    }
+                  }}
                   className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -285,7 +303,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             <div className="mt-3 flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={handleCancel}
                 className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
               >
                 Abbrechen

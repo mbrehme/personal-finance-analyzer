@@ -23,12 +23,12 @@ describe('Transactions Page', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/CSV Import/i)).toBeInTheDocument();
     expect(screen.getByText(/Filter & Suche/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Filter anwenden/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Filter anwenden/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Zeitraum auswählen/i })).toBeInTheDocument();
     expect(screen.getByText('Gesamter Zeitraum')).toBeInTheDocument();
   });
 
-  it('allows opening the date range picker and selecting a preset', async () => {
+  it('allows opening the date range picker and selecting a preset, which filters directly', async () => {
     const { userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
 
@@ -44,12 +44,9 @@ describe('Transactions Page', () => {
     expect(screen.getByText('Zeitraum wählen')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dieses Jahr' })).toBeInTheDocument();
 
+    // Auswahl wendet Filter direkt an ohne separaten Anwenden-Knopf
     await user.click(screen.getByRole('button', { name: 'Dieses Jahr' }));
     expect(screen.getByText(/Dieses Jahr/i)).toBeInTheDocument();
-
-    // Filter erst anwenden, wenn der Button geklickt wird
-    const applyBtn = screen.getByRole('button', { name: /Filter anwenden/i });
-    await user.click(applyBtn);
   });
 
   it('does not render Neue Buchung button but renders origin filter and CSV import', async () => {
@@ -163,7 +160,7 @@ describe('Transactions Page', () => {
     expect(await screen.findByText('Importierter Einkauf')).toBeInTheDocument();
     expect(screen.getByText('Manuelle Buchung')).toBeInTheDocument();
 
-    // Select "Overrides"
+    // Select "Overrides" directly filters
     const selects = screen.getAllByRole('combobox');
     // Origin select has options: Herkunft: Alle, Importiert, Splits, Overrides
     const originSelect = selects.find((s) =>
@@ -172,18 +169,15 @@ describe('Transactions Page', () => {
     expect(originSelect).toBeDefined();
 
     await user.selectOptions(originSelect, 'override');
-    const applyBtn = screen.getByRole('button', { name: /Filter anwenden/i });
-    await user.click(applyBtn);
 
-    // Under "Overrides": both manual booking and overridden bank booking are visible
+    // Under "Overrides": both manual booking and overridden bank booking are visible immediately
     expect(screen.getByText('Manuelle Buchung')).toBeInTheDocument();
     expect(screen.getByText('Tanken angepasst')).toBeInTheDocument();
     expect(screen.getAllByText('Geändert').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Importierter Einkauf')).not.toBeInTheDocument();
 
-    // Now select "Bank-Import"
+    // Now select "Bank-Import" directly filters
     await user.selectOptions(originSelect, 'imported');
-    await user.click(applyBtn);
 
     // Only untouched bank imports are visible, overrides and manual bookings are hidden
     expect(screen.getByText('Importierter Einkauf')).toBeInTheDocument();
@@ -867,5 +861,202 @@ describe('Transactions Page', () => {
 
     // No match
     expect(matchesSearch(tx, 'Unbekannt', categoryMap)).toBe(false);
+  });
+
+  it('calculates and displays column sum, footer sum, and bulk selected sum', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        { id: 'acc-giro', name: 'Girokonto', iban: 'DE1111', color: '#000', icon: 'Wallet' },
+      ] as any,
+      categories: [] as any,
+      transactions: [
+        {
+          id: 'tx-salary',
+          accountIban: 'DE1111',
+          date: '2026-03-01',
+          issuer: 'Arbeitgeber',
+          receiver: 'Ich',
+          subject: 'Gehalt',
+          type: 'inbound',
+          iban: 'DE999',
+          value: 3000,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-rent',
+          accountIban: 'DE1111',
+          date: '2026-03-02',
+          issuer: 'Ich',
+          receiver: 'Vermieter',
+          subject: 'Miete',
+          type: 'outbound',
+          iban: 'DE888',
+          value: -1000,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-food',
+          accountIban: 'DE1111',
+          date: '2026-03-03',
+          issuer: 'Ich',
+          receiver: 'Supermarkt',
+          subject: 'Einkauf',
+          type: 'outbound',
+          iban: 'DE777',
+          value: -200,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategoryBatch: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      deleteTransaction: vi.fn(),
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Total: 3000 - 1000 - 200 = 1800 -> +1.800,00 €
+    const headerSum = screen.getByTestId('transactions-column-sum');
+    expect(headerSum).toBeInTheDocument();
+    expect(headerSum).toHaveTextContent('+1.800,00');
+
+    const footerSum = screen.getByTestId('transactions-footer-total-sum');
+    expect(footerSum).toBeInTheDocument();
+    expect(footerSum).toHaveTextContent('+1.800,00');
+
+    // Check footer breakdown
+    expect(screen.getByText(/Summe \(3 Buchungen\)/i)).toBeInTheDocument();
+    const breakdown = screen.getByTestId('transactions-footer-breakdown');
+    expect(breakdown).toHaveTextContent('+3.000,00');
+    expect(breakdown).toHaveTextContent('-1.200,00');
+
+    // Select tx-rent (-1000) and tx-food (-200) -> selectedTotalSum = -1200
+    const rentCb = screen.getByTestId('tx-select-checkbox-tx-rent');
+    const foodCb = screen.getByTestId('tx-select-checkbox-tx-food');
+    await user.click(rentCb);
+    await user.click(foodCb);
+
+    const bulkSelectedSum = screen.getByTestId('bulk-selected-sum');
+    expect(bulkSelectedSum).toBeInTheDocument();
+    expect(bulkSelectedSum).toHaveTextContent('-1.200,00');
+
+    vi.restoreAllMocks();
+  });
+
+  it('requires Enter for full-text search while other filters apply directly without apply button', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        { id: 'acc-1', name: 'Girokonto', iban: 'DE1111', color: '#000', icon: 'Wallet' },
+        { id: 'acc-2', name: 'Sparkonto', iban: 'DE2222', color: '#111', icon: 'PiggyBank' },
+      ] as any,
+      categories: [
+        { id: 'cat-food', name: 'Lebensmittel', parentId: null, color: '#f00', icon: 'Apple' },
+      ] as any,
+      transactions: [
+        {
+          id: 'tx-1',
+          accountIban: 'DE1111',
+          date: '2026-03-01',
+          issuer: 'Supermarkt',
+          receiver: 'Ich',
+          subject: 'Wocheneinkauf',
+          type: 'outbound',
+          iban: 'DE999',
+          value: -100,
+          categoryId: 'cat-food',
+          assignmentSource: 'manual',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-2',
+          accountIban: 'DE2222',
+          date: '2026-03-02',
+          issuer: 'Arbeitgeber',
+          receiver: 'Ich',
+          subject: 'Gehaltszahlung',
+          type: 'inbound',
+          iban: 'DE888',
+          value: 3000,
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategoryBatch: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      deleteTransaction: vi.fn(),
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Initial state: both transactions are shown
+    expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.getByText('Gehaltszahlung')).toBeInTheDocument();
+
+    // Verify "Filter anwenden" button does NOT exist
+    expect(screen.queryByRole('button', { name: /Filter anwenden/i })).not.toBeInTheDocument();
+
+    // 1. Fulltext search: typing without Enter does NOT filter yet
+    const searchInput = screen.getByPlaceholderText(/Volltextsuche/i);
+    await user.type(searchInput, 'Wochen');
+
+    // Both are still visible because Enter was not pressed
+    expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.getByText('Gehaltszahlung')).toBeInTheDocument();
+
+    // Now press Enter -> filter is applied
+    await user.keyboard('{Enter}');
+    expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.queryByText('Gehaltszahlung')).not.toBeInTheDocument();
+
+    // Clear search using clear button -> both visible again immediately
+    const clearSearchBtn = screen.getByRole('button', { name: 'Suche leeren' });
+    await user.click(clearSearchBtn);
+    expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.getByText('Gehaltszahlung')).toBeInTheDocument();
+
+    // 2. Account filter: changes filter IMMEDIATELY without pressing Enter
+    const accountSelect = screen.getByLabelText('Konto filtern');
+    await user.selectOptions(accountSelect, 'acc-2');
+    expect(screen.queryByText('Wocheneinkauf')).not.toBeInTheDocument();
+    expect(screen.getByText('Gehaltszahlung')).toBeInTheDocument();
+
+    // Switch back to Alle Konten
+    await user.selectOptions(accountSelect, 'all');
+    expect(screen.getByText('Wocheneinkauf')).toBeInTheDocument();
+    expect(screen.getByText('Gehaltszahlung')).toBeInTheDocument();
+
+    // 3. Typ filter: changes filter IMMEDIATELY
+    const typeSelect = screen.getByLabelText('Buchungstyp filtern');
+    await user.selectOptions(typeSelect, 'inbound');
+    expect(screen.queryByText('Wocheneinkauf')).not.toBeInTheDocument();
+    expect(screen.getByText('Gehaltszahlung')).toBeInTheDocument();
+
+    vi.restoreAllMocks();
   });
 });

@@ -672,28 +672,58 @@ export function getDateRangeForPreset(
 }
 
 /**
- * Erzeugt einen Datumsbereich vom 1. Tag des Startmonats bis zum letzten Tag des Endmonats.
+ * Erzeugt einen Datumsbereich (`DateRange`) für gegebene Start- und Endmonate (YYYY-MM).
+ * Wenn nur ein Startmonat angegeben ist, bleibt das Enddatum leer (offenes Ende).
+ * Wenn nur ein Endmonat angegeben ist, bleibt das Startdatum leer (offener Beginn).
  *
- * @param {string} startMonthKey - Startmonat im Format YYYY-MM
- * @param {string} endMonthKey - Endmonat im Format YYYY-MM
- * @returns {DateRange} Bereich mit startDate und endDate
+ * @param {string} [startMonthKey] - Startmonat im Format YYYY-MM oder leer
+ * @param {string} [endMonthKey] - Endmonat im Format YYYY-MM oder leer
+ * @returns {DateRange} Von-Bis-Datumsbereich mit ISO-Strings (YYYY-MM-DD)
  *
  * @example
  * ```ts
  * getMonthDateRange('2025-02', '2025-04');
  * // => { startDate: '2025-02-01', endDate: '2025-04-30' }
+ *
+ * getMonthDateRange('2025-02', '');
+ * // => { startDate: '2025-02-01', endDate: '' }
+ *
+ * getMonthDateRange('', '2025-04');
+ * // => { startDate: '', endDate: '2025-04-30' }
  * ```
  */
-export function getMonthDateRange(startMonthKey: string, endMonthKey: string): DateRange {
-  if (!startMonthKey && !endMonthKey) {
+export function getMonthDateRange(
+  startMonthKey?: string | null,
+  endMonthKey?: string | null
+): DateRange {
+  const sKey = startMonthKey?.trim() || '';
+  const eKey = endMonthKey?.trim() || '';
+
+  if (!sKey && !eKey) {
     return { startDate: '', endDate: '' };
   }
 
-  const [sY, sM] = (startMonthKey || endMonthKey).split('-').map(Number);
-  const [eY, eM] = (endMonthKey || startMonthKey).split('-').map(Number);
+  let startDate = '';
+  let endDate = '';
 
-  const startDate = formatIso(sY, sM, 1);
-  const endDate = formatIso(eY, eM, getLastDayOfMonth(eY, eM));
+  if (sKey) {
+    const [sY, sM] = sKey.split('-').map(Number);
+    startDate = formatIso(sY, sM, 1);
+  }
+
+  if (eKey) {
+    const [eY, eM] = eKey.split('-').map(Number);
+    endDate = formatIso(eY, eM, getLastDayOfMonth(eY, eM));
+  }
+
+  if (startDate && endDate && startDate > endDate) {
+    const [sY, sM] = sKey.split('-').map(Number);
+    const [eY, eM] = eKey.split('-').map(Number);
+    return {
+      startDate: formatIso(eY, eM, 1),
+      endDate: formatIso(sY, sM, getLastDayOfMonth(sY, sM)),
+    };
+  }
 
   return { startDate, endDate };
 }

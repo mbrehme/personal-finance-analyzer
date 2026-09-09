@@ -167,4 +167,53 @@ describe('AccountModal', () => {
       )
     ).toBeInTheDocument();
   });
+
+  it('allows adding and saving a balance entry via "Stichtag speichern"', async () => {
+    const handleSave = vi.fn().mockResolvedValue(undefined);
+    const handleClose = vi.fn();
+
+    render(
+      <AccountModal
+        isOpen={true}
+        onClose={handleClose}
+        onSave={handleSave}
+        existingAccounts={existingAccounts}
+      />
+    );
+
+    const nameInput = screen.getByPlaceholderText('z. B. Girokonto ING, Tagesgeld DKB, Depot');
+    await act(async () => {
+      fireEvent.change(nameInput, { target: { value: 'Sparkonto' } });
+    });
+
+    // Stichtag erfassen: Betrag und Notiz
+    const noteInput = screen.getByPlaceholderText('Notiz (optional)');
+    await act(async () => {
+      fireEvent.change(noteInput, { target: { value: 'Startsaldo' } });
+    });
+
+    // "Stichtag speichern" Button klicken
+    const saveStichtagBtn = screen.getByRole('button', { name: /Stichtag speichern/i });
+    await act(async () => {
+      fireEvent.click(saveStichtagBtn);
+    });
+
+    expect(screen.getByText(/Startsaldo/)).toBeInTheDocument();
+
+    const submitBtn = screen.getByRole('button', { name: /Konto anlegen/i });
+    await act(async () => {
+      fireEvent.click(submitBtn);
+    });
+
+    expect(handleSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Sparkonto',
+        balanceEntries: expect.arrayContaining([
+          expect.objectContaining({
+            note: 'Startsaldo',
+          }),
+        ]),
+      })
+    );
+  });
 });

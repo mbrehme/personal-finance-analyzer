@@ -19,7 +19,7 @@ import { IconRenderer } from '../IconRenderer';
 import { EntityVisualFields } from '../EntityVisualFields';
 import { MoneyInput } from '../MoneyInput';
 import { CategoryFilterDropdown } from '@/ui/components/analytics/CategoryFilterDropdown';
-import { X, Plus, Trash2, Calendar, Landmark, FolderTree, Info } from 'lucide-react';
+import { X, Save, Trash2, Calendar, Landmark, FolderTree, Info } from 'lucide-react';
 import { toISODateString } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 
@@ -395,10 +395,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddBalanceEntry}
-                  className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  Stichtag hinzufügen
+                  <Save className="h-3.5 w-3.5 text-blue-600" />
+                  Stichtag speichern
                 </button>
               </div>
             </div>

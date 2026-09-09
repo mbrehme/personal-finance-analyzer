@@ -1232,10 +1232,10 @@ describe('Transactions Page', () => {
     expect(screen.getByText('Monatliche Rücklage Geschenke')).toBeInTheDocument();
     expect(screen.getByText('Umbuchung')).toBeInTheDocument();
 
-    // Richtung im Kontofeld: Haupt-Girokonto als fromAccount, Rücklagen > Geschenke als toAccount
+    // Richtung im Kontofeld: Haupt-Girokonto als fromAccount, Geschenke als toAccount
     expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
-    expect(screen.getByText('Rücklagen')).toBeInTheDocument();
     expect(screen.getAllByText('Geschenke').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTitle(/Nach: Geschenke/)).toBeInTheDocument();
 
     // Filtern auf das virtuelle Unterkonto
     const accountSelect = screen.getByLabelText('Konto filtern');
@@ -1309,9 +1309,8 @@ describe('Transactions Page', () => {
     expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
     expect(screen.getAllByText('Rücklagen').length).toBeGreaterThanOrEqual(1);
 
-    // Richtungspfeil für Eingang von Rücklagen
+    // Richtung im Kontofeld für Eingang von Rücklagen
     expect(screen.getByTitle('Umbuchungseingang von Rücklagen')).toBeInTheDocument();
-    expect(screen.getByText('←')).toBeInTheDocument();
 
     vi.restoreAllMocks();
   });

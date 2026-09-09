@@ -38,12 +38,12 @@ import {
   Trash2,
   RotateCcw,
   ChevronDown,
-  ChevronRight,
+  CornerDownRight,
+  FolderTree,
   Layers,
   Loader2,
   Pencil,
   Scissors,
-  FolderTree,
   CheckSquare,
   X,
 } from 'lucide-react';
@@ -635,6 +635,81 @@ export const Transactions: React.FC = () => {
       ? (displayedTransactions.length / filteredTransactions.length) * 100
       : 100;
 
+  /**
+   * Rendert eine Konten-Badge. Bei virtuellen Unterkonten wird das Hauptkonto
+   * dezent vorangestellt (mit möglicher Truncation), damit das Unterkonto klar erkennbar bleibt.
+   */
+  const renderAccountBadge = (
+    acc: Account,
+    isActive: boolean,
+    role?: 'sender' | 'receiver' | 'single',
+    counterpart?: Account
+  ) => {
+    const isVirtual = acc.accountType === 'virtual' && Boolean(acc.parentAccountId);
+    const parent =
+      isVirtual && acc.parentAccountId ? accountMap.get(acc.parentAccountId) : undefined;
+    const rolePrefix = role === 'sender' ? 'Von: ' : role === 'receiver' ? 'Nach: ' : '';
+
+    const defaultTitle =
+      isVirtual && parent
+        ? `${rolePrefix}${acc.name} (Unterkonto von ${parent.name})`
+        : `${rolePrefix}${acc.name}`;
+
+    const fullTitle =
+      role === 'receiver' && isActive && counterpart
+        ? `Umbuchungseingang von ${counterpart.name}`
+        : role === 'sender' && isActive && counterpart
+          ? `Umbuchungsausgang nach ${counterpart.name}`
+          : defaultTitle;
+
+    if (isVirtual && parent) {
+      return (
+        <span
+          className={`inline-flex min-w-0 max-w-full items-center gap-1 rounded-md px-2 py-0.5 text-xs ${
+            isActive
+              ? 'shadow-xs border border-blue-300 bg-blue-50/90 font-medium text-blue-950'
+              : 'border border-purple-200/80 bg-purple-50/70 text-purple-950'
+          }`}
+          title={fullTitle}
+        >
+          <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
+          <span
+            className="min-w-0 max-w-[70px] shrink truncate text-[11px] font-normal text-slate-500"
+            title={`Hauptkonto: ${parent.name}`}
+          >
+            {parent.name}
+          </span>
+          <span className="shrink-0 select-none text-[10px] text-slate-400">›</span>
+          <span
+            className="min-w-0 truncate font-semibold text-purple-800"
+            title={`Unterkonto: ${acc.name}`}
+          >
+            {acc.name}
+          </span>
+        </span>
+      );
+    }
+
+    // Echtes Bankkonto
+    return (
+      <span
+        className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${
+          isActive
+            ? 'shadow-xs border border-blue-200 bg-blue-50 text-blue-900'
+            : 'bg-slate-100 text-slate-800'
+        }`}
+        title={fullTitle}
+      >
+        <IconRenderer
+          name={acc.icon}
+          style={{ color: acc.color }}
+          className="h-3.5 w-3.5 shrink-0"
+        />
+        <span className="truncate">{acc.name}</span>
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Hauptaktionen */}
@@ -874,9 +949,9 @@ export const Transactions: React.FC = () => {
                 >
                   Datum
                 </th>
-                <th className="w-44 whitespace-nowrap px-3 py-3 lg:w-52">Konto</th>
+                <th className="w-48 whitespace-nowrap px-3 py-3 lg:w-56">Konto</th>
                 <th className="min-w-0 px-4 py-3">Empfänger / Sender & Text</th>
-                <th className="w-32 whitespace-nowrap px-4 py-3 text-right">
+                <th className="w-36 whitespace-nowrap px-4 py-3 text-right lg:w-40">
                   <div className="flex flex-col items-end">
                     <span>Betrag</span>
                     <span
@@ -919,71 +994,24 @@ export const Transactions: React.FC = () => {
                     : undefined;
                   const isTransfer = Boolean(senderAccount && receiverAccount);
 
-                  let primaryAccount: Account | undefined;
-                  let counterpartAccount: Account | undefined;
-                  let isIncomingTransfer = false;
+                  const isSenderActive = Boolean(
+                    selectedAccount &&
+                    senderAccount &&
+                    (senderAccount.id === selectedAccount.id ||
+                      senderAccount.parentAccountId === selectedAccount.id)
+                  );
 
-                  if (isTransfer && senderAccount && receiverAccount) {
-                    if (selectedAccount) {
-                      const matchesReceiver =
-                        selectedAccount.id === receiverAccount.id ||
-                        selectedAccount.parentAccountId === receiverAccount.id;
-                      if (matchesReceiver) {
-                        primaryAccount = receiverAccount;
-                        counterpartAccount = senderAccount;
-                        isIncomingTransfer = true;
-                      } else {
-                        primaryAccount = senderAccount;
-                        counterpartAccount = receiverAccount;
-                        isIncomingTransfer = false;
-                      }
-                    } else {
-                      // Gesamtübersicht: Geldfluss Sender -> Empfänger
-                      primaryAccount = senderAccount;
-                      counterpartAccount = receiverAccount;
-                      isIncomingTransfer = false;
-                    }
-                  } else {
-                    primaryAccount =
-                      (tx.value < 0 ? senderAccount : receiverAccount) ||
-                      senderAccount ||
-                      receiverAccount;
-                    counterpartAccount = undefined;
-                    isIncomingTransfer = false;
-                  }
+                  const isReceiverActive = Boolean(
+                    selectedAccount &&
+                    receiverAccount &&
+                    (receiverAccount.id === selectedAccount.id ||
+                      receiverAccount.parentAccountId === selectedAccount.id)
+                  );
 
-                  const realPrimary =
-                    primaryAccount?.accountType === 'virtual' && primaryAccount.parentAccountId
-                      ? accountMap.get(primaryAccount.parentAccountId) || primaryAccount
-                      : primaryAccount;
-
-                  const primaryVirtualAccounts = primaryAccount
-                    ? primaryAccount.accountType === 'virtual'
-                      ? [primaryAccount]
-                      : accounts.filter(
-                          (a) =>
-                            a.accountType === 'virtual' &&
-                            a.parentAccountId === primaryAccount.id &&
-                            accountInfo.includedAccountIds.includes(a.id)
-                        )
-                    : [];
-
-                  const realCounterpart =
-                    counterpartAccount?.accountType === 'virtual' &&
-                    counterpartAccount.parentAccountId
-                      ? accountMap.get(counterpartAccount.parentAccountId) || counterpartAccount
-                      : counterpartAccount;
-
-                  const counterpartVirtualAccounts = counterpartAccount
-                    ? counterpartAccount.accountType === 'virtual'
-                      ? [counterpartAccount]
-                      : accounts.filter(
-                          (a) =>
-                            a.accountType === 'virtual' &&
-                            a.parentAccountId === counterpartAccount.id &&
-                            accountInfo.includedAccountIds.includes(a.id)
-                        )
-                    : [];
+                  const primaryAccount =
+                    (tx.value < 0 ? senderAccount : receiverAccount) ||
+                    senderAccount ||
+                    receiverAccount;
 
                   const hasModifiedAccount =
                     (tx.originalSenderIban !== undefined &&
@@ -1070,92 +1098,49 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Konto */}
-                      <td className="w-44 whitespace-nowrap px-3 py-3 align-middle lg:w-52">
+                      <td className="w-48 whitespace-nowrap px-3 py-3 align-middle lg:w-56">
                         <div className="flex flex-col gap-1">
-                          {realPrimary ? (
-                            <span
-                              className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 font-medium ${
-                                selectedAccount &&
-                                (realPrimary.id === selectedAccount.id ||
-                                  realPrimary.id === selectedAccount.parentAccountId ||
-                                  primaryVirtualAccounts.some((v) => v.id === selectedAccount.id))
-                                  ? 'border border-blue-200 bg-blue-50 text-blue-900'
-                                  : 'bg-slate-100 text-slate-800'
-                              }`}
-                            >
-                              <IconRenderer
-                                name={realPrimary.icon}
-                                style={{ color: realPrimary.color }}
-                                className="h-3.5 w-3.5 shrink-0"
-                              />
-                              <span className="truncate" title={realPrimary.name}>
-                                {realPrimary.name}
-                              </span>
-                              {primaryVirtualAccounts.map((v) => (
-                                <React.Fragment key={v.id}>
-                                  <ChevronRight className="h-3 w-3 shrink-0 text-slate-400" />
-                                  <span
-                                    className="inline-flex min-w-0 items-center gap-1 font-semibold text-purple-700"
-                                    title={`Virtuelles Unterkonto von ${realPrimary.name}: ${v.name}`}
-                                  >
-                                    <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
-                                    <span className="truncate">{v.name}</span>
-                                  </span>
-                                </React.Fragment>
-                              ))}
-                            </span>
+                          {isTransfer && senderAccount && receiverAccount ? (
+                            <>
+                              {/* Zeile 1: Von (Sender) */}
+                              <div className="flex min-w-0 items-center">
+                                {renderAccountBadge(
+                                  senderAccount,
+                                  isSenderActive,
+                                  'sender',
+                                  receiverAccount
+                                )}
+                              </div>
+
+                              {/* Zeile 2: Nach (Empfänger) mit ↳ Pfeil */}
+                              <div className="flex min-w-0 items-center gap-1 pl-1">
+                                <CornerDownRight
+                                  className={`h-3 w-3 shrink-0 ${
+                                    isReceiverActive ? 'text-blue-600' : 'text-slate-400'
+                                  }`}
+                                />
+                                {renderAccountBadge(
+                                  receiverAccount,
+                                  isReceiverActive,
+                                  'receiver',
+                                  senderAccount
+                                )}
+                              </div>
+                            </>
+                          ) : primaryAccount ? (
+                            <div className="flex min-w-0 items-center">
+                              {renderAccountBadge(
+                                primaryAccount,
+                                Boolean(
+                                  selectedAccount &&
+                                  (primaryAccount.id === selectedAccount.id ||
+                                    primaryAccount.parentAccountId === selectedAccount.id)
+                                ),
+                                'single'
+                              )}
+                            </div>
                           ) : (
                             <span className="text-slate-400">-</span>
-                          )}
-
-                          {isTransfer && realCounterpart && (
-                            <div className="flex items-center gap-1 pl-1">
-                              <span
-                                className={`text-xs font-semibold ${
-                                  isIncomingTransfer ? 'text-emerald-600' : 'text-blue-500'
-                                }`}
-                                title={
-                                  isIncomingTransfer
-                                    ? `Umbuchungseingang von ${realCounterpart.name}`
-                                    : `Umbuchungsausgang nach ${realCounterpart.name}`
-                                }
-                              >
-                                {isIncomingTransfer ? '←' : '→'}
-                              </span>
-                              <span
-                                className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 font-medium ${
-                                  selectedAccount &&
-                                  (realCounterpart.id === selectedAccount.id ||
-                                    realCounterpart.id === selectedAccount.parentAccountId ||
-                                    counterpartVirtualAccounts.some(
-                                      (v) => v.id === selectedAccount.id
-                                    ))
-                                    ? 'border border-blue-200 bg-blue-50 text-blue-900'
-                                    : 'bg-slate-100 text-slate-800'
-                                }`}
-                              >
-                                <IconRenderer
-                                  name={realCounterpart.icon}
-                                  style={{ color: realCounterpart.color }}
-                                  className="h-3.5 w-3.5 shrink-0"
-                                />
-                                <span className="truncate" title={realCounterpart.name}>
-                                  {realCounterpart.name}
-                                </span>
-                                {counterpartVirtualAccounts.map((v) => (
-                                  <React.Fragment key={v.id}>
-                                    <ChevronRight className="h-3 w-3 shrink-0 text-blue-400" />
-                                    <span
-                                      className="inline-flex min-w-0 items-center gap-1 font-semibold text-purple-700"
-                                      title={`Virtuelles Unterkonto von ${realCounterpart.name}: ${v.name}`}
-                                    >
-                                      <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
-                                      <span className="truncate">{v.name}</span>
-                                    </span>
-                                  </React.Fragment>
-                                ))}
-                              </span>
-                            </div>
                           )}
 
                           {hasModifiedAccount && (
@@ -1232,43 +1217,43 @@ export const Transactions: React.FC = () => {
                       </td>
 
                       {/* Betrag */}
-                      <td className="w-32 whitespace-nowrap px-4 py-3 text-right align-middle font-mono font-bold">
-                        <div
-                          className={
-                            isTransfer && !selectedAccount
-                              ? 'text-blue-700'
-                              : isOutbound
-                                ? 'text-slate-900'
-                                : 'text-emerald-600'
-                          }
-                        >
-                          {isTransfer ? (
-                            <span className="inline-flex items-center gap-1.5">
+                      <td className="w-36 whitespace-nowrap px-4 py-3 text-right align-middle font-mono font-bold lg:w-40">
+                        <div className="flex flex-col items-end">
+                          <div className="flex items-center justify-end gap-1">
+                            <span
+                              className={`text-sm ${
+                                isTransfer && !selectedAccount
+                                  ? 'text-blue-700'
+                                  : isOutbound
+                                    ? 'text-slate-900'
+                                    : 'text-emerald-600'
+                              }`}
+                            >
+                              {isTransfer
+                                ? selectedAccount
+                                  ? formatMoney(effValue, { signDisplay: 'always' })
+                                  : formatMoney(tx.amount ?? Math.abs(tx.value))
+                                : formatMoney(effValue, { signDisplay: 'always' })}
+                            </span>
+                            {tx.originalValue !== undefined && tx.value !== tx.originalValue && (
+                              <span
+                                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-800"
+                                title={`Ursprünglicher Betrag: ${formatMoney(tx.originalValue, { signDisplay: 'always' })}`}
+                                aria-label="Betrag geändert"
+                              >
+                                <Pencil className="h-2.5 w-2.5" />
+                                <span className="sr-only">Geändert</span>
+                              </span>
+                            )}
+                          </div>
+                          {isTransfer && (
+                            <div className="mt-0.5">
                               <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
                                 Umbuchung
                               </span>
-                              <span>
-                                {selectedAccount
-                                  ? formatMoney(effValue, { signDisplay: 'always' })
-                                  : formatMoney(tx.amount ?? Math.abs(tx.value))}
-                              </span>
-                            </span>
-                          ) : (
-                            formatMoney(effValue, { signDisplay: 'always' })
+                            </div>
                           )}
                         </div>
-                        {tx.originalValue !== undefined && tx.value !== tx.originalValue && (
-                          <div className="mt-0.5 flex justify-end">
-                            <span
-                              className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-blue-100 text-blue-800"
-                              title={`Ursprünglicher Betrag: ${formatMoney(tx.originalValue, { signDisplay: 'always' })}`}
-                              aria-label="Betrag geändert"
-                            >
-                              <Pencil className="h-2.5 w-2.5" />
-                              <span className="sr-only">Geändert</span>
-                            </span>
-                          </div>
-                        )}
                       </td>
 
                       {/* Kategorie Selector */}

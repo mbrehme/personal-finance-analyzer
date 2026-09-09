@@ -17,7 +17,6 @@ import {
   isTransactionOverridden,
   resetTransactionToOriginal,
   isInternalTransfer,
-  normalizeIban,
 } from '@/types/finance';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/ui/components/IconRenderer';
@@ -70,15 +69,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const [partner, setPartner] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [date, setDate] = useState<string>('');
-  const [accountId, setAccountId] = useState<string>('');
   const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Nur reale Bankkonten stehen als Buchungskonto zur Verfügung
-  const realAccounts = useMemo(
-    () => accounts.filter((acc) => acc.accountType !== 'virtual'),
-    [accounts]
-  );
 
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
 
@@ -118,17 +110,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     setPartner(transaction.receiver || transaction.issuer || '');
     setCategoryId(transaction.categoryId ?? null);
     setDate(transaction.date || '');
-
-    const info = getTransactionAccountInfo(transaction, accounts);
-    const primaryAccId =
-      transaction.value < 0
-        ? info.senderAccountId || info.receiverAccountId
-        : info.receiverAccountId || info.senderAccountId;
-    const primaryAcc = primaryAccId ? accountMap.get(primaryAccId) : undefined;
-    const realParentId =
-      primaryAcc?.accountType === 'virtual' ? primaryAcc.parentAccountId : primaryAcc?.id;
-    setAccountId(realParentId || primaryAccId || realAccounts[0]?.id || '');
-  }, [isOpen, transaction, realAccounts, accounts, accountMap]);
+  }, [isOpen, transaction]);
 
   const isOutbound = (transaction?.value ?? 0) < 0;
   const isSplitChild = Boolean(transaction?.splitFromId);
@@ -137,11 +119,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === categoryId),
     [categories, categoryId]
-  );
-
-  const selectedRealAccount = useMemo(
-    () => realAccounts.find((a) => a.id === accountId),
-    [realAccounts, accountId]
   );
 
   // Dynamischer Suchstring basierend auf den aktuellen Eingaben
@@ -162,45 +139,31 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     if (!transaction) {
       return { senderAccountId: undefined, receiverAccountId: undefined, includedAccountIds: [] };
     }
-    const initialInfo = getTransactionAccountInfo(transaction, accounts);
-    const initialPrimaryId =
-      transaction.value < 0
-        ? initialInfo.senderAccountId || initialInfo.receiverAccountId
-        : initialInfo.receiverAccountId || initialInfo.senderAccountId;
-    const initialAcc = initialPrimaryId ? accountMap.get(initialPrimaryId) : undefined;
-    const initialRealId =
-      initialAcc?.accountType === 'virtual' ? initialAcc.parentAccountId : initialAcc?.id;
-    const isAccountChanged = selectedRealAccount && selectedRealAccount.id !== initialRealId;
-    const targetAccountIban = isAccountChanged
-      ? selectedRealAccount.iban || selectedRealAccount.id
-      : transaction.value < 0
-        ? transaction.senderIban
-        : transaction.receiverIban;
+    return getTransactionAccountInfo(transaction, accounts);
+  }, [transaction, accounts]);
 
-    return getTransactionAccountInfo(
-      {
-        ...transaction,
-        senderIban: isOutbound ? targetAccountIban : transaction.senderIban,
-        receiverIban: !isOutbound ? targetAccountIban : transaction.receiverIban,
-      },
-      accounts
-    );
-  }, [transaction, selectedRealAccount, accounts, accountMap, isOutbound]);
+  const primaryAccountId = isOutbound
+    ? accountInfo.senderAccountId || accountInfo.receiverAccountId
+    : accountInfo.receiverAccountId || accountInfo.senderAccountId;
+  const primaryAccount = primaryAccountId ? accountMap.get(primaryAccountId) : undefined;
 
   const counterAccountId = isOutbound ? accountInfo.receiverAccountId : accountInfo.senderAccountId;
   const counterAccount = counterAccountId ? accountMap.get(counterAccountId) : undefined;
 
   const primaryVirtuals = useMemo(
     () =>
-      selectedRealAccount
+      primaryAccount
         ? accounts.filter(
             (v) =>
               v.accountType === 'virtual' &&
-              v.parentAccountId === selectedRealAccount.id &&
+              v.id !== primaryAccount.id &&
+              (v.parentAccountId === primaryAccount.id ||
+                (primaryAccount.parentAccountId &&
+                  v.parentAccountId === primaryAccount.parentAccountId)) &&
               accountInfo.includedAccountIds.includes(v.id)
           )
         : [],
-    [selectedRealAccount, accounts, accountInfo.includedAccountIds]
+    [primaryAccount, accounts, accountInfo.includedAccountIds]
   );
 
   const counterVirtuals = useMemo(
@@ -209,12 +172,54 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         ? accounts.filter(
             (v) =>
               v.accountType === 'virtual' &&
-              v.parentAccountId === counterAccount.id &&
+              v.id !== counterAccount.id &&
+              (v.parentAccountId === counterAccount.id ||
+                (counterAccount.parentAccountId &&
+                  v.parentAccountId === counterAccount.parentAccountId)) &&
               accountInfo.includedAccountIds.includes(v.id)
           )
         : [],
     [counterAccount, accounts, accountInfo.includedAccountIds]
   );
+
+  /**
+   * Rendert eine Konten-Badge (für reale Bankkonten oder virtuelle Unterkonten mit Pfad).
+   */
+  const renderAccountBadge = (acc: Account) => {
+    const isVirtual = acc.accountType === 'virtual' && Boolean(acc.parentAccountId);
+    const parent =
+      isVirtual && acc.parentAccountId ? accountMap.get(acc.parentAccountId) : undefined;
+
+    if (isVirtual && parent) {
+      return (
+        <span
+          className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-purple-200/80 bg-purple-50/70 px-2.5 py-1 text-xs text-purple-950"
+          title={`${acc.name} (Unterkonto von ${parent.name})`}
+        >
+          <FolderTree className="h-3.5 w-3.5 shrink-0 text-purple-600" />
+          <span className="min-w-0 truncate text-[11px] font-normal text-slate-500">
+            {parent.name}
+          </span>
+          <span className="shrink-0 select-none text-[10px] text-slate-400">›</span>
+          <span className="min-w-0 truncate font-semibold text-purple-800">{acc.name}</span>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-900"
+        title={acc.name}
+      >
+        <IconRenderer
+          name={acc.icon}
+          style={{ color: acc.color }}
+          className="h-3.5 w-3.5 shrink-0"
+        />
+        <span className="truncate">{acc.name}</span>
+      </span>
+    );
+  };
 
   if (!isOpen || !transaction) return null;
 
@@ -240,16 +245,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     setDate(restored.date || '');
     setCategoryId(null);
 
-    const info = getTransactionAccountInfo(restored, accounts);
-    const primaryAccId =
-      restored.value < 0
-        ? info.senderAccountId || info.receiverAccountId
-        : info.receiverAccountId || info.senderAccountId;
-    const primaryAcc = primaryAccId ? accountMap.get(primaryAccId) : undefined;
-    const realParentId =
-      primaryAcc?.accountType === 'virtual' ? primaryAcc.parentAccountId : primaryAcc?.id;
-    setAccountId(realParentId || primaryAccId || realAccounts[0]?.id || '');
-
     if (onReset) {
       onReset(tx.id);
     }
@@ -261,23 +256,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
     try {
       setSaving(true);
-      const info = getTransactionAccountInfo(tx, accounts);
-      const primaryAccId =
-        tx.value < 0
-          ? info.senderAccountId || info.receiverAccountId
-          : info.receiverAccountId || info.senderAccountId;
-      const primaryAcc = primaryAccId ? accountMap.get(primaryAccId) : undefined;
-      const initialRealId =
-        primaryAcc?.accountType === 'virtual' ? primaryAcc.parentAccountId : primaryAcc?.id;
-      const isAccountChanged = selectedRealAccount && selectedRealAccount.id !== initialRealId;
-      const targetAccountIban = isAccountChanged
-        ? selectedRealAccount.iban || selectedRealAccount.id
-        : tx.value < 0
-          ? tx.senderIban
-          : tx.receiverIban;
-      const normTargetIban = normalizeIban(targetAccountIban);
-      const finalSenderIban = isAccountChanged && isOutbound ? normTargetIban : tx.senderIban;
-      const finalReceiverIban = isAccountChanged && !isOutbound ? normTargetIban : tx.receiverIban;
 
       const initialPartner = (tx.receiver || tx.issuer || '').trim();
       const trimmedPartner = partner.trim();
@@ -303,8 +281,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
       const updatedTx: Transaction = {
         ...tx,
-        senderIban: finalSenderIban,
-        receiverIban: finalReceiverIban,
         date: finalDate,
         subject: subject.trim(),
         receiver: finalReceiver,
@@ -520,30 +496,16 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label htmlFor="edit-tx-account" className="font-semibold text-slate-500">
-                  Buchungskonto
-                </label>
-                <select
-                  id="edit-tx-account"
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-800 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  {realAccounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} {acc.iban ? `(${acc.iban})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <span className="font-semibold text-slate-500">Buchungskonto</span>
+                <p className="select-all break-all rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 font-mono text-xs font-medium text-slate-800">
+                  {(isOutbound ? tx.senderIban : tx.receiverIban) ||
+                    primaryAccount?.iban ||
+                    'Keine Buchungskonto-IBAN'}
+                </p>
 
-                {selectedRealAccount && (
+                {primaryAccount ? (
                   <div className="space-y-1.5 pt-0.5">
-                    <p className="select-all break-all rounded-lg border border-slate-200 bg-slate-50/50 p-2 font-mono text-[11px] text-slate-700">
-                      IBAN:{' '}
-                      {selectedRealAccount.iban ||
-                        (tx.value < 0 ? tx.senderIban : tx.receiverIban) ||
-                        'Keine IBAN angegeben'}
-                    </p>
+                    {renderAccountBadge(primaryAccount)}
 
                     {primaryVirtuals.length > 0 && (
                       <div className="space-y-1 pl-1 pt-0.5">
@@ -569,6 +531,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                       </div>
                     )}
                   </div>
+                ) : (
+                  <span className="text-[11px] text-slate-400">Externes / unbekanntes Konto</span>
                 )}
               </div>
 

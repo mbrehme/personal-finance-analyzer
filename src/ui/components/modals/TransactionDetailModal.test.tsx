@@ -90,7 +90,7 @@ describe('TransactionDetailModal', () => {
     expect(screen.getByLabelText('Wertstellungsdatum (Valuta)')).toHaveValue('2026-08-15');
 
     // Konten & Virtuelle Unterkonten
-    expect(screen.getByText(/IBAN: DE44500105175407324900/)).toBeInTheDocument();
+    expect(screen.getByText('DE44500105175407324900')).toBeInTheDocument();
     expect(screen.getByText('Urlaubstopf')).toBeInTheDocument();
 
     // Kategorie & Herkunft
@@ -102,7 +102,7 @@ describe('TransactionDetailModal', () => {
     expect(screen.getByText('fp-lufthansa-123')).toBeInTheDocument();
   });
 
-  it('excludes virtual accounts from the booking account dropdown', () => {
+  it('renders booking account as non-editable with badge when known', () => {
     render(
       <TransactionDetailModal
         isOpen={true}
@@ -113,15 +113,14 @@ describe('TransactionDetailModal', () => {
       />
     );
 
-    const accountSelect = screen.getByLabelText('Buchungskonto') as HTMLSelectElement;
-    const optionTexts = Array.from(accountSelect.options).map((opt) => opt.textContent || '');
+    // Buchungskonto ist kein Dropdown / Select mehr
+    expect(screen.queryByRole('combobox', { name: /Buchungskonto/i })).toBeNull();
+    expect(screen.getByText('Buchungskonto')).toBeInTheDocument();
 
-    // Reale Konten sind vorhanden
-    expect(optionTexts.some((text) => text.includes('Haupt-Girokonto'))).toBe(true);
-    expect(optionTexts.some((text) => text.includes('Tagesgeldkonto'))).toBe(true);
-
-    // Virtuelle Unterkonten sind NICHT als Auswahloption vorhanden
-    expect(optionTexts.some((text) => text.includes('Urlaubstopf'))).toBe(false);
+    // Reales Konto wird als Badge gerendert
+    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
+    // Virtuelles Unterkonto wird ebenfalls darunter als Badge gerendert
+    expect(screen.getByText('Urlaubstopf')).toBeInTheDocument();
   });
 
   it('dynamically updates compound search string when editing subject or partner', () => {
@@ -278,7 +277,7 @@ describe('TransactionDetailModal', () => {
 
     // Gegenkonto IBAN und Name sichtbar
     expect(screen.getByText('DE44500105175407324995')).toBeInTheDocument();
-    expect(screen.getByText(/IBAN: DE44500105175407324900/)).toBeInTheDocument();
+    expect(screen.getByText('DE44500105175407324900')).toBeInTheDocument();
     expect(screen.getByText('Tagesgeldkonto')).toBeInTheDocument();
   });
 
@@ -324,7 +323,7 @@ describe('TransactionDetailModal', () => {
     );
 
     // Primäres Konto ist Haupt-Girokonto (Elternkonto von Urlaubstopf)
-    expect(screen.getByText(/IBAN: DE44500105175407324900/)).toBeInTheDocument();
+    expect(screen.getByText('DE44500105175407324900')).toBeInTheDocument();
     expect(screen.getByText('Urlaubstopf')).toBeInTheDocument();
 
     // Gegenkonto ist Tagesgeldkonto (nicht extern)

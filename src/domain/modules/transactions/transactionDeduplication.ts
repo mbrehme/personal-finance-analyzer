@@ -164,7 +164,7 @@ export function findMatchingTransaction(
       const matchesSubject = isTextSimilar(candSubject, incomingSubject);
       const matchesPartner = isTextSimilar(candPartner, incomingPartner);
 
-      if (matchesPartnerNames || matchesSubject || (matchesPartner && diffDays <= 1)) {
+      if (matchesPartnerNames || (matchesSubject && matchesPartner && diffDays <= 1)) {
         return { matchedTx: cand, matchType: 'counterpart' };
       }
     }
@@ -184,8 +184,10 @@ export function findMatchingTransaction(
         const matchesSubject = isTextSimilar(candSubject, incomingSubject);
         const matchesPartner = isTextSimilar(candPartner, incomingPartner);
 
-        // Am gleichen Tag (oder innerhalb 1 Tages) mit identischem Betreff oder Partner
-        if (matchesSubject || (matchesPartner && diffDays <= 1)) {
+        // Am gleichen Tag (oder innerhalb 1 Tages) mit identischem Betreff UND Partner
+        // Verhindert, dass separate Buchungen desselben Betrags (z. B. zwei verschiedene Einkäufe oder Lastschriften)
+        // fälschlicherweise als Duplikat zusammengeführt werden.
+        if (matchesSubject && matchesPartner && diffDays <= 1) {
           return { matchedTx: cand, matchType: 'same_transfer' };
         }
       }

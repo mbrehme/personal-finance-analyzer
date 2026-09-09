@@ -8,7 +8,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { FinanceProvider, useFinance } from './index';
-import { Transaction } from '@/types/finance';
+import { Transaction, ISODateString } from '@/types/finance';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <FinanceProvider>{children}</FinanceProvider>
@@ -818,5 +818,72 @@ describe('FinanceContext', () => {
     expect(matchingTxs[0].assignmentSource).toBe('manual');
     expect(matchingTxs[0].senderIban).toBe('DE80120300001027106861');
     expect(matchingTxs[0].receiverIban).toBe('DE89120300001083850147');
+  });
+
+  it('preserves all newly imported transactions across reloads/remounts without deleting them', async () => {
+    // 1. Initialer Mount & Import von Buchungen mit gleichen Beträgen und generischen Texten
+    const { result, unmount } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const newTxs: Transaction[] = [
+      {
+        id: 'tx-kartenzahlung-1',
+        date: '2026-09-01' as ISODateString,
+        amount: 15.5,
+        value: -15.5,
+        type: 'outbound' as const,
+        accountIban: 'DE89120300001083850147',
+        senderIban: 'DE89120300001083850147',
+        receiverIban: '',
+        sender: 'Martin Brehme',
+        receiver: 'Supermarkt A',
+        issuer: '',
+        subject: 'Kartenzahlung',
+        iban: '',
+        categoryId: null,
+        assignmentSource: 'unassigned' as const,
+      },
+      {
+        id: 'tx-kartenzahlung-2',
+        date: '2026-09-03' as ISODateString,
+        amount: 15.5,
+        value: -15.5,
+        type: 'outbound' as const,
+        accountIban: 'DE89120300001083850147',
+        senderIban: 'DE89120300001083850147',
+        receiverIban: '',
+        sender: 'Martin Brehme',
+        receiver: 'Bäckerei B',
+        issuer: '',
+        subject: 'Kartenzahlung',
+        iban: '',
+        categoryId: null,
+        assignmentSource: 'unassigned' as const,
+      },
+    ];
+
+    await act(async () => {
+      const count = await result.current.importTransactions(newTxs);
+      expect(count).toBe(2);
+    });
+
+    expect(result.current.transactions.find((t) => t.id === 'tx-kartenzahlung-1')).toBeDefined();
+    expect(result.current.transactions.find((t) => t.id === 'tx-kartenzahlung-2')).toBeDefined();
+
+    // 2. Unmount simulieren (z. B. Browser Tab geschlossen oder Neuladen)
+    unmount();
+
+    // 3. Remount (Page Reload / Hard Refresh) simulieren
+    const { result: reloadedResult } = renderHook(() => useFinance(), { wrapper });
+    await waitFor(() => expect(reloadedResult.current.loading).toBe(false));
+
+    // Beide Buchungen müssen weiterhin vollständig in der Datenbank und im State vorhanden sein!
+    const tx1 = reloadedResult.current.transactions.find((t) => t.id === 'tx-kartenzahlung-1');
+    const tx2 = reloadedResult.current.transactions.find((t) => t.id === 'tx-kartenzahlung-2');
+
+    expect(tx1).toBeDefined();
+    expect(tx2).toBeDefined();
+    expect(tx1?.receiver).toBe('Supermarkt A');
+    expect(tx2?.receiver).toBe('Bäckerei B');
   });
 });

@@ -320,9 +320,9 @@ export const financeDB = {
   },
 
   /**
-   * Lädt alle Transaktionen. Standardmäßig über den 'date'-Index
-   * der IndexedDB und deterministisch absteigend nach Datum sortiert (neueste zuerst).
-   * Versehen mit virtuellem `type`-Getter.
+   * Lädt alle Transaktionen vollständig aus der IndexedDB und sortiert diese
+   * deterministisch absteigend nach Datum (neueste zuerst).
+   * Jede Transaktion wird mit standardisierten Feldern und virtuellem `type`-Getter versehen.
    *
    * @returns Promise mit Transaktionsliste
    */
@@ -337,31 +337,14 @@ export const financeDB = {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORES.TRANSACTIONS, 'readonly');
       const store = tx.objectStore(STORES.TRANSACTIONS);
-      const results: Transaction[] = [];
-
-      if (store.indexNames.contains('date')) {
-        const index = store.index('date');
-        const req = index.openCursor(null, 'prev');
-        req.onsuccess = (event: Event) => {
-          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-          if (cursor) {
-            results.push(this.normalizeTransaction(cursor.value));
-            cursor.continue();
-          } else {
-            resolve(sortTransactionsDesc(results));
-          }
-        };
-        req.onerror = () => reject(req.error);
-      } else {
-        const req = store.getAll();
-        req.onsuccess = () =>
-          resolve(
-            sortTransactionsDesc(
-              (req.result as Transaction[]).map((t) => this.normalizeTransaction(t))
-            )
-          );
-        req.onerror = () => reject(req.error);
-      }
+      const req = store.getAll();
+      req.onsuccess = () =>
+        resolve(
+          sortTransactionsDesc(
+            (req.result as Transaction[]).map((t) => this.normalizeTransaction(t))
+          )
+        );
+      req.onerror = () => reject(req.error);
     });
   },
 
@@ -389,6 +372,7 @@ export const financeDB = {
       sanitizedList.forEach((t) => store.put(t));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Transaktion abgebrochen'));
     });
   },
 

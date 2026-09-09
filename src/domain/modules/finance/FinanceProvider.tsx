@@ -298,53 +298,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         loadedAccounts = seededAccounts;
       }
 
-      // Migration und Deduplizierung für gerichteten Geldfluss
-      let transactionsToUse = loadedTransactions;
+      // Migration für gerichteten Geldfluss (rein anreichernd, niemals destruktiv)
       let needsTxMigrationSave = false;
-
-      // 1. Sicherstellen, dass gerichtete Felder befüllt sind
-      const migrated = transactionsToUse.map((tx) => {
-        if (tx.amount === undefined || (!tx.senderIban && !tx.receiverIban)) {
+      const migrated = loadedTransactions.map((tx) => {
+        if (
+          tx.amount === undefined ||
+          (!tx.senderIban && !tx.receiverIban && (tx.accountIban || tx.iban))
+        ) {
           needsTxMigrationSave = true;
           return financeDB.normalizeTransaction(tx);
         }
         return tx;
       });
 
-      // 2. Bestehende historische Duplikate (Gegenbuchungen aus früheren getrennten CSV-Imports) zusammenführen
-      const uniqueTxMap = new Map<string, Transaction>();
-      const idsToDelete: string[] = [];
-
-      for (const tx of migrated) {
-        const matchResult = findMatchingTransaction(
-          tx,
-          Array.from(uniqueTxMap.values()),
-          loadedAccounts
-        );
-
-        if (matchResult) {
-          const merged = mergeTransactions(matchResult.matchedTx, tx);
-          uniqueTxMap.set(merged.id, merged);
-          idsToDelete.push(tx.id);
-          needsTxMigrationSave = true;
-          continue;
-        }
-
-        uniqueTxMap.set(tx.id, tx);
-      }
-
       if (needsTxMigrationSave) {
-        const cleanedList = Array.from(uniqueTxMap.values());
-        await financeDB.saveTransactions(cleanedList);
-        for (const delId of idsToDelete) {
-          await financeDB.deleteTransaction(delId);
-        }
-        transactionsToUse = cleanedList;
+        await financeDB.saveTransactions(migrated);
       }
 
       setAccounts(loadedAccounts);
       setCategories(loadedCategories);
-      setTransactions(sortTransactionsDesc(transactionsToUse));
+      setTransactions(sortTransactionsDesc(migrated));
       setDeletedTransactions(sortTransactionsDesc(validDeleted));
       setError(null);
     } catch (err) {

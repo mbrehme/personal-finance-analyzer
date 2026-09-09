@@ -278,6 +278,88 @@ describe('transactionDeduplication', () => {
       const match = findMatchingTransaction(incoming, [existing], accounts);
       expect(match).toBeNull();
     });
+
+    it('does not falsely match distinct transactions of same amount with generic subject to different partners', () => {
+      const txRewe: Transaction = {
+        id: 'tx-rewe',
+        date: '2024-03-01',
+        amount: 15.5,
+        value: -15.5,
+        type: 'outbound',
+        accountIban: 'DE89120300001083850147',
+        senderIban: 'DE89120300001083850147',
+        receiverIban: '',
+        subject: 'Kartenzahlung',
+        sender: 'Martin Brehme',
+        receiver: 'Supermarkt REWE',
+        issuer: '',
+        iban: '',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+        origin: 'imported',
+      };
+
+      const txAldi: Transaction = {
+        id: 'tx-aldi',
+        date: '2024-03-03',
+        amount: 15.5,
+        value: -15.5,
+        type: 'outbound',
+        accountIban: 'DE89120300001083850147',
+        senderIban: 'DE89120300001083850147',
+        receiverIban: '',
+        subject: 'Kartenzahlung',
+        sender: 'Martin Brehme',
+        receiver: 'Discounter ALDI',
+        issuer: '',
+        iban: '',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+        origin: 'imported',
+      };
+
+      const match = findMatchingTransaction(txAldi, [txRewe], accounts);
+      expect(match).toBeNull();
+    });
+
+    it('does not falsely match opposite signed transactions of same amount with generic subject without partner match', () => {
+      const txOutflow: Transaction = {
+        id: 'tx-out',
+        date: '2024-03-01',
+        amount: 50,
+        value: -50,
+        type: 'outbound',
+        accountIban: 'DE89120300001083850147',
+        subject: 'Überweisung',
+        sender: 'Martin Brehme',
+        receiver: 'Vermieter',
+        issuer: '',
+        iban: 'DE11111111111111111111',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+        origin: 'imported',
+      };
+
+      const txInflow: Transaction = {
+        id: 'tx-in',
+        date: '2024-03-02',
+        amount: 50,
+        value: 50,
+        type: 'inbound',
+        accountIban: 'DE80120300001027106861',
+        subject: 'Überweisung',
+        sender: 'Arbeitgeber Bonus',
+        receiver: 'Martin Brehme',
+        issuer: '',
+        iban: 'DE22222222222222222222',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+        origin: 'imported',
+      };
+
+      const match = findMatchingTransaction(txInflow, [txOutflow], accounts);
+      expect(match).toBeNull();
+    });
   });
 
   describe('mergeTransactions', () => {

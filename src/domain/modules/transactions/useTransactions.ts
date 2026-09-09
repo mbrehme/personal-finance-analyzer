@@ -357,6 +357,18 @@ export function useTransactions(
     const tx = transactions.find((t) => t.id === id);
     if (!tx) return;
 
+    if (tx.splitFromId) {
+      await deleteTransaction(id);
+      return;
+    }
+
+    const children = transactions.filter((t) => t.splitFromId === id);
+    const childIds = new Set(children.map((c) => c.id));
+
+    for (const child of children) {
+      await transactionRepo.delete(child.id);
+    }
+
     const restored = resetTransactionToOriginal(tx);
     const match = matchTransaction(restored, categories);
     const finalTx: Transaction = {
@@ -365,21 +377,22 @@ export function useTransactions(
       assignmentSource: match.assignmentSource,
     };
 
-    let updatedCats = categories.map((c) => {
-      if (c.manualTransactionIds && c.manualTransactionIds.includes(id)) {
-        return {
-          ...c,
-          manualTransactionIds: c.manualTransactionIds.filter((tid) => tid !== id),
-        };
-      }
-      return c;
-    });
+    const updatedCats = categories.map((c) => ({
+      ...c,
+      manualTransactionIds: (c.manualTransactionIds || []).filter(
+        (tid) => tid !== id && !childIds.has(tid)
+      ),
+    }));
 
     await categoryRepo.saveAll(updatedCats);
     setCategories(updatedCats);
     await transactionRepo.save(finalTx);
 
-    setTransactions((prev) => sortTransactionsDesc(prev.map((t) => (t.id === id ? finalTx : t))));
+    setTransactions((prev) =>
+      sortTransactionsDesc(
+        prev.filter((t) => !childIds.has(t.id)).map((t) => (t.id === id ? finalTx : t))
+      )
+    );
   };
 
   const assignTransactionCategoryBatch = async (

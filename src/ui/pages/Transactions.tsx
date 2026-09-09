@@ -1274,16 +1274,19 @@ export const Transactions: React.FC = () => {
                             dataTestId={`tx-category-picker-${tx.id}`}
                           />
 
-                          {/* Geändert Symbol bei manueller Zuweisung */}
+                          {/* Geändert Symbol bei manueller Zuweisung – Klick setzt Kategorie zurück */}
                           {tx.origin !== 'override' && tx.assignmentSource === 'manual' && (
-                            <span
-                              className="shadow-xs inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-800"
-                              title="Kategorie manuell zugewiesen / angepasst"
-                              aria-label="Kategorie geändert"
+                            <button
+                              type="button"
+                              onClick={() => resetTransaction(tx.id)}
+                              className="shadow-xs group inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-800 transition-colors hover:bg-amber-100 hover:text-amber-800"
+                              title="Kategorie manuell zugewiesen (Klicken zum Zurücksetzen auf automatische Erkennung)"
+                              aria-label="Kategorie auf automatische Erkennung zurücksetzen"
                             >
-                              <Pencil className="h-2.5 w-2.5" />
+                              <Pencil className="h-2.5 w-2.5 group-hover:hidden" />
+                              <RotateCcw className="hidden h-2.5 w-2.5 group-hover:block" />
                               <span className="sr-only">Geändert</span>
-                            </span>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -1309,17 +1312,19 @@ export const Transactions: React.FC = () => {
                           ) : (
                             <>
                               {/* Reset-Knopf: wenn Transaktion von Originaldaten abweicht */}
-                              {isTransactionOverridden(tx) && tx.originalValue !== undefined && (
-                                <button
-                                  type="button"
-                                  onClick={() => resetTransaction(tx.id)}
-                                  className="rounded p-1 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
-                                  title="Auf Originaldaten zurücksetzen"
-                                  aria-label="Transaktion zurücksetzen"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                </button>
-                              )}
+                              {isTransactionOverridden(tx) &&
+                                (tx.originalValue !== undefined ||
+                                  tx.importFilename !== undefined) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => resetTransaction(tx.id)}
+                                    className="rounded p-1 text-slate-400 transition-colors hover:bg-amber-50 hover:text-amber-600"
+                                    title="Auf Originaldaten zurücksetzen"
+                                    aria-label="Transaktion zurücksetzen"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               <button
                                 type="button"
                                 onClick={() => handleOpenSplitModal(tx)}

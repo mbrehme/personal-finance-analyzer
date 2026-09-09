@@ -296,6 +296,41 @@ describe('finance domain helpers', () => {
     expect(isTransactionOverridden(restored)).toBe(false);
   });
 
+  it('detects transaction as overridden when category is manually assigned', async () => {
+    const { isTransactionOverridden } = await import('./finance');
+
+    const txWithManualCat: Transaction = {
+      id: 'tx-manual-cat',
+      date: '2026-09-07',
+      value: 250,
+      originalValue: 250,
+      subject: 'Geschenke',
+      originalSubject: 'Geschenke',
+      receiver: 'Denise Gül Brehme',
+      originalReceiver: 'Denise Gül Brehme',
+      issuer: 'Denise Gül Brehme und Martin Brehme',
+      originalIssuer: 'Denise Gül Brehme und Martin Brehme',
+      categoryId: 'cat-gifts',
+      assignmentSource: 'manual',
+      origin: 'imported',
+    };
+
+    expect(isTransactionOverridden(txWithManualCat)).toBe(true);
+
+    const txWithAutoRegex: Transaction = {
+      ...txWithManualCat,
+      assignmentSource: 'auto_regex',
+    };
+    expect(isTransactionOverridden(txWithAutoRegex)).toBe(false);
+
+    const txUnassigned: Transaction = {
+      ...txWithManualCat,
+      assignmentSource: 'unassigned',
+      categoryId: null,
+    };
+    expect(isTransactionOverridden(txUnassigned)).toBe(false);
+  });
+
   it('normalizes IBAN by removing spaces and capitalizing', () => {
     expect(normalizeIban('de89 3704 0044 0532 0130 00')).toBe('DE89370400440532013000');
     expect(normalizeIban('DE12345')).toBe('DE12345');

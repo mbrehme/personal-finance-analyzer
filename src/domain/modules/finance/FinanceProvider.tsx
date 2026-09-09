@@ -1040,15 +1040,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Alle Split-Kinder löschen
     const children = transactions.filter((t) => t.splitFromId === transactionId);
     const childIds = new Set(children.map((c) => c.id));
-    let updatedCategories = [...categories];
-
     for (const child of children) {
       await financeDB.deleteTransaction(child.id);
-      updatedCategories = updatedCategories.map((c) => ({
-        ...c,
-        manualTransactionIds: (c.manualTransactionIds || []).filter((id) => id !== child.id),
-      }));
     }
+
+    let updatedCategories = categories.map((c) => ({
+      ...c,
+      manualTransactionIds: (c.manualTransactionIds || []).filter(
+        (id) => id !== transactionId && !childIds.has(id)
+      ),
+    }));
 
     const restored = resetTransactionToOriginal(tx);
 

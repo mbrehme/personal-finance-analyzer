@@ -1314,4 +1314,79 @@ describe('Transactions Page', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('renders revert action button when a category was manually assigned and triggers resetTransaction', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+    const mockReset = vi.fn();
+
+    const manualTx = {
+      id: 'tx-manual-cat-1',
+      date: '2026-09-07',
+      senderIban: 'DE89120300001083850147',
+      value: 250,
+      originalValue: 250,
+      subject: 'Geschenke',
+      receiver: 'Denise Gül Brehme',
+      issuer: 'Denise Gül Brehme und Martin Brehme',
+      categoryId: 'cat-geschenke',
+      assignmentSource: 'manual',
+      origin: 'imported',
+    };
+
+    const categories = [
+      {
+        id: 'cat-geschenke',
+        name: 'Geschenke',
+        color: '#3b82f6',
+        icon: 'Gift',
+        parentId: null,
+      },
+    ];
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [
+        {
+          id: 'acc-giro-main',
+          name: 'Haupt-Girokonto',
+          accountType: 'real',
+          iban: 'DE89120300001083850147',
+          balanceEntries: [],
+        },
+      ] as any,
+      categories: categories as any,
+      transactions: [manualTx] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategoryBatch: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      deleteTransaction: vi.fn(),
+      resetTransaction: mockReset,
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Sowohl der Button in den Zeilen-Aktionen als auch das Klick-Icon an der Kategorie müssen vorhanden sein
+    const rowResetBtn = screen.getByRole('button', { name: 'Transaktion zurücksetzen' });
+    expect(rowResetBtn).toBeInTheDocument();
+
+    const catResetBtn = screen.getByRole('button', {
+      name: 'Kategorie auf automatische Erkennung zurücksetzen',
+    });
+    expect(catResetBtn).toBeInTheDocument();
+
+    // Klick auf den Reset-Button ruft resetTransaction auf
+    await user.click(rowResetBtn);
+    expect(mockReset).toHaveBeenCalledWith('tx-manual-cat-1');
+
+    await user.click(catResetBtn);
+    expect(mockReset).toHaveBeenCalledWith('tx-manual-cat-1');
+
+    vi.restoreAllMocks();
+  });
 });

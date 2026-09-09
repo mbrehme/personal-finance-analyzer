@@ -237,6 +237,36 @@ describe('TransactionDetailModal', () => {
     expect(handleReset).toHaveBeenCalledWith(overriddenTx.id);
   });
 
+  it('renders reset actions when only category is manually assigned', () => {
+    const manualCatTx: Transaction = {
+      ...mockTx,
+      categoryId: 'cat-essen',
+      assignmentSource: 'manual',
+    };
+    const handleReset = vi.fn();
+
+    render(
+      <TransactionDetailModal
+        isOpen={true}
+        onClose={vi.fn()}
+        transaction={manualCatTx}
+        accounts={mockAccounts}
+        categories={mockCategories}
+        onReset={handleReset}
+      />
+    );
+
+    // Footer-Reset-Button "Auf Bankdaten zurücksetzen"
+    const footerReset = screen.getByRole('button', { name: /Auf Bankdaten zurücksetzen/i });
+    expect(footerReset).toBeInTheDocument();
+    fireEvent.click(footerReset);
+    expect(handleReset).toHaveBeenCalledWith(manualCatTx.id);
+
+    // Inline-Button "Auf Auto-Kategorie zurücksetzen"
+    const inlineReset = screen.getByRole('button', { name: /Auf Auto-Kategorie zurücksetzen/i });
+    expect(inlineReset).toBeInTheDocument();
+  });
+
   it('does not render when isOpen is false', () => {
     const { container } = render(
       <TransactionDetailModal

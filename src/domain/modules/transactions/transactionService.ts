@@ -29,7 +29,8 @@ export function isTransactionOverridden(tx: Transaction): boolean {
     isDateOverridden ||
     (tx.originalSenderIban !== undefined && tx.senderIban !== tx.originalSenderIban) ||
     (tx.originalReceiverIban !== undefined && tx.receiverIban !== tx.originalReceiverIban) ||
-    Boolean(tx.splitFromId)
+    Boolean(tx.splitFromId) ||
+    tx.assignmentSource === 'manual'
   );
 }
 

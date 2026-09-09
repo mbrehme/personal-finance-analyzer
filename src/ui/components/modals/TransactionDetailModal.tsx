@@ -17,6 +17,7 @@ import {
   isTransactionOverridden,
   resetTransactionToOriginal,
   isInternalTransfer,
+  matchTransaction,
 } from '@/types/finance';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/ui/components/IconRenderer';
@@ -114,7 +115,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   const isOutbound = (transaction?.value ?? 0) < 0;
   const isSplitChild = Boolean(transaction?.splitFromId);
-  const isOverridden = transaction ? isTransactionOverridden(transaction) : false;
+  const isBankImported = Boolean(
+    transaction?.originalValue !== undefined ||
+    transaction?.originalDate !== undefined ||
+    transaction?.importFilename ||
+    transaction?.rawFingerprint ||
+    transaction?.origin === 'imported'
+  );
+  const isOverridden = transaction ? isTransactionOverridden(transaction) && isBankImported : false;
 
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === categoryId),
@@ -240,10 +248,11 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const handleResetToOriginal = () => {
     if (!tx) return;
     const restored = resetTransactionToOriginal(tx);
+    const match = matchTransaction(restored, categories);
     setSubject(restored.subject || '');
     setPartner(restored.receiver || restored.issuer || '');
     setDate(restored.date || '');
-    setCategoryId(null);
+    setCategoryId(match.categoryId);
 
     if (onReset) {
       onReset(tx.id);
@@ -624,30 +633,51 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 pt-1 text-[11px]">
-                <span className="text-slate-500">Status / Herkunft:</span>
-                {categoryId !== (tx.categoryId ?? null) ? (
-                  <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
-                    Wird als manuell zugewiesen gespeichert
-                  </span>
-                ) : (
-                  <>
-                    {tx.assignmentSource === 'auto_regex' && (
-                      <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-700">
-                        Automatisch via Regex
-                      </span>
-                    )}
-                    {tx.assignmentSource === 'manual' && (
-                      <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">
-                        Manuell zugewiesen
-                      </span>
-                    )}
-                    {(!tx.assignmentSource || tx.assignmentSource === 'unassigned') && (
-                      <span className="rounded-md bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">
-                        Nicht zugewiesen
-                      </span>
-                    )}
-                  </>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Status / Herkunft:</span>
+                  {categoryId !== (tx.categoryId ?? null) ? (
+                    <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
+                      Wird als manuell zugewiesen gespeichert
+                    </span>
+                  ) : (
+                    <>
+                      {tx.assignmentSource === 'auto_regex' && (
+                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-700">
+                          Automatisch via Regex
+                        </span>
+                      )}
+                      {tx.assignmentSource === 'manual' && (
+                        <span className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">
+                          Manuell zugewiesen
+                        </span>
+                      )}
+                      {(!tx.assignmentSource || tx.assignmentSource === 'unassigned') && (
+                        <span className="rounded-md bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">
+                          Nicht zugewiesen
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {((tx.assignmentSource === 'manual' && tx.origin !== 'override') ||
+                  (categoryId !== null && categoryId !== (tx.categoryId ?? null))) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const match = matchTransaction(
+                        { ...tx, assignmentSource: 'unassigned' },
+                        categories
+                      );
+                      setCategoryId(match.categoryId);
+                    }}
+                    className="inline-flex items-center gap-1 font-medium text-amber-700 hover:text-amber-800 hover:underline"
+                    title="Kategorie auf automatische Regex-Erkennung zurücksetzen"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Auf Auto-Kategorie zurücksetzen
+                  </button>
                 )}
               </div>
             </div>

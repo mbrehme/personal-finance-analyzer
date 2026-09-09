@@ -1389,4 +1389,168 @@ describe('Transactions Page', () => {
 
     vi.restoreAllMocks();
   });
+
+  describe('URL Query Parameter Filter Synchronization', () => {
+    it('correctly parses search params with aliases and defaults', async () => {
+      const { parseTransactionFiltersFromParams, serializeTransactionFiltersToParams } =
+        await import('./Transactions');
+
+      const params = new URLSearchParams(
+        'category=__uncategorized__&startDate=2024-04-01&endDate=2024-04-30&search=Lufthansa&account=acc-1&type=outbound&origin=imported'
+      );
+      const parsed = parseTransactionFiltersFromParams(params);
+
+      expect(parsed.categoryIds).toEqual(['__uncategorized__']);
+      expect(parsed.startDate).toBe('2024-04-01');
+      expect(parsed.endDate).toBe('2024-04-30');
+      expect(parsed.searchTerm).toBe('Lufthansa');
+      expect(parsed.accountId).toBe('acc-1');
+      expect(parsed.type).toBe('outbound');
+      expect(parsed.origin).toBe('imported');
+
+      // Serializing back produces identical clean params
+      const serialized = serializeTransactionFiltersToParams(parsed);
+      expect(serialized.get('category')).toBe('__uncategorized__');
+      expect(serialized.get('startDate')).toBe('2024-04-01');
+      expect(serialized.get('endDate')).toBe('2024-04-30');
+      expect(serialized.get('search')).toBe('Lufthansa');
+      expect(serialized.get('account')).toBe('acc-1');
+      expect(serialized.get('type')).toBe('outbound');
+      expect(serialized.get('origin')).toBe('imported');
+    });
+
+    it('supports alias parameters (q, categories, from, to)', async () => {
+      const { parseTransactionFiltersFromParams } = await import('./Transactions');
+
+      const params = new URLSearchParams(
+        'q=Einkauf&categories=cat-1,cat-2&from=2024-05-01&to=2024-05-31&accountId=acc-2'
+      );
+      const parsed = parseTransactionFiltersFromParams(params);
+
+      expect(parsed.searchTerm).toBe('Einkauf');
+      expect(parsed.categoryIds).toEqual(['cat-1', 'cat-2']);
+      expect(parsed.startDate).toBe('2024-05-01');
+      expect(parsed.endDate).toBe('2024-05-31');
+      expect(parsed.accountId).toBe('acc-2');
+    });
+
+    it('initializes filters from URL deep link and updates URL when filter changes', async () => {
+      const { userEvent } = await import('@testing-library/user-event');
+      const { MemoryRouter, useLocation } = await import('react-router-dom');
+      const user = userEvent.setup();
+      const FinanceContextModule = await import('@/domain');
+
+      const testTransactions = [
+        {
+          id: 'tx-match',
+          date: '2024-04-15',
+          value: -50,
+          subject: 'Unkategorisiert April',
+          receiver: 'Supermarkt',
+          issuer: '',
+          senderIban: 'DE11',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-wrong-cat',
+          date: '2024-04-20',
+          value: -100,
+          subject: 'Kategorisiert April',
+          receiver: 'Bäcker',
+          issuer: '',
+          senderIban: 'DE11',
+          categoryId: 'cat-essen',
+          assignmentSource: 'auto_regex',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-wrong-date',
+          date: '2024-05-10',
+          value: -30,
+          subject: 'Unkategorisiert Mai',
+          receiver: 'Kiosk',
+          issuer: '',
+          senderIban: 'DE11',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ];
+
+      const testAccounts = [
+        {
+          id: 'acc-giro',
+          name: 'Girokonto',
+          accountType: 'real',
+          iban: 'DE11',
+          balanceEntries: [],
+        },
+      ];
+
+      const testCategories = [
+        {
+          id: 'cat-essen',
+          name: 'Lebensmittel',
+          color: '#10b981',
+          icon: 'Utensils',
+          parentId: null,
+        },
+      ];
+
+      vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+        accounts: testAccounts as any,
+        categories: testCategories as any,
+        transactions: testTransactions as any,
+        deletedTransactions: [],
+        loading: false,
+        assignTransactionCategoryBatch: vi.fn(),
+        assignTransactionCategory: vi.fn(),
+        deleteTransaction: vi.fn(),
+        resetTransaction: vi.fn(),
+      } as any);
+
+      let currentSearch = '';
+      const LocationWatcher = () => {
+        const location = useLocation();
+        currentSearch = location.search;
+        return null;
+      };
+
+      // Tiefenlink mit Uncategorized im April 2024
+      render(
+        <MemoryRouter
+          initialEntries={[
+            '/transactions?category=__uncategorized__&startDate=2024-04-01&endDate=2024-04-30',
+          ]}
+        >
+          <LocationWatcher />
+          <FinanceProvider>
+            <Transactions />
+          </FinanceProvider>
+        </MemoryRouter>
+      );
+
+      // Nur tx-match darf gerendert werden
+      expect(await screen.findByText('Unkategorisiert April')).toBeInTheDocument();
+      expect(screen.queryByText('Kategorisiert April')).not.toBeInTheDocument();
+      expect(screen.queryByText('Unkategorisiert Mai')).not.toBeInTheDocument();
+
+      // Filter zurücksetzen klicken
+      const resetFiltersBtn = screen.getByRole('button', { name: /^Zurücksetzen$/ });
+      expect(resetFiltersBtn).toBeInTheDocument();
+      await user.click(resetFiltersBtn);
+
+      // Nach dem Zurücksetzen sind alle Buchungen sichtbar
+      expect(screen.getByText('Unkategorisiert April')).toBeInTheDocument();
+      expect(screen.getByText('Kategorisiert April')).toBeInTheDocument();
+      expect(screen.getByText('Unkategorisiert Mai')).toBeInTheDocument();
+
+      // Die URL-Suchparameter wurden geleert
+      expect(currentSearch).toBe('');
+
+      vi.restoreAllMocks();
+    });
+  });
 });

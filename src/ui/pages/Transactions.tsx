@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, useInRouterContext } from 'react-router-dom';
 import { useFinance } from '@/domain';
 import {
   TransactionType,
@@ -49,6 +50,151 @@ import {
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
+
+/**
+ * Zustand aller Transaktionsfilter auf der Buchungsseite.
+ */
+export interface TransactionFiltersState {
+  /** Suchbegriff für Freitextsuche über Zweck, Partner und IBAN */
+  searchTerm: string;
+  /** ID des gefilterten Kontos oder 'all' */
+  accountId: string;
+  /** Liste gefilterter Kategorie-IDs (inkl. '__uncategorized__') oder null für alle */
+  categoryIds: string[] | null;
+  /** Buchungstyp (Einnahme, Ausgabe oder alle) */
+  type: TransactionType | 'all';
+  /** Herkunft der Buchung (Importiert, Split, Override, Gelöscht oder alle) */
+  origin: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
+  /** Startdatum des Zeitraums (ISO-Datum 'YYYY-MM-DD') */
+  startDate: string;
+  /** Enddatum des Zeitraums (ISO-Datum 'YYYY-MM-DD') */
+  endDate: string;
+}
+
+/**
+ * Standard-Filterzustand ohne aktive Filter.
+ */
+export const DEFAULT_TRANSACTION_FILTERS: TransactionFiltersState = {
+  searchTerm: '',
+  accountId: 'all',
+  categoryIds: null,
+  type: 'all',
+  origin: 'all',
+  startDate: '',
+  endDate: '',
+};
+
+/**
+ * Parst URLSearchParams in den typisierten TransactionFiltersState.
+ * Unterstützt gängige Aliase wie 'q' für 'search', 'from'/'to' für Datumsbereiche
+ * und 'categories' für 'category'.
+ *
+ * @param {URLSearchParams} params - Die URL-Query-Parameter
+ * @returns {TransactionFiltersState} Der geparste Filterzustand
+ * @example
+ * const filters = parseTransactionFiltersFromParams(new URLSearchParams('category=__uncategorized__&startDate=2024-04-01'));
+ * console.log(filters.categoryIds); // ['__uncategorized__']
+ */
+export function parseTransactionFiltersFromParams(
+  params: URLSearchParams
+): TransactionFiltersState {
+  const searchTerm = params.get('search') ?? params.get('q') ?? '';
+  const accountId = params.get('account') ?? params.get('accountId') ?? 'all';
+
+  const catParam = params.get('category') ?? params.get('categories');
+  const categoryIds =
+    catParam !== null
+      ? catParam
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : null;
+
+  const rawType = params.get('type');
+  const type: TransactionType | 'all' =
+    rawType === 'inbound' || rawType === 'outbound' ? rawType : 'all';
+
+  const rawOrigin = params.get('origin');
+  const origin: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted' =
+    rawOrigin === 'imported' ||
+    rawOrigin === 'split' ||
+    rawOrigin === 'override' ||
+    rawOrigin === 'manual' ||
+    rawOrigin === 'deleted'
+      ? rawOrigin
+      : 'all';
+
+  const startDate = params.get('startDate') ?? params.get('from') ?? '';
+  const endDate = params.get('endDate') ?? params.get('to') ?? '';
+
+  return {
+    searchTerm,
+    accountId,
+    categoryIds: categoryIds && categoryIds.length > 0 ? categoryIds : null,
+    type,
+    origin,
+    startDate,
+    endDate,
+  };
+}
+
+/**
+ * Serialisiert einen TransactionFiltersState in saubere URLSearchParams.
+ * Lässt Standardwerte weg, um kurze und lesbare URLs zu gewährleisten.
+ *
+ * @param {TransactionFiltersState} filters - Der zu serialisierende Filterzustand
+ * @returns {URLSearchParams} Die erzeugten URL-Query-Parameter
+ * @example
+ * const params = serializeTransactionFiltersToParams({ ...DEFAULT_TRANSACTION_FILTERS, categoryIds: ['cat-1'] });
+ * console.log(params.toString()); // 'category=cat-1'
+ */
+export function serializeTransactionFiltersToParams(
+  filters: TransactionFiltersState
+): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (filters.searchTerm.trim()) {
+    params.set('search', filters.searchTerm.trim());
+  }
+  if (filters.accountId && filters.accountId !== 'all') {
+    params.set('account', filters.accountId);
+  }
+  if (filters.categoryIds && filters.categoryIds.length > 0) {
+    params.set('category', filters.categoryIds.join(','));
+  }
+  if (filters.type && filters.type !== 'all') {
+    params.set('type', filters.type);
+  }
+  if (filters.origin && filters.origin !== 'all') {
+    params.set('origin', filters.origin);
+  }
+  if (filters.startDate) {
+    params.set('startDate', filters.startDate);
+  }
+  if (filters.endDate) {
+    params.set('endDate', filters.endDate);
+  }
+
+  return params;
+}
+
+/**
+ * Hook zum sicheren Zugriff auf useSearchParams().
+ * Fällt außerhalb eines <Router>-Kontexts auf einen lokalen Fallback zurück,
+ * damit isolierte Tests ohne Wrapper weiterhin funktionieren.
+ */
+function useSafeSearchParams(): [
+  URLSearchParams,
+  (nextParams: URLSearchParams, navigateOptions?: { replace?: boolean }) => void,
+] {
+  const inRouter = useInRouterContext();
+  if (inRouter) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [searchParams, setSearchParams] = useSearchParams();
+    return [searchParams, (nextParams, opts) => setSearchParams(nextParams, opts)];
+  }
+  return [new URLSearchParams(), () => {}];
+}
 
 /**
  * Prüft, ob eine Transaktion mit einem Suchbegriff übereinstimmt.
@@ -180,35 +326,30 @@ export const Transactions: React.FC = () => {
     restoreTransaction,
   } = useFinance();
 
+  const [searchParams, setSearchParams] = useSafeSearchParams();
+  const inRouter = useInRouterContext();
+
+  const initialFilters = useMemo(
+    () => parseTransactionFiltersFromParams(searchParams),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   // Entwurfs-Filter State (Eingaben)
-  const [inputSearchTerm, setInputSearchTerm] = useState('');
-  const [inputAccountId, setInputAccountId] = useState<string>('all');
-  const [inputCategoryIds, setInputCategoryIds] = useState<string[] | null>(null);
-  const [inputType, setInputType] = useState<TransactionType | 'all'>('all');
+  const [inputSearchTerm, setInputSearchTerm] = useState(initialFilters.searchTerm);
+  const [inputAccountId, setInputAccountId] = useState<string>(initialFilters.accountId);
+  const [inputCategoryIds, setInputCategoryIds] = useState<string[] | null>(
+    initialFilters.categoryIds
+  );
+  const [inputType, setInputType] = useState<TransactionType | 'all'>(initialFilters.type);
   const [inputOrigin, setInputOrigin] = useState<
     'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted'
-  >('all');
-  const [inputStartDate, setInputStartDate] = useState<string>('');
-  const [inputEndDate, setInputEndDate] = useState<string>('');
+  >(initialFilters.origin);
+  const [inputStartDate, setInputStartDate] = useState<string>(initialFilters.startDate);
+  const [inputEndDate, setInputEndDate] = useState<string>(initialFilters.endDate);
 
   // Aktiv angewandte Filter
-  const [appliedFilters, setAppliedFilters] = useState<{
-    searchTerm: string;
-    accountId: string;
-    categoryIds: string[] | null;
-    type: TransactionType | 'all';
-    origin: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
-    startDate: string;
-    endDate: string;
-  }>({
-    searchTerm: '',
-    accountId: 'all',
-    categoryIds: null,
-    type: 'all',
-    origin: 'all',
-    startDate: '',
-    endDate: '',
-  });
+  const [appliedFilters, setAppliedFilters] = useState<TransactionFiltersState>(initialFilters);
 
   // Modal State für Manuelle Buchung / Edit / Split
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -516,43 +657,73 @@ export const Transactions: React.FC = () => {
     setSelectedTxIds(new Set());
   };
 
+  const lastSerializedParamsRef = useRef<string>(searchParams.toString());
+
+  const updateFiltersAndUrl = useCallback(
+    (newFilters: TransactionFiltersState) => {
+      setAppliedFilters(newFilters);
+      if (inRouter) {
+        const nextParams = serializeTransactionFiltersToParams(newFilters);
+        const nextString = nextParams.toString();
+        lastSerializedParamsRef.current = nextString;
+        if (nextString !== searchParams.toString()) {
+          setSearchParams(nextParams, { replace: true });
+        }
+      }
+      setSelectedTxIds(new Set());
+      setVisibleCount(PAGE_SIZE);
+    },
+    [inRouter, searchParams, setSearchParams]
+  );
+
+  // Synchronisation bei externen URL-Änderungen (z. B. Navigation via Deep Link, Browser Vor/Zurück)
+  useEffect(() => {
+    if (!inRouter) return;
+    const currentParamsString = searchParams.toString();
+    if (currentParamsString === lastSerializedParamsRef.current) {
+      return;
+    }
+    lastSerializedParamsRef.current = currentParamsString;
+    const currentFromUrl = parseTransactionFiltersFromParams(searchParams);
+    setAppliedFilters(currentFromUrl);
+    setInputSearchTerm(currentFromUrl.searchTerm);
+    setInputAccountId(currentFromUrl.accountId);
+    setInputCategoryIds(currentFromUrl.categoryIds);
+    setInputType(currentFromUrl.type);
+    setInputOrigin(currentFromUrl.origin);
+    setInputStartDate(currentFromUrl.startDate);
+    setInputEndDate(currentFromUrl.endDate);
+    setSelectedTxIds(new Set());
+    setVisibleCount(PAGE_SIZE);
+  }, [inRouter, searchParams]);
+
   // Kategorie-Auswahl ändern (wendet direkt an für flüssige Bedienung)
   const handleCategoryChange = (ids: string[] | null) => {
     setInputCategoryIds(ids);
-    setAppliedFilters((prev) => ({ ...prev, categoryIds: ids }));
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl({ ...appliedFilters, categoryIds: ids });
   };
 
   // Konto-Auswahl ändern (wendet direkt an für flüssige Bedienung)
   const handleAccountChange = (id: string) => {
     setInputAccountId(id);
-    setAppliedFilters((prev) => ({ ...prev, accountId: id }));
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl({ ...appliedFilters, accountId: id });
   };
 
   // Typ-Auswahl ändern (wendet direkt an für flüssige Bedienung)
   const handleTypeChange = (val: TransactionType | 'all') => {
     setInputType(val);
-    setAppliedFilters((prev) => ({ ...prev, type: val }));
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl({ ...appliedFilters, type: val });
   };
 
   // Volltextsuche anwenden (bei Enter oder Klick)
   const handleSearchSubmit = () => {
-    setAppliedFilters((prev) => ({ ...prev, searchTerm: inputSearchTerm }));
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl({ ...appliedFilters, searchTerm: inputSearchTerm });
   };
 
   // Suche leeren
   const handleClearSearch = () => {
     setInputSearchTerm('');
-    setAppliedFilters((prev) => ({ ...prev, searchTerm: '' }));
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl({ ...appliedFilters, searchTerm: '' });
   };
 
   // Quelle-Auswahl ändern (wendet direkt an für flüssige Bedienung)
@@ -560,9 +731,7 @@ export const Transactions: React.FC = () => {
     val: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted'
   ) => {
     setInputOrigin(val);
-    setAppliedFilters((prev) => ({ ...prev, origin: val }));
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl({ ...appliedFilters, origin: val });
   };
 
   // Datumsbereich ändern (wendet direkt an für flüssige Bedienung)
@@ -575,9 +744,7 @@ export const Transactions: React.FC = () => {
   }) => {
     setInputStartDate(startDate);
     setInputEndDate(endDate);
-    setAppliedFilters((prev) => ({ ...prev, startDate, endDate }));
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl({ ...appliedFilters, startDate, endDate });
   };
 
   // Zurücksetzen aller Filter
@@ -589,17 +756,7 @@ export const Transactions: React.FC = () => {
     setInputOrigin('all');
     setInputStartDate('');
     setInputEndDate('');
-    setAppliedFilters({
-      searchTerm: '',
-      accountId: 'all',
-      categoryIds: null,
-      type: 'all',
-      origin: 'all',
-      startDate: '',
-      endDate: '',
-    });
-    setSelectedTxIds(new Set());
-    setVisibleCount(PAGE_SIZE);
+    updateFiltersAndUrl(DEFAULT_TRANSACTION_FILTERS);
   };
 
   const hasActiveFilters =

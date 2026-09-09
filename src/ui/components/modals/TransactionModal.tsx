@@ -12,7 +12,7 @@ import {
   Category,
   TransactionType,
   ISODateString,
-  normalizeIban,
+  getTransactionAccountInfo,
   isTransactionOverridden,
   resetTransactionToOriginal,
 } from '@/types/finance';
@@ -101,7 +101,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const originalSubject = initialTransaction?.originalSubject ?? initialTransaction?.subject ?? '';
   const originalReceiver =
     initialTransaction?.originalReceiver ?? initialTransaction?.receiver ?? '';
-  const originalIban = initialTransaction?.originalIban ?? initialTransaction?.iban ?? '';
+  const originalIban =
+    (initialTransaction?.value ?? 0) < 0
+      ? (initialTransaction?.originalReceiverIban ?? initialTransaction?.receiverIban ?? '')
+      : (initialTransaction?.originalSenderIban ?? initialTransaction?.senderIban ?? '');
   const isImportedWithBankData = Boolean(initialTransaction?.rawFingerprint);
 
   // Formular initialisieren, wenn das Modal geöffnet wird oder sich die Transaktion ändert
@@ -119,12 +122,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setSubject('');
       setCategoryId(null);
     } else if (initialTransaction) {
-      const matchingAcc = initialTransaction.accountIban
-        ? accounts.find(
-            (a) => a.iban && normalizeIban(a.iban) === normalizeIban(initialTransaction.accountIban)
-          )
-        : undefined;
-      setAccountId(matchingAcc?.id || accounts[0]?.id || '');
+      const accInfo = getTransactionAccountInfo(initialTransaction, accounts);
+      const matchingAccId =
+        initialTransaction.value < 0
+          ? accInfo.senderAccountId || accInfo.receiverAccountId
+          : accInfo.receiverAccountId || accInfo.senderAccountId;
+      setAccountId(matchingAccId || accounts[0]?.id || '');
       setValueDate(initialTransaction.date || '');
       setAmount(Math.abs(initialTransaction.value));
       setReceiver(initialTransaction.receiver || initialTransaction.issuer || '');
@@ -220,12 +223,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
       if (mode === 'create') {
         await onSave({
-          accountIban,
+          senderIban: isOutbound ? accountIban : '',
+          receiverIban: !isOutbound ? accountIban : '',
           date: valueDate as ISODateString,
           issuer: !isOutbound ? receiver : '',
           receiver: isOutbound ? receiver : '',
           subject: subject.trim(),
-          iban: '',
+          amount: Math.abs(signedValue),
           value: signedValue,
           categoryId,
           assignmentSource: categoryId ? 'manual' : 'unassigned',
@@ -264,7 +268,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
         await onSave({
           ...rest,
-          accountIban: accountIban || initialTransaction.accountIban,
+          senderIban: isOutbound
+            ? accountIban || initialTransaction.senderIban
+            : initialTransaction.senderIban,
+          receiverIban: !isOutbound
+            ? accountIban || initialTransaction.receiverIban
+            : initialTransaction.receiverIban,
+          amount: Math.abs(signedValue),
           date: valueDate as ISODateString,
           value: signedValue,
           receiver: finalReceiver,

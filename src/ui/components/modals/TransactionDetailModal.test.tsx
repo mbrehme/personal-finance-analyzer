@@ -42,12 +42,12 @@ describe('TransactionDetailModal', () => {
 
   const mockTx: Transaction = {
     id: 'tx-101',
-    accountIban: 'DE44500105175407324900',
+    senderIban: 'DE44500105175407324900',
+    receiverIban: 'DE991234567890',
     date: '2026-08-15',
     issuer: '',
     receiver: 'Lufthansa AG',
     subject: 'Flugbuchung Sommerurlaub',
-    iban: 'DE991234567890',
     value: -450,
     categoryId: 'cat-reisen',
     assignmentSource: 'auto_regex',
@@ -255,12 +255,12 @@ describe('TransactionDetailModal', () => {
   it('renders managed counter account pill for internal transfers', () => {
     const transferTx: Transaction = {
       id: 'tx-transfer-99',
-      accountIban: 'DE44500105175407324900',
+      senderIban: 'DE44500105175407324900',
+      receiverIban: 'DE44500105175407324995',
       date: '2026-08-10',
       receiver: 'Tagesgeldkonto',
       issuer: 'Martin',
       subject: 'Umbuchung',
-      iban: 'DE44500105175407324995',
       value: -500,
       assignmentSource: 'manual',
       origin: 'imported',
@@ -296,5 +296,40 @@ describe('TransactionDetailModal', () => {
     // Gegenkonto hat IBAN als Text und Hinweistext als extern darunter
     expect(screen.getByText('DE991234567890')).toBeInTheDocument();
     expect(screen.getByText('Externes Konto (nicht verwaltet)')).toBeInTheDocument();
+  });
+
+  it('correctly displays primary account and managed counter account for incoming transfer on virtual sub-account', () => {
+    const incomingTransferTx: Transaction = {
+      id: 'tx-incoming-urlaub',
+      date: '2026-09-07',
+      senderIban: 'DE44500105175407324995',
+      receiverIban: 'DE44500105175407324900',
+      receiver: 'Denise und Martin',
+      issuer: 'Denise und Martin',
+      subject: 'Umbuchung Urlaub',
+      value: 250,
+      categoryId: 'cat-reisen',
+      assignmentSource: 'manual',
+      origin: 'imported',
+    };
+
+    render(
+      <TransactionDetailModal
+        isOpen={true}
+        onClose={vi.fn()}
+        transaction={incomingTransferTx}
+        accounts={mockAccounts}
+        categories={mockCategories}
+      />
+    );
+
+    // Primäres Konto ist Haupt-Girokonto (Elternkonto von Urlaubstopf)
+    expect(screen.getByText(/IBAN: DE44500105175407324900/)).toBeInTheDocument();
+    expect(screen.getByText('Urlaubstopf')).toBeInTheDocument();
+
+    // Gegenkonto ist Tagesgeldkonto (nicht extern)
+    expect(screen.getByText('DE44500105175407324995')).toBeInTheDocument();
+    expect(screen.getByText('Tagesgeldkonto')).toBeInTheDocument();
+    expect(screen.queryByText('Externes Konto (nicht verwaltet)')).toBeNull();
   });
 });

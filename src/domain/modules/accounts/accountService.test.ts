@@ -9,6 +9,7 @@ import { Account, Transaction } from '@/types';
 import {
   normalizeIban,
   getTransactionAccountInfo,
+  getSubAccountIds,
   getTransactionEffectiveValueForAccount,
   isTransactionMatchingAccount,
 } from './accountService';
@@ -90,82 +91,118 @@ describe('accountService', () => {
   });
 
   describe('getTransactionAccountInfo', () => {
-    it('matches primary account by accountIban', () => {
+    it('matches primary account by accountIban/senderIban', () => {
       const tx: Transaction = {
         id: 'tx-1',
-        accountIban: 'DE44500105175407324900',
+        senderIban: 'DE44500105175407324900',
+        receiverIban: 'DE999999',
         date: '2026-08-01',
         issuer: 'Supermarkt',
         receiver: 'Martin',
         subject: 'Einkauf',
-        iban: 'DE999999',
         value: -50,
         assignmentSource: 'unassigned',
       };
 
       const info = getTransactionAccountInfo(tx, allAccounts);
-      expect(info.primaryAccount?.id).toBe('acc-giro');
-      expect(info.counterAccount).toBeUndefined();
-      expect(info.virtualAccounts).toHaveLength(0);
-      expect(info.allAccounts).toHaveLength(1);
+      expect(info.senderAccountId).toBe('acc-giro');
+      expect(info.receiverAccountId).toBeUndefined();
+      expect(info.includedAccountIds).toEqual(['acc-giro']);
     });
 
     it('matches primary account by account id when account has no IBAN', () => {
       const tx: Transaction = {
         id: 'tx-cash',
-        accountIban: 'acc-cash',
+        senderIban: 'acc-cash',
+        receiverIban: '',
         date: '2026-08-01',
         issuer: 'Martin',
         receiver: 'Bäcker',
         subject: 'Bargeld Einkauf',
-        iban: '',
         value: -5,
         assignmentSource: 'unassigned',
       };
 
       const info = getTransactionAccountInfo(tx, allAccounts);
-      expect(info.primaryAccount?.id).toBe('acc-cash');
-      expect(info.allAccounts.some((a) => a.id === 'acc-cash')).toBe(true);
+      expect(info.senderAccountId).toBe('acc-cash');
+      expect(info.receiverAccountId).toBeUndefined();
+      expect(info.includedAccountIds).toEqual(['acc-cash']);
     });
 
     it('matches counterAccount for internal transfer between real accounts', () => {
       const tx: Transaction = {
         id: 'tx-transfer',
-        accountIban: 'DE44500105175407324900',
+        senderIban: 'DE44500105175407324900',
+        receiverIban: 'DE44500105175407324995',
         date: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',
         subject: 'Umbuchung',
-        iban: 'DE44500105175407324995',
         value: -500,
         assignmentSource: 'unassigned',
       };
 
       const info = getTransactionAccountInfo(tx, allAccounts);
-      expect(info.primaryAccount?.id).toBe('acc-giro');
-      expect(info.counterAccount?.id).toBe('acc-tagesgeld');
-      expect(info.allAccounts.map((a) => a.id)).toContain('acc-giro');
-      expect(info.allAccounts.map((a) => a.id)).toContain('acc-tagesgeld');
+      expect(info.senderAccountId).toBe('acc-giro');
+      expect(info.receiverAccountId).toBe('acc-tagesgeld');
+      expect(info.includedAccountIds).toContain('acc-giro');
+      expect(info.includedAccountIds).toContain('acc-tagesgeld');
     });
 
     it('associates virtual account if category matches and parent matches primaryAccount', () => {
       const tx: Transaction = {
         id: 'tx-rent',
-        accountIban: 'DE44500105175407324900',
+        senderIban: 'DE44500105175407324900',
+        receiverIban: 'DE88888',
         date: '2026-08-01',
         issuer: 'Martin',
         receiver: 'Vermieter',
         subject: 'Miete',
-        iban: 'DE88888',
         value: -800,
         categoryId: 'cat-miete',
         assignmentSource: 'manual',
       };
 
       const info = getTransactionAccountInfo(tx, allAccounts);
-      expect(info.primaryAccount?.id).toBe('acc-giro');
-      expect(info.virtualAccounts.map((v) => v.id)).toContain('acc-virt-wohnen');
-      expect(info.allAccounts.map((a) => a.id)).toContain('acc-virt-wohnen');
+      // Tiefstes Konto für Sender ist das virtuelle Unterkonto 'acc-virt-wohnen'
+      expect(info.senderAccountId).toBe('acc-virt-wohnen');
+      expect(info.receiverAccountId).toBeUndefined();
+      expect(info.includedAccountIds).toEqual(['acc-virt-wohnen']);
+    });
+
+    it('correctly identifies senderAccountId and receiverAccountId when booking is on receiver account', () => {
+      const tx: Transaction = {
+        id: 'tx-incoming-transfer',
+        date: '2026-09-07',
+        senderIban: giroAccount.iban, // Hauptkonto ist Absender
+        receiverIban: tagesgeldAccount.iban, // Tagesgeld ist Empfänger
+        issuer: 'Martin Brehme',
+        receiver: 'Martin Brehme',
+        subject: 'Rücklage Bildung',
+        value: 250,
+        categoryId: 'cat-buffer',
+        assignmentSource: 'auto_regex',
+      };
+
+      const info = getTransactionAccountInfo(tx, allAccounts);
+      expect(info.senderAccountId).toBe('acc-giro');
+      expect(info.receiverAccountId).toBe('acc-virt-buffer');
+      expect(info.includedAccountIds).toEqual(['acc-giro', 'acc-virt-buffer']);
+    });
+  });
+
+  describe('getSubAccountIds', () => {
+    it('returns empty array when account has no subaccounts', () => {
+      expect(getSubAccountIds(cashAccount, allAccounts)).toEqual([]);
+    });
+
+    it('returns subaccount ids for real account with subaccounts', () => {
+      expect(getSubAccountIds(giroAccount, allAccounts)).toEqual(['acc-virt-wohnen']);
+      expect(getSubAccountIds(tagesgeldAccount, allAccounts)).toEqual(['acc-virt-buffer']);
+    });
+
+    it('returns empty array for a virtual account itself', () => {
+      expect(getSubAccountIds(virtualWohnen, allAccounts)).toEqual([]);
     });
   });
 
@@ -173,12 +210,12 @@ describe('accountService', () => {
     it('returns direct value for primary account', () => {
       const tx: Transaction = {
         id: 'tx-1',
-        accountIban: 'DE44500105175407324900',
+        senderIban: 'DE44500105175407324900',
+        receiverIban: 'DE999999',
         date: '2026-08-01',
         issuer: 'Supermarkt',
         receiver: 'Martin',
         subject: 'Einkauf',
-        iban: 'DE999999',
         value: -50,
         assignmentSource: 'unassigned',
       };
@@ -189,12 +226,12 @@ describe('accountService', () => {
     it('returns effective value for virtual account when category matches', () => {
       const tx: Transaction = {
         id: 'tx-rent',
-        accountIban: 'DE44500105175407324900',
+        senderIban: 'DE44500105175407324900',
+        receiverIban: 'DE88888',
         date: '2026-08-01',
         issuer: 'Martin',
         receiver: 'Vermieter',
         subject: 'Miete',
-        iban: 'DE88888',
         value: -800,
         categoryId: 'cat-miete',
         assignmentSource: 'manual',
@@ -209,8 +246,6 @@ describe('accountService', () => {
         date: '2026-08-01',
         senderIban: tagesgeldAccount.iban,
         receiverIban: giroAccount.iban,
-        accountIban: giroAccount.iban,
-        iban: tagesgeldAccount.iban || '',
         issuer: 'Denise',
         receiver: 'Martin',
         amount: 960,
@@ -243,8 +278,6 @@ describe('accountService', () => {
         date: '2026-08-01',
         senderIban: giroAccount.iban,
         receiverIban: tagesgeldAccount.iban,
-        accountIban: giroAccount.iban,
-        iban: tagesgeldAccount.iban || '',
         issuer: 'Martin',
         receiver: 'Denise',
         amount: 250,
@@ -266,8 +299,6 @@ describe('accountService', () => {
         date: '2026-08-01',
         senderIban: tagesgeldAccount.iban,
         receiverIban: giroAccount.iban,
-        accountIban: tagesgeldAccount.iban,
-        iban: giroAccount.iban || '',
         issuer: 'Denise',
         receiver: 'Martin',
         amount: 960,
@@ -282,8 +313,6 @@ describe('accountService', () => {
         date: '2026-08-01',
         senderIban: tagesgeldAccount.iban,
         receiverIban: giroAccount.iban,
-        accountIban: giroAccount.iban,
-        iban: tagesgeldAccount.iban || '',
         issuer: 'Denise',
         receiver: 'Martin',
         amount: 960,
@@ -326,12 +355,12 @@ describe('accountService', () => {
   describe('isTransactionMatchingAccount', () => {
     const tx: Transaction = {
       id: 'tx-1',
-      accountIban: 'DE44500105175407324900',
+      senderIban: 'DE44500105175407324900',
+      receiverIban: 'DE999999',
       date: '2026-08-01',
       issuer: 'Supermarkt',
       receiver: 'Martin',
       subject: 'Einkauf',
-      iban: 'DE999999',
       value: -50,
       assignmentSource: 'unassigned',
     };
@@ -358,15 +387,15 @@ describe('accountService', () => {
       expect(isTransactionMatchingAccount(rentTx, 'acc-giro', allAccounts)).toBe(true);
     });
 
-    it('matches transactions on accounts without IBAN when accountIban is account ID', () => {
+    it('matches transactions on accounts without IBAN when senderIban is account ID', () => {
       const cashTx: Transaction = {
         id: 'tx-c',
-        accountIban: 'acc-cash',
+        senderIban: 'acc-cash',
+        receiverIban: '',
         date: '2026-08-01',
         issuer: 'Martin',
         receiver: 'Bäcker',
         subject: 'Brot',
-        iban: '',
         value: -3.5,
         assignmentSource: 'unassigned',
       };
@@ -377,12 +406,12 @@ describe('accountService', () => {
     it('matches Hauptkonto when transaction belongs to its virtual sub-account by category', () => {
       const rentTx: Transaction = {
         id: 'tx-rent',
-        accountIban: 'DE44500105175407324900',
+        senderIban: 'DE44500105175407324900',
+        receiverIban: 'DE88888',
         date: '2026-08-01',
         issuer: 'Martin',
         receiver: 'Vermieter',
         subject: 'Miete',
-        iban: 'DE88888',
         value: -800,
         categoryId: 'cat-miete',
         assignmentSource: 'manual',
@@ -393,15 +422,15 @@ describe('accountService', () => {
       expect(isTransactionMatchingAccount(rentTx, 'acc-tagesgeld', allAccounts)).toBe(false);
     });
 
-    it('matches both Unterkonto and Hauptkonto when accountIban is set to the sub-account ID', () => {
+    it('matches both Unterkonto and Hauptkonto when senderIban is set to the sub-account ID', () => {
       const subTx: Transaction = {
         id: 'tx-sub',
-        accountIban: 'acc-virt-wohnen',
+        senderIban: 'acc-virt-wohnen',
+        receiverIban: 'DE999',
         date: '2026-08-01',
         issuer: 'Martin',
         receiver: 'Möbelhaus',
         subject: 'Sofa',
-        iban: 'DE999',
         value: -400,
         assignmentSource: 'manual',
       };
@@ -413,12 +442,12 @@ describe('accountService', () => {
     it('matches target account when transaction is an incoming transfer / counter account', () => {
       const transferTx: Transaction = {
         id: 'tx-transfer',
-        accountIban: 'DE44500105175407324900', // Girokonto
+        senderIban: 'DE44500105175407324900', // Girokonto
+        receiverIban: 'DE44500105175407324995', // Tagesgeld IBAN
         date: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',
         subject: 'Umbuchung',
-        iban: 'DE44500105175407324995', // Tagesgeld IBAN
         value: -500,
         assignmentSource: 'unassigned',
       };
@@ -433,12 +462,12 @@ describe('accountService', () => {
     it('matches real parent account when transaction is an internal transfer to its virtual sub-account', () => {
       const bufferTransferTx: Transaction = {
         id: 'tx-buffer-transfer',
-        accountIban: 'DE44500105175407324900', // Girokonto
+        senderIban: 'DE44500105175407324900', // Girokonto
+        receiverIban: 'DE44500105175407324995', // Tagesgeld IBAN
         date: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',
         subject: 'Umbuchung Rücklage',
-        iban: 'DE44500105175407324995', // Tagesgeld IBAN
         value: -250,
         categoryId: 'cat-buffer', // gehört zu virtualBuffer unter acc-tagesgeld
         assignmentSource: 'manual',
@@ -500,7 +529,6 @@ describe('accountService', () => {
       subject: 'Sparübertrag',
       assignmentSource: 'unassigned',
       issuer: 'Martin Brehme',
-      iban: 'DE33334444',
       value: -960,
     };
 
@@ -519,7 +547,6 @@ describe('accountService', () => {
         subject: 'Einkauf',
         assignmentSource: 'unassigned',
         issuer: 'Martin',
-        iban: 'DE99999999',
         value: -50,
       };
       expect(isInternalTransfer(externalTx, [giroAccount, tgAccount])).toBe(false);

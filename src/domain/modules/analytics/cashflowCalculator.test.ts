@@ -40,7 +40,7 @@ describe('cashflowCalculator', () => {
       receiver: 'Me',
       subject: 'Gehalt',
       type: 'inbound',
-      iban: 'DE00',
+      senderIban: 'DE00',
       value: 3000,
       categoryId: 'b-salary',
       assignmentSource: 'auto_regex',
@@ -52,7 +52,7 @@ describe('cashflowCalculator', () => {
       receiver: 'Vermieter',
       subject: 'Miete',
       type: 'outbound',
-      iban: 'DE00',
+      receiverIban: 'DE00',
       value: -1200,
       categoryId: 'b-rent',
       assignmentSource: 'auto_regex',
@@ -64,7 +64,7 @@ describe('cashflowCalculator', () => {
       receiver: 'Me',
       subject: 'Gehalt',
       type: 'inbound',
-      iban: 'DE00',
+      senderIban: 'DE00',
       value: 3000,
       categoryId: 'b-salary',
       assignmentSource: 'auto_regex',
@@ -125,7 +125,7 @@ describe('cashflowCalculator', () => {
         receiver: 'Shop',
         subject: 'Shop',
         type: 'outbound',
-        iban: 'DE00',
+        receiverIban: 'DE00',
         value: -518,
         categoryId: 'b-exp',
         assignmentSource: 'auto_regex',
@@ -137,7 +137,7 @@ describe('cashflowCalculator', () => {
         receiver: 'Me',
         subject: 'Einnahme',
         type: 'inbound',
-        iban: 'DE00',
+        senderIban: 'DE00',
         value: 518,
         categoryId: 'b-inc',
         assignmentSource: 'auto_regex',
@@ -245,7 +245,7 @@ describe('cashflowCalculator', () => {
         receiver: 'Landlord',
         subject: 'Miete',
         type: 'outbound',
-        iban: 'DE00',
+        receiverIban: 'DE00',
         value: -800,
         categoryId: 'c1',
         assignmentSource: 'manual',
@@ -257,7 +257,7 @@ describe('cashflowCalculator', () => {
         receiver: 'Utility',
         subject: 'Strom',
         type: 'outbound',
-        iban: 'DE00',
+        receiverIban: 'DE00',
         value: -90,
         categoryId: 'c2',
         assignmentSource: 'manual',
@@ -307,7 +307,6 @@ describe('cashflowCalculator', () => {
         value: -50,
         categoryId: 'cat-1',
         assignmentSource: 'manual',
-        iban: '',
       },
       {
         id: 'tx-uncat-1',
@@ -318,7 +317,6 @@ describe('cashflowCalculator', () => {
         value: -30,
         categoryId: null,
         assignmentSource: 'unassigned',
-        iban: '',
       },
       {
         id: 'tx-uncat-2',
@@ -329,7 +327,6 @@ describe('cashflowCalculator', () => {
         value: 100,
         categoryId: null,
         assignmentSource: 'unassigned',
-        iban: '',
       },
     ];
 
@@ -386,8 +383,8 @@ describe('cashflowCalculator', () => {
 
     const transferTx: Transaction = {
       id: 'tx-transfer-cf',
-      accountIban: 'DE1111',
-      iban: 'DE2222',
+      senderIban: 'DE1111',
+      receiverIban: 'DE2222',
       date: '2026-09-05',
       issuer: 'Martin',
       receiver: 'Tagesgeld',
@@ -454,8 +451,8 @@ describe('cashflowCalculator', () => {
       // Gehalt auf Girokonto
       {
         id: 'tx-salary',
-        accountIban: 'DE1111',
-        iban: 'DE9999',
+        senderIban: 'DE9999',
+        receiverIban: 'DE1111',
         date: '2026-08-01',
         issuer: 'Firma',
         receiver: 'Me',
@@ -467,8 +464,8 @@ describe('cashflowCalculator', () => {
       // Miete von Girokonto
       {
         id: 'tx-rent',
-        accountIban: 'DE1111',
-        iban: 'DE8888',
+        senderIban: 'DE1111',
+        receiverIban: 'DE8888',
         date: '2026-08-05',
         issuer: 'Me',
         receiver: 'Vermieter',
@@ -480,8 +477,8 @@ describe('cashflowCalculator', () => {
       // Überweisung von Giro auf Tagesgeld für Sparen
       {
         id: 'tx-transfer-giro',
-        accountIban: 'DE1111',
-        iban: 'DE2222',
+        senderIban: 'DE1111',
+        receiverIban: 'DE2222',
         date: '2026-08-10',
         issuer: 'Me',
         receiver: 'Tagesgeld',
@@ -493,8 +490,8 @@ describe('cashflowCalculator', () => {
       // Buchung auf Tagesgeld-Auszug (technische Gegenbuchung, ohne Kategorie)
       {
         id: 'tx-transfer-tg',
-        accountIban: 'DE2222',
-        iban: 'DE1111',
+        senderIban: 'DE1111',
+        receiverIban: 'DE2222',
         date: '2026-08-10',
         issuer: 'Me',
         receiver: 'Tagesgeld',

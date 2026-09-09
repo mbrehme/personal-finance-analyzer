@@ -150,9 +150,9 @@ export function useTransactions(
       originalSubject: oldTx?.originalSubject ?? oldTx?.subject,
       originalReceiver: oldTx?.originalReceiver ?? oldTx?.receiver,
       originalIssuer: oldTx?.originalIssuer ?? oldTx?.issuer,
-      originalAccountIban: oldTx?.originalAccountIban ?? oldTx?.accountIban,
+      originalSenderIban: oldTx?.originalSenderIban ?? oldTx?.senderIban,
+      originalReceiverIban: oldTx?.originalReceiverIban ?? oldTx?.receiverIban,
       originalDate: oldTx?.originalDate ?? oldTx?.date,
-      originalIban: oldTx?.originalIban ?? oldTx?.iban,
     };
 
     await transactionRepo.save(preparedTx);
@@ -280,9 +280,9 @@ export function useTransactions(
       originalValue: rootTx.originalValue ?? rootTx.value,
       originalSubject: rootTx.originalSubject ?? rootTx.subject,
       originalReceiver: rootTx.originalReceiver ?? rootTx.receiver,
-      originalAccountIban: rootTx.originalAccountIban ?? rootTx.accountIban,
+      originalSenderIban: rootTx.originalSenderIban ?? rootTx.senderIban,
+      originalReceiverIban: rootTx.originalReceiverIban ?? rootTx.receiverIban,
       originalDate: rootTx.originalDate ?? rootTxDate,
-      originalIban: rootTx.originalIban ?? rootTx.iban,
     };
 
     const existingChildren = transactions.filter((t) => t.splitFromId === actualRootId);
@@ -302,6 +302,7 @@ export function useTransactions(
           receiver: split.receiver.trim() || updatedRootTx.receiver,
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
           value: splitValue,
+          amount: split.amount,
           categoryId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',
         };
@@ -310,12 +311,14 @@ export function useTransactions(
         const newChildId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const newChild: Transaction = {
           id: newChildId,
-          accountIban: updatedRootTx.accountIban,
           date: rootTxDate,
           issuer: updatedRootTx.issuer,
+          sender: updatedRootTx.sender,
           receiver: split.receiver.trim() || updatedRootTx.receiver,
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
-          iban: updatedRootTx.iban,
+          senderIban: updatedRootTx.senderIban,
+          receiverIban: updatedRootTx.receiverIban,
+          amount: split.amount,
           value: splitValue,
           categoryId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',

@@ -16,10 +16,10 @@ import {
   isTransactionOverridden,
   getTransactionType,
   Transaction,
+  Account,
   getTransactionAccountInfo,
   isTransactionMatchingAccount,
   getTransactionEffectiveValueForAccount,
-  isInternalTransfer,
   getEffectiveTransactionPartner,
 } from '@/types/finance';
 import { IconRenderer } from '@/ui/components/IconRenderer';
@@ -256,6 +256,8 @@ export const Transactions: React.FC = () => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
 
   // IDs aller Transaktionen, die als Original aufgeteilt (gesplittet) wurden
   const splitParentIds = useMemo(
@@ -908,39 +910,86 @@ export const Transactions: React.FC = () => {
                   const isSplitParent = splitParentIds.has(tx.id);
                   const isSplitChild = Boolean(tx.splitFromId);
                   const isSplitPart = isSplitParent || isSplitChild;
-                  const isTransfer =
-                    Boolean(accountInfo.counterAccount) || isInternalTransfer(tx, accounts);
-                  const isDirectedInternal = Boolean(
-                    accountInfo.primaryAccount &&
-                    accountInfo.counterAccount &&
-                    isInternalTransfer(tx, accounts)
-                  );
-                  const fromAccount = isDirectedInternal
-                    ? accountInfo.primaryAccount
-                    : isTransfer
-                      ? isOutbound
-                        ? accountInfo.primaryAccount
-                        : accountInfo.counterAccount
-                      : accountInfo.primaryAccount;
-                  const toAccount = isDirectedInternal
-                    ? accountInfo.counterAccount
-                    : isTransfer
-                      ? isOutbound
-                        ? accountInfo.counterAccount
-                        : accountInfo.primaryAccount
-                      : undefined;
 
-                  const fromVirtualAccounts = fromAccount
-                    ? accountInfo.virtualAccounts.filter(
-                        (v) => v.parentAccountId === fromAccount.id
-                      )
+                  const senderAccount = accountInfo.senderAccountId
+                    ? accountMap.get(accountInfo.senderAccountId)
+                    : undefined;
+                  const receiverAccount = accountInfo.receiverAccountId
+                    ? accountMap.get(accountInfo.receiverAccountId)
+                    : undefined;
+                  const isTransfer = Boolean(senderAccount && receiverAccount);
+
+                  let primaryAccount: Account | undefined;
+                  let counterpartAccount: Account | undefined;
+                  let isIncomingTransfer = false;
+
+                  if (isTransfer && senderAccount && receiverAccount) {
+                    if (selectedAccount) {
+                      const matchesReceiver =
+                        selectedAccount.id === receiverAccount.id ||
+                        selectedAccount.parentAccountId === receiverAccount.id;
+                      if (matchesReceiver) {
+                        primaryAccount = receiverAccount;
+                        counterpartAccount = senderAccount;
+                        isIncomingTransfer = true;
+                      } else {
+                        primaryAccount = senderAccount;
+                        counterpartAccount = receiverAccount;
+                        isIncomingTransfer = false;
+                      }
+                    } else {
+                      // Gesamtübersicht: Geldfluss Sender -> Empfänger
+                      primaryAccount = senderAccount;
+                      counterpartAccount = receiverAccount;
+                      isIncomingTransfer = false;
+                    }
+                  } else {
+                    primaryAccount =
+                      (tx.value < 0 ? senderAccount : receiverAccount) ||
+                      senderAccount ||
+                      receiverAccount;
+                    counterpartAccount = undefined;
+                    isIncomingTransfer = false;
+                  }
+
+                  const realPrimary =
+                    primaryAccount?.accountType === 'virtual' && primaryAccount.parentAccountId
+                      ? accountMap.get(primaryAccount.parentAccountId) || primaryAccount
+                      : primaryAccount;
+
+                  const primaryVirtualAccounts = primaryAccount
+                    ? primaryAccount.accountType === 'virtual'
+                      ? [primaryAccount]
+                      : accounts.filter(
+                          (a) =>
+                            a.accountType === 'virtual' &&
+                            a.parentAccountId === primaryAccount.id &&
+                            accountInfo.includedAccountIds.includes(a.id)
+                        )
                     : [];
-                  const toVirtualAccounts = toAccount
-                    ? accountInfo.virtualAccounts.filter((v) => v.parentAccountId === toAccount.id)
+
+                  const realCounterpart =
+                    counterpartAccount?.accountType === 'virtual' &&
+                    counterpartAccount.parentAccountId
+                      ? accountMap.get(counterpartAccount.parentAccountId) || counterpartAccount
+                      : counterpartAccount;
+
+                  const counterpartVirtualAccounts = counterpartAccount
+                    ? counterpartAccount.accountType === 'virtual'
+                      ? [counterpartAccount]
+                      : accounts.filter(
+                          (a) =>
+                            a.accountType === 'virtual' &&
+                            a.parentAccountId === counterpartAccount.id &&
+                            accountInfo.includedAccountIds.includes(a.id)
+                        )
                     : [];
+
                   const hasModifiedAccount =
-                    tx.originalAccountIban !== undefined &&
-                    tx.accountIban !== tx.originalAccountIban;
+                    (tx.originalSenderIban !== undefined &&
+                      tx.senderIban !== tx.originalSenderIban) ||
+                    (tx.originalReceiverIban !== undefined &&
+                      tx.receiverIban !== tx.originalReceiverIban);
 
                   const currentDate = tx.date;
                   const origDate = tx.originalDate;
@@ -1023,28 +1072,31 @@ export const Transactions: React.FC = () => {
                       {/* Konto */}
                       <td className="w-44 whitespace-nowrap px-3 py-3 align-middle lg:w-52">
                         <div className="flex flex-col gap-1">
-                          {fromAccount ? (
+                          {realPrimary ? (
                             <span
                               className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 font-medium ${
-                                !isTransfer || isOutbound
-                                  ? 'bg-slate-100 text-slate-800'
-                                  : 'border border-blue-200 bg-blue-50 text-blue-900'
+                                selectedAccount &&
+                                (realPrimary.id === selectedAccount.id ||
+                                  realPrimary.id === selectedAccount.parentAccountId ||
+                                  primaryVirtualAccounts.some((v) => v.id === selectedAccount.id))
+                                  ? 'border border-blue-200 bg-blue-50 text-blue-900'
+                                  : 'bg-slate-100 text-slate-800'
                               }`}
                             >
                               <IconRenderer
-                                name={fromAccount.icon}
-                                style={{ color: fromAccount.color }}
+                                name={realPrimary.icon}
+                                style={{ color: realPrimary.color }}
                                 className="h-3.5 w-3.5 shrink-0"
                               />
-                              <span className="truncate" title={fromAccount.name}>
-                                {fromAccount.name}
+                              <span className="truncate" title={realPrimary.name}>
+                                {realPrimary.name}
                               </span>
-                              {fromVirtualAccounts.map((v) => (
+                              {primaryVirtualAccounts.map((v) => (
                                 <React.Fragment key={v.id}>
                                   <ChevronRight className="h-3 w-3 shrink-0 text-slate-400" />
                                   <span
                                     className="inline-flex min-w-0 items-center gap-1 font-semibold text-purple-700"
-                                    title={`Virtuelles Unterkonto von ${fromAccount.name}: ${v.name}`}
+                                    title={`Virtuelles Unterkonto von ${realPrimary.name}: ${v.name}`}
                                   >
                                     <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
                                     <span className="truncate">{v.name}</span>
@@ -1056,30 +1108,46 @@ export const Transactions: React.FC = () => {
                             <span className="text-slate-400">-</span>
                           )}
 
-                          {isTransfer && toAccount && (
+                          {isTransfer && realCounterpart && (
                             <div className="flex items-center gap-1 pl-1">
-                              <span className="text-xs font-semibold text-blue-500">↳</span>
+                              <span
+                                className={`text-xs font-semibold ${
+                                  isIncomingTransfer ? 'text-emerald-600' : 'text-blue-500'
+                                }`}
+                                title={
+                                  isIncomingTransfer
+                                    ? `Umbuchungseingang von ${realCounterpart.name}`
+                                    : `Umbuchungsausgang nach ${realCounterpart.name}`
+                                }
+                              >
+                                {isIncomingTransfer ? '←' : '→'}
+                              </span>
                               <span
                                 className={`inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 font-medium ${
-                                  isOutbound
+                                  selectedAccount &&
+                                  (realCounterpart.id === selectedAccount.id ||
+                                    realCounterpart.id === selectedAccount.parentAccountId ||
+                                    counterpartVirtualAccounts.some(
+                                      (v) => v.id === selectedAccount.id
+                                    ))
                                     ? 'border border-blue-200 bg-blue-50 text-blue-900'
                                     : 'bg-slate-100 text-slate-800'
                                 }`}
                               >
                                 <IconRenderer
-                                  name={toAccount.icon}
-                                  style={{ color: toAccount.color }}
+                                  name={realCounterpart.icon}
+                                  style={{ color: realCounterpart.color }}
                                   className="h-3.5 w-3.5 shrink-0"
                                 />
-                                <span className="truncate" title={toAccount.name}>
-                                  {toAccount.name}
+                                <span className="truncate" title={realCounterpart.name}>
+                                  {realCounterpart.name}
                                 </span>
-                                {toVirtualAccounts.map((v) => (
+                                {counterpartVirtualAccounts.map((v) => (
                                   <React.Fragment key={v.id}>
                                     <ChevronRight className="h-3 w-3 shrink-0 text-blue-400" />
                                     <span
                                       className="inline-flex min-w-0 items-center gap-1 font-semibold text-purple-700"
-                                      title={`Virtuelles Unterkonto von ${toAccount.name}: ${v.name}`}
+                                      title={`Virtuelles Unterkonto von ${realCounterpart.name}: ${v.name}`}
                                     >
                                       <FolderTree className="h-3 w-3 shrink-0 text-purple-600" />
                                       <span className="truncate">{v.name}</span>
@@ -1475,6 +1543,11 @@ export const Transactions: React.FC = () => {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         accounts={accounts}
+        initialAccountId={
+          selectedAccount?.accountType === 'real'
+            ? selectedAccount.id
+            : selectedAccount?.parentAccountId || undefined
+        }
         onImport={importTransactions}
       />
 

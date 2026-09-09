@@ -244,7 +244,15 @@ export const financeDB = {
    * gerichteten Feldern (amount, senderIban, receiverIban, sender, receiver).
    */
   normalizeTransaction(t: Transaction): Transaction {
-    const { type: _discardedType, ...rest } = t;
+    const raw = t as unknown as Record<string, unknown>;
+    const {
+      type: _discardedType,
+      accountIban: _legacyAccIban,
+      iban: _legacyIban,
+      originalAccountIban: _legacyOrigAccIban,
+      originalIban: _legacyOrigIban,
+      ...rest
+    } = raw;
     const value = t.value ?? 0;
     const amount = t.amount !== undefined ? t.amount : Math.abs(value);
     const isOutflow = value < 0;
@@ -255,8 +263,12 @@ export const financeDB = {
     let receiver = t.receiver;
 
     if (!senderIban && !receiverIban) {
-      const normAccIban = (t.accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
-      const normTxIban = (t.iban || '').trim().toUpperCase().replace(/\s+/g, '');
+      const normAccIban =
+        typeof _legacyAccIban === 'string'
+          ? _legacyAccIban.trim().toUpperCase().replace(/\s+/g, '')
+          : '';
+      const normTxIban =
+        typeof _legacyIban === 'string' ? _legacyIban.trim().toUpperCase().replace(/\s+/g, '') : '';
       senderIban = isOutflow ? normAccIban : normTxIban;
       receiverIban = isOutflow ? normTxIban : normAccIban;
     }
@@ -267,7 +279,7 @@ export const financeDB = {
     }
 
     return {
-      ...rest,
+      ...(rest as unknown as Omit<Transaction, 'type'>),
       amount,
       senderIban,
       receiverIban,
@@ -286,7 +298,15 @@ export const financeDB = {
    * und stellt sicher, dass gerichtete Felder persistiert werden.
    */
   sanitizeForPersistence(tx: Transaction): Omit<Transaction, 'type'> {
-    const { type: _discardedType, ...rest } = tx;
+    const raw = tx as unknown as Record<string, unknown>;
+    const {
+      type: _discardedType,
+      accountIban: _legacyAccIban,
+      iban: _legacyIban,
+      originalAccountIban: _legacyOrigAccIban,
+      originalIban: _legacyOrigIban,
+      ...rest
+    } = raw;
     const value = tx.value ?? 0;
     const amount = tx.amount !== undefined ? tx.amount : Math.abs(value);
     const isOutflow = value < 0;
@@ -297,8 +317,12 @@ export const financeDB = {
     let receiver = tx.receiver;
 
     if (!senderIban && !receiverIban) {
-      const normAccIban = (tx.accountIban || '').trim().toUpperCase().replace(/\s+/g, '');
-      const normTxIban = (tx.iban || '').trim().toUpperCase().replace(/\s+/g, '');
+      const normAccIban =
+        typeof _legacyAccIban === 'string'
+          ? _legacyAccIban.trim().toUpperCase().replace(/\s+/g, '')
+          : '';
+      const normTxIban =
+        typeof _legacyIban === 'string' ? _legacyIban.trim().toUpperCase().replace(/\s+/g, '') : '';
       senderIban = isOutflow ? normAccIban : normTxIban;
       receiverIban = isOutflow ? normTxIban : normAccIban;
     }
@@ -309,7 +333,7 @@ export const financeDB = {
     }
 
     return {
-      ...rest,
+      ...(rest as unknown as Omit<Transaction, 'type'>),
       amount,
       senderIban,
       receiverIban,

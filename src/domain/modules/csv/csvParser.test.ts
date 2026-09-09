@@ -106,7 +106,7 @@ describe('csvParser', () => {
     );
 
     expect(transactions).toHaveLength(2);
-    expect(transactions[0].accountIban).toBe('DE11112222');
+    expect(transactions[0].senderIban).toBe('DE11112222');
     expect(transactions[0].date).toBe('2026-09-01');
     expect(transactions[0].receiver).toBe('Rewe Markt');
     expect(transactions[0].value).toBe(-45.5);
@@ -118,7 +118,7 @@ describe('csvParser', () => {
     expect(transactions[0].originalValue).toBe(-45.5);
     expect(transactions[0].originalSubject).toBe('Lebensmitteleinkauf');
     expect(transactions[0].originalReceiver).toBe('Rewe Markt');
-    expect(transactions[0].originalAccountIban).toBe('DE11112222');
+    expect(transactions[0].originalSenderIban).toBe('DE11112222');
 
     expect(transactions[1].date).toBe('2026-09-02');
     expect(transactions[1].value).toBe(3200);
@@ -264,8 +264,8 @@ describe('csvParser', () => {
 
     // Transaktion 1 (Eingang 250 €)
     expect(txs[0].date).toBe('2026-09-07');
-    expect(txs[0].accountIban).toBe('DE80120300001027106861');
-    expect(txs[0].iban).toBe('DE89120300001083850147');
+    expect(txs[0].receiverIban).toBe('DE80120300001027106861');
+    expect(txs[0].senderIban).toBe('DE89120300001083850147');
     expect(txs[0].issuer).toBe('Denise Gül Brehme und Martin Brehme');
     expect(txs[0].receiver).toBe('Denise Gül Brehme');
     expect(txs[0].subject).toBe('Rücklage: Urlaub');

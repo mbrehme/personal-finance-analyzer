@@ -301,9 +301,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Migration für gerichteten Geldfluss (rein anreichernd, niemals destruktiv)
       let needsTxMigrationSave = false;
       const migrated = loadedTransactions.map((tx) => {
+        const raw = tx as unknown as Record<string, unknown>;
         if (
           tx.amount === undefined ||
-          (!tx.senderIban && !tx.receiverIban && (tx.accountIban || tx.iban))
+          (!tx.senderIban && !tx.receiverIban && (raw.accountIban || raw.iban))
         ) {
           needsTxMigrationSave = true;
           return financeDB.normalizeTransaction(tx);
@@ -580,9 +581,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalSubject: oldTx?.originalSubject ?? oldTx?.subject,
       originalReceiver: oldTx?.originalReceiver ?? oldTx?.receiver,
       originalIssuer: oldTx?.originalIssuer ?? oldTx?.issuer,
-      originalAccountIban: oldTx?.originalAccountIban ?? oldTx?.accountIban,
+      originalSenderIban: oldTx?.originalSenderIban ?? oldTx?.senderIban,
+      originalReceiverIban: oldTx?.originalReceiverIban ?? oldTx?.receiverIban,
       originalDate: oldTx?.originalDate ?? oldTx?.date,
-      originalIban: oldTx?.originalIban ?? oldTx?.iban,
     };
 
     await financeDB.saveTransaction(preparedTx);
@@ -621,21 +622,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalValue: originalTx.originalValue ?? originalTx.value,
       originalSubject: originalTx.originalSubject ?? originalTx.subject,
       originalReceiver: originalTx.originalReceiver ?? originalTx.receiver,
-      originalAccountIban: originalTx.originalAccountIban ?? originalTx.accountIban,
+      originalSenderIban: originalTx.originalSenderIban ?? originalTx.senderIban,
+      originalReceiverIban: originalTx.originalReceiverIban ?? originalTx.receiverIban,
       originalDate: originalTx.originalDate ?? originalTxDate,
-      originalIban: originalTx.originalIban ?? originalTx.iban,
     };
 
     const splitId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const splitValue = (sign * Math.round(splitAmount * 100)) / 100;
     const newSplitTx: Transaction = {
       id: splitId,
-      accountIban: originalTx.accountIban,
       date: originalTxDate,
       issuer: originalTx.issuer,
+      sender: originalTx.sender,
       receiver: splitData.receiver.trim() || originalTx.receiver,
       subject: splitData.subject.trim() || `${originalTx.subject} (Split)`,
-      iban: originalTx.iban,
+      senderIban: originalTx.senderIban,
+      receiverIban: originalTx.receiverIban,
+      amount: splitAmount,
       value: splitValue,
       categoryId: splitData.categoryId || null,
       assignmentSource: splitData.categoryId ? 'manual' : 'unassigned',
@@ -718,9 +721,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       originalValue: rootTx.originalValue ?? rootTx.value,
       originalSubject: rootTx.originalSubject ?? rootTx.subject,
       originalReceiver: rootTx.originalReceiver ?? rootTx.receiver,
-      originalAccountIban: rootTx.originalAccountIban ?? rootTx.accountIban,
+      originalSenderIban: rootTx.originalSenderIban ?? rootTx.senderIban,
+      originalReceiverIban: rootTx.originalReceiverIban ?? rootTx.receiverIban,
       originalDate: rootTx.originalDate ?? rootTxDate,
-      originalIban: rootTx.originalIban ?? rootTx.iban,
     };
 
     // 3. Bestehende Kinder identifizieren
@@ -742,6 +745,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const updatedChild: Transaction = {
           ...existing,
           value: splitValue,
+          amount: split.amount,
           receiver: split.receiver.trim() || updatedRootTx.receiver,
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
           categoryId: split.categoryId || null,
@@ -767,12 +771,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const newChildId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const newChild: Transaction = {
           id: newChildId,
-          accountIban: updatedRootTx.accountIban,
           date: rootTxDate,
           issuer: updatedRootTx.issuer,
+          sender: updatedRootTx.sender,
           receiver: split.receiver.trim() || updatedRootTx.receiver,
           subject: split.subject.trim() || `${updatedRootTx.subject} (Split)`,
-          iban: updatedRootTx.iban,
+          senderIban: updatedRootTx.senderIban,
+          receiverIban: updatedRootTx.receiverIban,
+          amount: split.amount,
           value: splitValue,
           categoryId: split.categoryId || null,
           assignmentSource: split.categoryId ? 'manual' : 'unassigned',

@@ -27,7 +27,8 @@ describe('finance domain helpers', () => {
       receiver: 'Max Mustermann',
       subject: 'Gehaltszahlung August',
       type: 'inbound',
-      iban: 'DE1234567890',
+      senderIban: 'DE1234567890',
+      receiverIban: 'DE_MY_GIRO',
       value: 3500,
       assignmentSource: 'unassigned',
     };
@@ -42,7 +43,8 @@ describe('finance domain helpers', () => {
       receiver: 'REWE Markt GmbH',
       subject: 'Kartenzahlung',
       type: 'outbound',
-      iban: 'DE9876543210',
+      senderIban: 'DE_MY_GIRO',
+      receiverIban: 'DE9876543210',
       value: -42.5,
       assignmentSource: 'unassigned',
     };
@@ -59,7 +61,8 @@ describe('finance domain helpers', () => {
       receiver: 'Me',
       subject: 'Einkauf',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -20,
       assignmentSource: 'unassigned',
       dayIndex: 0,
@@ -74,7 +77,8 @@ describe('finance domain helpers', () => {
       receiver: 'Me',
       subject: 'Medikamente',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -15,
       assignmentSource: 'unassigned',
       dayIndex: 1,
@@ -89,7 +93,8 @@ describe('finance domain helpers', () => {
       receiver: 'Me',
       subject: 'Lohn',
       type: 'inbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: 3000,
       assignmentSource: 'unassigned',
       dayIndex: 2,
@@ -113,7 +118,8 @@ describe('finance domain helpers', () => {
       receiver: 'Me',
       subject: 'Einkauf Rest',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -36.29,
       assignmentSource: 'unassigned',
       dayIndex: 0,
@@ -126,7 +132,8 @@ describe('finance domain helpers', () => {
       receiver: 'Me',
       subject: 'Kaffee',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -28.33,
       assignmentSource: 'unassigned',
       dayIndex: 1,
@@ -139,7 +146,8 @@ describe('finance domain helpers', () => {
       receiver: 'Me',
       subject: 'Snack',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -14.0,
       assignmentSource: 'unassigned',
       dayIndex: 2,
@@ -153,7 +161,8 @@ describe('finance domain helpers', () => {
       receiver: 'Me',
       subject: 'Einkauf Teilbetrag',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -80.0,
       assignmentSource: 'unassigned',
     };
@@ -173,7 +182,8 @@ describe('finance domain helpers', () => {
       receiver: 'B',
       subject: 'Newest',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -10,
       assignmentSource: 'unassigned',
     };
@@ -185,7 +195,8 @@ describe('finance domain helpers', () => {
       receiver: 'B',
       subject: 'Middle',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -20,
       assignmentSource: 'unassigned',
     };
@@ -196,7 +207,8 @@ describe('finance domain helpers', () => {
       receiver: 'B',
       subject: 'Oldest',
       type: 'outbound',
-      iban: '',
+      senderIban: '',
+      receiverIban: '',
       value: -30,
       assignmentSource: 'unassigned',
     };
@@ -224,7 +236,8 @@ describe('finance domain helpers', () => {
       value: 100,
       receiver: 'Max',
       subject: 'Bonus',
-      iban: 'DE11',
+      senderIban: 'DE11',
+      receiverIban: 'DE_MY_GIRO',
     } as Transaction);
     expect(searchInbound).toContain('[Eingang]');
 
@@ -232,7 +245,8 @@ describe('finance domain helpers', () => {
       value: -50,
       receiver: 'Rewe',
       subject: 'Einkauf',
-      iban: 'DE22',
+      senderIban: 'DE_MY_GIRO',
+      receiverIban: 'DE22',
     } as Transaction);
     expect(searchOutbound).toContain('[Ausgang]');
   });
@@ -242,8 +256,10 @@ describe('finance domain helpers', () => {
 
     const modifiedTx: Transaction = {
       id: 'tx-override-1',
-      accountIban: 'DE2222',
-      originalAccountIban: 'DE1111',
+      senderIban: 'DE2222',
+      originalSenderIban: 'DE1111',
+      receiverIban: 'DE9999',
+      originalReceiverIban: 'DE1111',
       date: '2026-08-15',
       originalDate: '2026-08-10',
       issuer: 'Manuell Sender',
@@ -252,8 +268,6 @@ describe('finance domain helpers', () => {
       originalReceiver: 'Bank Empfänger',
       subject: 'Manuell Verwendungszweck',
       originalSubject: 'Bank Verwendungszweck',
-      iban: 'DE9999',
-      originalIban: 'DE1111',
       value: -100,
       originalValue: -50,
       categoryId: 'cat-1',
@@ -268,12 +282,12 @@ describe('finance domain helpers', () => {
     const restored = resetTransactionToOriginal(modifiedTx);
 
     expect(restored.id).toBe('tx-override-1');
-    expect(restored.accountIban).toBe('DE1111');
+    expect(restored.senderIban).toBe('DE1111');
+    expect(restored.receiverIban).toBe('DE1111');
     expect(restored.date).toBe('2026-08-10');
     expect(restored.issuer).toBe('Bank Sender');
     expect(restored.receiver).toBe('Bank Empfänger');
     expect(restored.subject).toBe('Bank Verwendungszweck');
-    expect(restored.iban).toBe('DE1111');
     expect(restored.value).toBe(-50);
     expect(restored.categoryId).toBeNull();
     expect(restored.assignmentSource).toBe('unassigned');
@@ -318,21 +332,21 @@ describe('finance domain helpers', () => {
     // 1. Umbuchung von Girokonto auf Tagesgeld
     const transferTx: Transaction = {
       id: 'tx-transfer',
-      accountIban: 'DE1111',
+      senderIban: 'DE1111',
+      receiverIban: 'DE2222',
       date: '2026-08-10',
       issuer: 'Martin',
       receiver: 'Tagesgeld',
       subject: 'Umbuchung Tagesgeld',
-      iban: 'DE2222',
       value: -500,
       assignmentSource: 'unassigned',
     };
 
     const transferInfo = getTransactionAccountInfo(transferTx, accounts);
-    expect(transferInfo.primaryAccount?.id).toBe('acc-giro');
-    expect(transferInfo.counterAccount?.id).toBe('acc-tagesgeld');
-    expect(transferInfo.virtualAccounts).toHaveLength(0);
-    expect(transferInfo.allAccounts).toHaveLength(2);
+    expect(transferInfo.senderAccountId).toBe('acc-giro');
+    expect(transferInfo.receiverAccountId).toBe('acc-tagesgeld');
+    expect(transferInfo.includedAccountIds).toContain('acc-giro');
+    expect(transferInfo.includedAccountIds).toContain('acc-tagesgeld');
 
     expect(isTransactionMatchingAccount(transferTx, 'acc-giro', accounts)).toBe(true);
     // Gegenkonto matcht auch (Eingänge / Übertrag aus Sicht des Zielkontos im Transaktions-Filter)
@@ -342,23 +356,21 @@ describe('finance domain helpers', () => {
     // 2. Buchung auf Girokonto, die zum virtuellen Unterkonto Urlaubstopf gehört
     const vacationTx: Transaction = {
       id: 'tx-vacation',
-      accountIban: 'DE1111',
+      senderIban: 'DE1111',
+      receiverIban: 'DE9999',
       date: '2026-08-12',
       issuer: 'Martin',
       receiver: 'Lufthansa',
       subject: 'Flugticket',
-      iban: 'DE9999',
       value: -300,
       categoryId: 'cat-urlaub',
       assignmentSource: 'unassigned',
     };
 
     const vacationInfo = getTransactionAccountInfo(vacationTx, accounts);
-    expect(vacationInfo.primaryAccount?.id).toBe('acc-giro');
-    expect(vacationInfo.counterAccount).toBeUndefined();
-    expect(vacationInfo.virtualAccounts).toHaveLength(1);
-    expect(vacationInfo.virtualAccounts[0].id).toBe('acc-sub-urlaub');
-    expect(vacationInfo.allAccounts).toHaveLength(2);
+    expect(vacationInfo.senderAccountId).toBe('acc-sub-urlaub');
+    expect(vacationInfo.receiverAccountId).toBeUndefined();
+    expect(vacationInfo.includedAccountIds).toEqual(['acc-sub-urlaub']);
 
     expect(isTransactionMatchingAccount(vacationTx, 'acc-giro', accounts)).toBe(true);
     expect(isTransactionMatchingAccount(vacationTx, 'acc-sub-urlaub', accounts)).toBe(true);
@@ -367,23 +379,21 @@ describe('finance domain helpers', () => {
     // 3. Transaktion OHNE accountId, rein über accountIban und categoryId aufgelöst
     const purelyVirtualTx: Transaction = {
       id: 'tx-no-account-id',
-      accountIban: 'DE1111',
+      senderIban: 'DE1111',
+      receiverIban: 'DE7777',
       date: '2026-08-15',
       issuer: 'Martin',
       receiver: 'Hotel Strandlust',
       subject: 'Urlaub Übernachtung',
-      iban: 'DE7777',
       value: -150,
       categoryId: 'cat-urlaub',
       assignmentSource: 'unassigned',
     };
 
     const purelyVirtualInfo = getTransactionAccountInfo(purelyVirtualTx, accounts);
-    expect(purelyVirtualInfo.primaryAccount?.id).toBe('acc-giro');
-    expect(purelyVirtualInfo.counterAccount).toBeUndefined();
-    expect(purelyVirtualInfo.virtualAccounts).toHaveLength(1);
-    expect(purelyVirtualInfo.virtualAccounts[0].id).toBe('acc-sub-urlaub');
-    expect(purelyVirtualInfo.allAccounts).toHaveLength(2);
+    expect(purelyVirtualInfo.senderAccountId).toBe('acc-sub-urlaub');
+    expect(purelyVirtualInfo.receiverAccountId).toBeUndefined();
+    expect(purelyVirtualInfo.includedAccountIds).toEqual(['acc-sub-urlaub']);
 
     expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-giro', accounts)).toBe(true);
     expect(isTransactionMatchingAccount(purelyVirtualTx, 'acc-sub-urlaub', accounts)).toBe(true);
@@ -439,8 +449,8 @@ describe('finance domain helpers', () => {
       // Überweisung von Girokonto auf Tagesgeld für Kategorie "Sparen"
       const transferTx: Transaction = {
         id: 'tx-transfer-savings',
-        accountIban: 'DE1111',
-        iban: 'DE2222',
+        senderIban: 'DE1111',
+        receiverIban: 'DE2222',
         date: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeldkonto',
@@ -462,8 +472,8 @@ describe('finance domain helpers', () => {
       // Falls ein eigener Tagesgeld-Auszug vorliegt: Doppelzählung verhindern
       const directTgTx: Transaction = {
         id: 'tx-tg-direct',
-        accountIban: 'DE2222',
-        iban: 'DE1111',
+        senderIban: 'DE1111',
+        receiverIban: 'DE2222',
         date: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeldkonto',
@@ -496,8 +506,8 @@ describe('finance domain helpers', () => {
       // Buchung auf Kreditkarte mit Kategorie 'cat-urlaub'
       const ccVacationTx: Transaction = {
         id: 'tx-cc-vacation',
-        accountIban: 'DE3333',
-        iban: 'DE9999',
+        senderIban: 'DE3333',
+        receiverIban: 'DE9999',
         date: '2026-08-11',
         issuer: 'Martin',
         receiver: 'Hotel Roma',
@@ -534,8 +544,8 @@ describe('finance domain helpers', () => {
 
       const tx: Transaction = {
         id: 'tx-orphan-test',
-        accountIban: 'DE1111',
-        iban: 'DE2222',
+        senderIban: 'DE1111',
+        receiverIban: 'DE2222',
         date: '2026-08-10',
         issuer: 'Martin',
         receiver: 'Tagesgeld',

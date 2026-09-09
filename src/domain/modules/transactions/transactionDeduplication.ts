@@ -84,8 +84,6 @@ export function findMatchingTransaction(
 ): TransactionMatchResult | null {
   const incomingNormSender = normalizeIban(incoming.senderIban);
   const incomingNormReceiver = normalizeIban(incoming.receiverIban);
-  const incomingNormAccount = normalizeIban(incoming.accountIban);
-  const incomingNormIban = normalizeIban(incoming.iban);
   const incomingSubject = incoming.subject || '';
   const incomingPartner = incoming.receiver || incoming.issuer || incoming.sender || '';
 
@@ -114,8 +112,6 @@ export function findMatchingTransaction(
 
     const candNormSender = normalizeIban(cand.senderIban);
     const candNormReceiver = normalizeIban(cand.receiverIban);
-    const candNormAccount = normalizeIban(cand.accountIban);
-    const candNormIban = normalizeIban(cand.iban);
     const candSubject = cand.subject || '';
     const candPartner = cand.receiver || cand.issuer || cand.sender || '';
 
@@ -140,10 +136,14 @@ export function findMatchingTransaction(
     if (isOppositeSigns) {
       // B.1: IBAN-Kreuzübereinstimmung
       const crossIbanMatch =
-        (candNormAccount && incomingNormIban && candNormAccount === incomingNormIban) ||
-        (candNormIban && incomingNormAccount && candNormIban === incomingNormAccount) ||
         (candNormSender && incomingNormReceiver && candNormSender === incomingNormReceiver) ||
-        (candNormReceiver && incomingNormSender && candNormReceiver === incomingNormSender);
+        (candNormReceiver && incomingNormSender && candNormReceiver === incomingNormSender) ||
+        (candNormSender &&
+          incomingNormSender &&
+          candNormReceiver &&
+          incomingNormReceiver &&
+          candNormSender === incomingNormSender &&
+          candNormReceiver === incomingNormReceiver);
 
       if (crossIbanMatch) {
         return { matchedTx: cand, matchType: 'counterpart' };
@@ -151,10 +151,14 @@ export function findMatchingTransaction(
 
       // B.2: Text- und Kontonamen-Kreuzabgleich (z. B. wenn Bank-CSV Gegen-IBAN nicht exportierte)
       const candPrimaryAcc = accounts.find(
-        (a) => a.iban && normalizeIban(a.iban) === candNormAccount
+        (a) =>
+          (a.iban && normalizeIban(a.iban) === candNormSender) ||
+          (a.iban && normalizeIban(a.iban) === candNormReceiver)
       );
       const incomingPrimaryAcc = accounts.find(
-        (a) => a.iban && normalizeIban(a.iban) === incomingNormAccount
+        (a) =>
+          (a.iban && normalizeIban(a.iban) === incomingNormSender) ||
+          (a.iban && normalizeIban(a.iban) === incomingNormReceiver)
       );
 
       const matchesPartnerNames =
@@ -176,7 +180,6 @@ export function findMatchingTransaction(
     if (isSameSign) {
       // Gleiches Hauptkonto (oder gleicher Absender)
       const isSameAccount =
-        (candNormAccount && incomingNormAccount && candNormAccount === incomingNormAccount) ||
         (candNormSender && incomingNormSender && candNormSender === incomingNormSender) ||
         (candNormReceiver && incomingNormReceiver && candNormReceiver === incomingNormReceiver);
 
@@ -225,8 +228,6 @@ export function mergeTransactions(existing: Transaction, incoming: Transaction):
   // 3. IBAN-Metadaten anreichern
   const senderIban = existing.senderIban || incoming.senderIban;
   const receiverIban = existing.receiverIban || incoming.receiverIban;
-  const iban = existing.iban || incoming.iban;
-  const accountIban = existing.accountIban || incoming.accountIban;
 
   // 4. Namen und Verwendungszweck anreichern
   const sender = existing.sender || incoming.sender;
@@ -248,8 +249,6 @@ export function mergeTransactions(existing: Transaction, incoming: Transaction):
     origin,
     senderIban,
     receiverIban,
-    iban,
-    accountIban,
     sender,
     receiver,
     issuer,

@@ -399,13 +399,13 @@ describe('Transactions Page', () => {
         // 1. Umbuchung von Girokonto auf Tagesgeld
         {
           id: 'tx-transfer-1',
-          accountIban: 'DE1111',
+          senderIban: 'DE1111',
+          receiverIban: 'DE2222',
           date: '2026-08-10',
           receiver: 'Tagesgeldkonto',
           issuer: 'Martin',
           subject: 'Umbuchung Tagesgeld Rücklage',
           type: 'outbound',
-          iban: 'DE2222',
           value: -500,
           categoryId: null,
           assignmentSource: 'unassigned',
@@ -413,13 +413,13 @@ describe('Transactions Page', () => {
         // 2. Buchung auf Girokonto, die auch zum virtuellen Unterkonto Urlaubstopf gehört
         {
           id: 'tx-vacation-1',
-          accountIban: 'DE1111',
+          senderIban: 'DE1111',
+          receiverIban: 'DE9999',
           date: '2026-08-15',
           receiver: 'Lufthansa',
           issuer: 'Martin',
           subject: 'Flug nach Mallorca',
           type: 'outbound',
-          iban: 'DE9999',
           value: -350,
           categoryId: 'cat-urlaub',
           assignmentSource: 'auto_regex',
@@ -480,12 +480,12 @@ describe('Transactions Page', () => {
       transactions: [
         {
           id: 'tx-flight-detail',
-          accountIban: 'DE44500105175407324900',
+          senderIban: 'DE44500105175407324900',
+          receiverIban: 'DE5544332211',
           date: '2026-08-20',
           receiver: 'Eurowings',
           issuer: 'Martin',
           subject: 'Flugurlaub Sommer',
-          iban: 'DE5544332211',
           value: -280,
           categoryId: 'cat-reisen',
           assignmentSource: 'auto_regex',
@@ -556,26 +556,26 @@ describe('Transactions Page', () => {
       transactions: [
         {
           id: 'tx-giro',
-          accountIban: 'DE1111',
+          senderIban: 'DE1111',
+          receiverIban: 'DE999',
           date: '2026-03-01',
           issuer: 'Supermarkt',
           receiver: 'Ich',
           subject: 'Giro Einkauf',
           type: 'outbound',
-          iban: 'DE999',
           value: -45,
           assignmentSource: 'unassigned',
           origin: 'imported',
         },
         {
           id: 'tx-tg',
-          accountIban: 'DE2222',
+          senderIban: '',
+          receiverIban: 'DE2222',
           date: '2026-03-02',
           issuer: 'Bank',
           receiver: 'Ich',
           subject: 'Zinsen Tagesgeld',
           type: 'inbound',
-          iban: '',
           value: 15,
           assignmentSource: 'unassigned',
           origin: 'imported',
@@ -974,13 +974,13 @@ describe('Transactions Page', () => {
       transactions: [
         {
           id: 'tx-1',
-          accountIban: 'DE1111',
+          senderIban: 'DE1111',
+          receiverIban: 'DE999',
           date: '2026-03-01',
           issuer: 'Supermarkt',
           receiver: 'Ich',
           subject: 'Wocheneinkauf',
           type: 'outbound',
-          iban: 'DE999',
           value: -100,
           categoryId: 'cat-food',
           assignmentSource: 'manual',
@@ -988,13 +988,13 @@ describe('Transactions Page', () => {
         },
         {
           id: 'tx-2',
-          accountIban: 'DE2222',
+          senderIban: 'DE888',
+          receiverIban: 'DE2222',
           date: '2026-03-02',
           issuer: 'Arbeitgeber',
           receiver: 'Ich',
           subject: 'Gehaltszahlung',
           type: 'inbound',
-          iban: 'DE888',
           value: 3000,
           categoryId: null,
           assignmentSource: 'unassigned',
@@ -1096,8 +1096,6 @@ describe('Transactions Page', () => {
     const transferTx = {
       id: 'tx-transfer-urlaub',
       date: '2026-07-06',
-      accountIban: 'DE11112222',
-      iban: 'DE22223333',
       senderIban: 'DE11112222',
       receiverIban: 'DE22223333',
       issuer: 'Martin',
@@ -1157,6 +1155,163 @@ describe('Transactions Page', () => {
     expect(screen.getByText('Umbuchung')).toBeInTheDocument();
     // Aus Sicht des Girokontos ist es ein Abgang (-250,00 €)
     expect(screen.getAllByText('-250,00 €').length).toBeGreaterThanOrEqual(1);
+
+    vi.restoreAllMocks();
+  });
+
+  it('renders incoming transfer into virtual account with correct direction (from Hauptkonto to Rücklagen > Geschenke)', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    const giroAcc = {
+      id: 'acc-giro',
+      name: 'Haupt-Girokonto',
+      iban: 'DE11112222',
+      accountType: 'real',
+      color: '#3b82f6',
+      icon: 'Landmark',
+      balanceEntries: [],
+    };
+    const ruecklagenAcc = {
+      id: 'acc-ruecklagen',
+      name: 'Rücklagen',
+      iban: 'DE22223333',
+      accountType: 'real',
+      color: '#10b981',
+      icon: 'PiggyBank',
+      balanceEntries: [],
+    };
+    const geschenkeVirtAcc = {
+      id: 'acc-geschenke',
+      name: 'Geschenke',
+      accountType: 'virtual',
+      parentAccountId: 'acc-ruecklagen',
+      categoryIds: ['cat-geschenke'],
+      color: '#8b5cf6',
+      icon: 'FolderTree',
+      balanceEntries: [],
+    };
+
+    const incomingTransferTx = {
+      id: 'tx-incoming-geschenke',
+      date: '2026-09-07',
+      senderIban: 'DE11112222',
+      receiverIban: 'DE22223333',
+      issuer: 'Denise und Martin',
+      receiver: 'Denise und Martin',
+      subject: 'Monatliche Rücklage Geschenke',
+      value: 250,
+      amount: 250,
+      categoryId: 'cat-geschenke',
+      type: 'inbound',
+      origin: 'imported',
+      assignmentSource: 'manual',
+    };
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: [giroAcc, ruecklagenAcc, geschenkeVirtAcc] as any,
+      categories: [
+        { id: 'cat-geschenke', name: 'Geschenke', color: '#8b5cf6', icon: 'Gift' },
+      ] as any,
+      transactions: [incomingTransferTx] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategoryBatch: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      deleteTransaction: vi.fn(),
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Umbuchung Badge muss sichtbar sein
+    expect(screen.getByText('Monatliche Rücklage Geschenke')).toBeInTheDocument();
+    expect(screen.getByText('Umbuchung')).toBeInTheDocument();
+
+    // Richtung im Kontofeld: Haupt-Girokonto als fromAccount, Rücklagen > Geschenke als toAccount
+    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
+    expect(screen.getByText('Rücklagen')).toBeInTheDocument();
+    expect(screen.getAllByText('Geschenke').length).toBeGreaterThanOrEqual(1);
+
+    // Filtern auf das virtuelle Unterkonto
+    const accountSelect = screen.getByLabelText('Konto filtern');
+    await user.selectOptions(accountSelect, 'acc-geschenke');
+    expect(screen.getByText('Monatliche Rücklage Geschenke')).toBeInTheDocument();
+    expect(screen.getByText('Umbuchung')).toBeInTheDocument();
+    expect(screen.getAllByText('+250,00 €').length).toBeGreaterThanOrEqual(1);
+
+    vi.restoreAllMocks();
+  });
+
+  it('displays filtered account as primary with directional incoming arrow for transfers', async () => {
+    const { userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    const FinanceContextModule = await import('@/domain');
+
+    const accounts = [
+      {
+        id: 'acc-giro-main',
+        name: 'Haupt-Girokonto',
+        accountType: 'real' as const,
+        iban: 'DE89120300001083850147',
+        balanceEntries: [],
+      },
+      {
+        id: 'acc-ruecklagen',
+        name: 'Rücklagen',
+        accountType: 'real' as const,
+        iban: 'DE80120300001027106861',
+        balanceEntries: [],
+      },
+    ];
+
+    // Transfer von Rücklagen nach Hauptkonto (aus Sicht Rücklagen Ausgang, aus Sicht Hauptkonto Eingang)
+    const transferTx = {
+      id: 'tx-transfer-1',
+      senderIban: 'DE80120300001027106861',
+      receiverIban: 'DE89120300001083850147',
+      date: '2026-09-07',
+      value: 500,
+      subject: 'Rücklagenauflösung',
+      receiver: 'Haupt-Girokonto',
+      sender: 'Rücklagen',
+      categoryId: null,
+      assignmentSource: 'unassigned',
+      origin: 'imported',
+    };
+
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      accounts: accounts as any,
+      categories: [] as any,
+      transactions: [transferTx] as any,
+      deletedTransactions: [],
+      loading: false,
+      assignTransactionCategoryBatch: vi.fn(),
+      assignTransactionCategory: vi.fn(),
+      deleteTransaction: vi.fn(),
+    } as any);
+
+    render(
+      <FinanceProvider>
+        <Transactions />
+      </FinanceProvider>
+    );
+
+    // Auf Hauptkonto filtern
+    const accountSelect = screen.getByLabelText('Konto filtern');
+    await user.selectOptions(accountSelect, 'acc-giro-main');
+
+    // Das gefilterte Hauptkonto muss vorhanden sein
+    expect(screen.getByText('Haupt-Girokonto')).toBeInTheDocument();
+    expect(screen.getAllByText('Rücklagen').length).toBeGreaterThanOrEqual(1);
+
+    // Richtungspfeil für Eingang von Rücklagen
+    expect(screen.getByTitle('Umbuchungseingang von Rücklagen')).toBeInTheDocument();
+    expect(screen.getByText('←')).toBeInTheDocument();
 
     vi.restoreAllMocks();
   });

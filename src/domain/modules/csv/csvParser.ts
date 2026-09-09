@@ -632,16 +632,12 @@ export function convertRowsToTransactions(
       id,
       date,
       amount,
-      senderIban,
-      receiverIban,
+      senderIban: normSenderIban,
+      receiverIban: normReceiverIban,
       sender: senderName,
       receiver: receiverName,
       subject,
-
-      // Abwärtskompatible Felder
-      accountIban: normAccountIban,
       issuer,
-      iban,
       value,
       get type() {
         return getTransactionType(value);
@@ -656,7 +652,6 @@ export function convertRowsToTransactions(
       importedAt: timestamp,
 
       // Flache Original-Rohdaten aus der Bank-CSV
-      originalAccountIban: normAccountIban,
       originalDate: date,
       originalValue: value,
       originalAmount: amount,
@@ -666,7 +661,6 @@ export function convertRowsToTransactions(
       originalSubject: subject,
       originalReceiver: receiverName,
       originalIssuer: issuer,
-      originalIban: iban,
     };
   });
 }

@@ -50,9 +50,7 @@ export interface Transaction {
   /** Verwendungszweck / Buchungstext */
   subject: string;
 
-  /* --- Abwärtskompatible / Auszugsbezogene Felder --- */
-  /** Eigene Bank-IBAN des Kontos, auf dem die Buchung importiert wurde */
-  accountIban?: string;
+  /* --- Auszugsbezogene Felder --- */
   /** Auftraggeber / Absender der Zahlung (äquivalent zu sender) */
   issuer: string;
   /**
@@ -60,8 +58,6 @@ export interface Transaction {
    * Wird nicht in der Datenbank persistiert, sondern dynamisch aus dem Vorzeichen von `value` abgeleitet.
    */
   type?: TransactionType;
-  /** Zugehörige Gegenkonto-IBAN */
-  iban: string;
   /** Betrag der Transaktion (positiv für Inbound, negativ für Outbound) */
   value: number;
 
@@ -91,7 +87,6 @@ export interface Transaction {
   splitFromId?: string;
 
   /* Flache Original-Felder der Bank-Rohdaten (nur bei importierten Buchungen vorhanden) */
-  originalAccountIban?: string;
   /** Ursprüngliches Wertstellungsdatum (Valutadatum) aus den Bank-Rohdaten */
   originalDate?: ISODateString;
   originalValue?: number;
@@ -102,7 +97,6 @@ export interface Transaction {
   originalSubject?: string;
   originalReceiver?: string;
   originalIssuer?: string;
-  originalIban?: string;
   /** Zeitstempel der Löschung als ISO-String (falls gelöscht / im Papierkorb) */
   deletedAt?: string;
 }

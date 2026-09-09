@@ -99,6 +99,61 @@ describe('CsvImportModal', () => {
     expect(importedTransactions).toHaveLength(1);
     expect(importedTransactions[0].value).toBe(-25.5);
     expect(importedTransactions[0].subject).toBe('Einkauf');
-    expect(importedTransactions[0].accountIban).toBe('DE1122334455');
+    expect(importedTransactions[0].senderIban).toBe('DE1122334455');
+  });
+
+  it('preselects initialAccountId and does not silently overwrite it when CSV contains a different preamble IBAN', async () => {
+    const handleClose = vi.fn();
+    const handleImport = vi.fn().mockResolvedValue(1);
+
+    const accounts = [
+      {
+        id: 'acc-real-1',
+        name: 'Girokonto Hauptkonto',
+        accountType: 'real' as const,
+        iban: 'DE1122334455',
+        balanceEntries: [],
+      },
+      {
+        id: 'acc-real-2',
+        name: 'Rücklagenkonto',
+        accountType: 'real' as const,
+        iban: 'DE80120300001027106861',
+        balanceEntries: [],
+      },
+    ];
+
+    const { container } = render(
+      <CsvImportModal
+        isOpen={true}
+        onClose={handleClose}
+        accounts={accounts}
+        initialAccountId="acc-real-1"
+        onImport={handleImport}
+      />
+    );
+
+    // CSV mit Preamble-IBAN von Konto 2 (Rücklagen)
+    const csvContent = `"Tagesgeld";"DE80120300001027106861"
+"Buchungsdatum";"Empfänger";"Verwendungszweck";"Betrag";"IBAN"
+"01.09.2026";"Supermarkt";"Einkauf";"-25,50";"DE9876543210"`;
+    const file = new File([csvContent], 'umsatz.csv', { type: 'text/csv' });
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    // Buchungskonto bleibt das initial gewählte Hauptkonto (kein stilles Überschreiben!)
+    const accountSelect = (await screen.findByLabelText(/Buchungskonto/i)) as HTMLSelectElement;
+    expect(accountSelect.value).toBe('acc-real-1');
+
+    // Wechsel-Button wird angeboten
+    const switchButton = screen.getByRole('button', {
+      name: /Zu 'Rücklagenkonto' wechseln/i,
+    });
+    expect(switchButton).toBeInTheDocument();
+
+    // Klick auf den Wechsel-Button schaltet auf Rücklagenkonto um
+    fireEvent.click(switchButton);
+    expect(accountSelect.value).toBe('acc-real-2');
   });
 });

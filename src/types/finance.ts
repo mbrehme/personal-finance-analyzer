@@ -10,7 +10,9 @@ export * from './index';
 // Re-export domain calculations for backwards compatibility
 export {
   normalizeIban,
+  resolveDeepestAccount,
   getTransactionAccountInfo,
+  getSubAccountIds,
   getTransactionEffectiveValueForAccount,
   hasDirectCounterpart,
   isTransactionMatchingAccount,

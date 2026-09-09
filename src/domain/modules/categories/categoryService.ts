@@ -36,12 +36,18 @@ export function sanitizeParentCategoryRules(
  * Format: `[Typ] Empfänger: Zweck (Iban)`
  */
 export function buildCompoundSearchField(tx: Transaction): string {
-  const type = typeof tx.value === 'number' && tx.value >= 0 ? 'Eingang' : 'Ausgang';
+  const isOutbound = typeof tx.value === 'number' ? tx.value < 0 : true;
+  const type = isOutbound ? 'Ausgang' : 'Eingang';
   const receiver = (tx.receiver || tx.issuer || '').trim();
   const subject = (tx.subject || '').trim();
-  const iban = (tx.iban || '').trim();
+  const partnerIban = (
+    (isOutbound ? tx.receiverIban : tx.senderIban) ||
+    tx.receiverIban ||
+    tx.senderIban ||
+    ''
+  ).trim();
 
-  return `[${type}] ${receiver}: ${subject} (${iban})`;
+  return `[${type}] ${receiver}: ${subject} (${partnerIban})`;
 }
 
 export interface CategoryMatchResult {

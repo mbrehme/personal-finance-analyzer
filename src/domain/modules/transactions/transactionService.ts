@@ -27,8 +27,8 @@ export function isTransactionOverridden(tx: Transaction): boolean {
     (tx.originalSubject !== undefined && tx.subject !== tx.originalSubject) ||
     isPartnerOverridden ||
     isDateOverridden ||
-    (tx.originalAccountIban !== undefined && tx.accountIban !== tx.originalAccountIban) ||
-    (tx.originalIban !== undefined && tx.iban !== tx.originalIban) ||
+    (tx.originalSenderIban !== undefined && tx.senderIban !== tx.originalSenderIban) ||
+    (tx.originalReceiverIban !== undefined && tx.receiverIban !== tx.originalReceiverIban) ||
     Boolean(tx.splitFromId)
   );
 }
@@ -62,10 +62,10 @@ export function resetTransactionToOriginal(tx: Transaction): Transaction {
     subject: tx.originalSubject ?? tx.subject,
     receiver: tx.originalReceiver ?? tx.receiver,
     issuer: tx.originalIssuer ?? tx.issuer,
+    senderIban: tx.originalSenderIban ?? tx.senderIban,
+    receiverIban: tx.originalReceiverIban ?? tx.receiverIban,
     date: restoredDate,
     originalDate: tx.originalDate,
-    accountIban: tx.originalAccountIban ?? tx.accountIban,
-    iban: tx.originalIban ?? tx.iban,
     categoryId: null,
     assignmentSource: 'unassigned',
     origin: 'imported',
@@ -161,9 +161,9 @@ export function calculateSingleSplit(
     originalValue: originalTx.originalValue ?? originalTx.value,
     originalSubject: originalTx.originalSubject ?? originalTx.subject,
     originalReceiver: originalTx.originalReceiver ?? originalTx.receiver,
-    originalAccountIban: originalTx.originalAccountIban ?? originalTx.accountIban,
+    originalSenderIban: originalTx.originalSenderIban ?? originalTx.senderIban,
+    originalReceiverIban: originalTx.originalReceiverIban ?? originalTx.receiverIban,
     originalDate: originalTx.originalDate ?? originalTxDate,
-    originalIban: originalTx.originalIban ?? originalTx.iban,
   };
 
   const splitId = `tx-split-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -171,12 +171,14 @@ export function calculateSingleSplit(
 
   const newSplitTx: Transaction = {
     id: splitId,
-    accountIban: originalTx.accountIban,
     date: originalTxDate,
     issuer: originalTx.issuer,
+    sender: originalTx.sender,
     receiver: splitData.receiver.trim() || originalTx.receiver,
     subject: splitData.subject.trim() || `${originalTx.subject} (Split)`,
-    iban: originalTx.iban,
+    senderIban: originalTx.senderIban,
+    receiverIban: originalTx.receiverIban,
+    amount: splitAmount,
     value: splitValue,
     categoryId: splitData.categoryId || null,
     assignmentSource: splitData.categoryId ? 'manual' : 'unassigned',

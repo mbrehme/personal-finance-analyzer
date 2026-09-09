@@ -19,14 +19,84 @@ export function normalizeIban(iban?: string): string {
 }
 
 export interface TransactionAccountInfo {
-  primaryAccount?: Account;
-  counterAccount?: Account;
-  virtualAccounts: Account[];
-  allAccounts: Account[];
+  senderAccountId?: string;
+  receiverAccountId?: string;
+  includedAccountIds: string[];
+}
+
+/**
+ * Liefert alle Unterkonto-IDs eines Kontos (für echte Konten die IDs ihrer virtuellen Unterkonten).
+ *
+ * @param {Account} account - Das übergeordnete Konto
+ * @param {Account[]} accounts - Alle Konten
+ * @returns {string[]} Liste der Unterkonto-IDs
+ */
+export function getSubAccountIds(account: Account, accounts: Account[]): string[] {
+  return accounts.filter((a) => a.parentAccountId === account.id).map((a) => a.id);
+}
+
+/**
+ * Löst für eine IBAN oder Konto-ID und eine optionale Kategorie das tiefste Konto in der Hierarchie auf.
+ * Wenn z. B. auf ein reales Konto referenziert wird, dieses aber ein virtuelles Unterkonto
+ * mit der passenden categoryId besitzt, wird das virtuelle Unterkonto zurückgegeben.
+ *
+ * @param {string | undefined} ibanOrId - IBAN oder ID des Kontos
+ * @param {string | null | undefined} categoryId - Optionale Kategorie-ID der Buchung
+ * @param {Account[]} accounts - Alle bekannten Konten
+ * @param {string} [nameHint] - Optionaler Kontoname als Fallback
+ * @returns {Account | undefined} Das tiefste passende Konto
+ */
+export function resolveDeepestAccount(
+  ibanOrId: string | undefined,
+  categoryId: string | null | undefined,
+  accounts: Account[],
+  nameHint?: string
+): Account | undefined {
+  const normIban = normalizeIban(ibanOrId);
+
+  // 1. Suche nach Konto anhand IBAN oder ID
+  let matchedAcc: Account | undefined;
+  if (normIban || ibanOrId) {
+    matchedAcc = accounts.find((a) =>
+      Boolean((normIban && a.iban && normalizeIban(a.iban) === normIban) || a.id === ibanOrId)
+    );
+  }
+
+  // Fallback über Kontoname, falls keine IBAN/ID übereinstimmte
+  if (!matchedAcc && nameHint && nameHint.trim()) {
+    const normName = nameHint.trim().toLowerCase();
+    matchedAcc = accounts.find((a) => a.name.trim().toLowerCase() === normName);
+  }
+
+  if (!matchedAcc) {
+    return undefined;
+  }
+
+  // 2. Wenn das gefundene Konto bereits ein virtuelles Unterkonto ist, ist es bereits das tiefste
+  if (matchedAcc.accountType === 'virtual') {
+    return matchedAcc;
+  }
+
+  // 3. Wenn es ein reales Hauptkonto ist und die Buchung eine Kategorie hat:
+  // Prüfen, ob unter diesem Hauptkonto ein virtuelles Unterkonto für diese Kategorie existiert
+  if (categoryId) {
+    const matchingVirtualChild = accounts.find(
+      (a) =>
+        a.accountType === 'virtual' &&
+        a.parentAccountId === matchedAcc!.id &&
+        Boolean(a.categoryIds && a.categoryIds.includes(categoryId))
+    );
+    if (matchingVirtualChild) {
+      return matchingVirtualChild;
+    }
+  }
+
+  return matchedAcc;
 }
 
 /**
  * Ermittelt alle Konten, die einer Transaktion zugeordnet sind.
+ * Liefert stets die tiefsten Konto-IDs (z. B. virtuelle Unterkonten anstelle der Elternkonten).
  *
  * @param {Transaction} tx - Die Transaktion
  * @param {Account[]} accounts - Alle Konten
@@ -36,126 +106,49 @@ export function getTransactionAccountInfo(
   tx: Transaction,
   accounts: Account[]
 ): TransactionAccountInfo {
-  const normSenderIban = normalizeIban(tx.senderIban);
-  const normReceiverIban = normalizeIban(tx.receiverIban);
-  const normAccountIban = normalizeIban(tx.accountIban);
-  const normTxIban = normalizeIban(tx.iban);
-
-  let primaryAccount: Account | undefined;
-  let counterAccount: Account | undefined;
-
-  // 1. Gerichtete Auflösung über senderIban und receiverIban
-  if (normSenderIban || normReceiverIban) {
-    const senderAcc = accounts.find(
-      (a) =>
-        a.accountType !== 'virtual' &&
-        Boolean((a.iban && normalizeIban(a.iban) === normSenderIban) || a.id === tx.senderIban)
-    );
-    const receiverAcc = accounts.find(
-      (a) =>
-        a.accountType !== 'virtual' &&
-        Boolean((a.iban && normalizeIban(a.iban) === normReceiverIban) || a.id === tx.receiverIban)
-    );
-
-    if (senderAcc && receiverAcc) {
-      // Interne Umbuchung: primäres Konto ist Absender, Gegenkonto ist Empfänger
-      primaryAccount = senderAcc;
-      counterAccount = receiverAcc;
-    } else if (senderAcc) {
-      primaryAccount = senderAcc;
-    } else if (receiverAcc) {
-      primaryAccount = receiverAcc;
-    }
-  }
-
-  // 2. Fallback für Legacy-Felder (accountIban / iban)
-  if (!primaryAccount) {
-    if (normAccountIban || tx.accountIban) {
-      primaryAccount = accounts.find(
-        (a) =>
-          a.accountType !== 'virtual' &&
-          Boolean((a.iban && normalizeIban(a.iban) === normAccountIban) || a.id === tx.accountIban)
-      );
-    }
-    if (!primaryAccount && (normTxIban || tx.iban)) {
-      primaryAccount = accounts.find(
-        (a) =>
-          a.accountType !== 'virtual' &&
-          Boolean((a.iban && normalizeIban(a.iban) === normTxIban) || a.id === tx.iban)
-      );
-    }
-
-    // Falls tx.accountIban die ID eines virtuellen Unterkontos ist, Hauptkonto über parentAccountId ermitteln
-    if (!primaryAccount && (normAccountIban || tx.accountIban)) {
-      const matchedVirtual = accounts.find(
-        (a) =>
-          a.accountType === 'virtual' &&
-          Boolean(a.id === tx.accountIban || (a.iban && normalizeIban(a.iban) === normAccountIban))
-      );
-      if (matchedVirtual && matchedVirtual.parentAccountId) {
-        primaryAccount = accounts.find((a) => a.id === matchedVirtual.parentAccountId);
-      }
-    }
-  }
-
-  if (!counterAccount && primaryAccount && (normTxIban || tx.iban)) {
-    counterAccount = accounts.find(
-      (a) =>
-        a.id !== primaryAccount!.id &&
-        a.accountType !== 'virtual' &&
-        Boolean((a.iban && normalizeIban(a.iban) === normTxIban) || a.id === tx.iban)
-    );
-  }
-
-  // Ergänzend: Gegenkonto anhand von Empfänger / Sender (tx.receiver / tx.issuer) zuordnen, falls IBAN fehlt
-  if (!counterAccount && primaryAccount) {
-    const normReceiver = (tx.receiver || '').trim().toLowerCase();
-    const normIssuer = (tx.issuer || tx.sender || '').trim().toLowerCase();
-
-    if (normReceiver || normIssuer) {
-      counterAccount = accounts.find((a) => {
-        if (a.id === primaryAccount!.id || a.accountType === 'virtual') return false;
-        const normName = a.name.trim().toLowerCase();
-        if (!normName) return false;
-        return normName === normReceiver || normName === normIssuer;
-      });
-    }
-  }
-
   const txCatId = tx.categoryId ?? null;
-  const virtualAccounts = accounts.filter((a) => {
-    if (a.accountType !== 'virtual') return false;
-    const catIds = a.categoryIds || [];
-    if (catIds.length > 0 && (!txCatId || !catIds.includes(txCatId))) return false;
 
-    if (a.parentAccountId) {
-      const isUnderPrimary = primaryAccount ? a.parentAccountId === primaryAccount.id : false;
-      const isUnderCounter = counterAccount ? a.parentAccountId === counterAccount.id : false;
-      return isUnderPrimary || isUnderCounter;
-    }
-    return false;
-  });
+  // 1. Deepest Account für Sender ermitteln
+  let senderAcc = resolveDeepestAccount(tx.senderIban, txCatId, accounts, tx.sender || tx.issuer);
 
-  // Falls tx.accountIban direkt die ID eines virtuellen Unterkontos ist, dieses zu virtualAccounts ergänzen
-  if (tx.accountIban) {
-    const directVirtual = accounts.find(
-      (a) => a.accountType === 'virtual' && a.id === tx.accountIban
+  // 2. Deepest Account für Receiver ermitteln
+  let receiverAcc = resolveDeepestAccount(tx.receiverIban, txCatId, accounts, tx.receiver);
+
+  // Gegenkonto-Erkennung bei internen Umbuchungen über den Namen, falls eine IBAN fehlte
+  if (!receiverAcc && senderAcc && tx.receiver) {
+    const normPartner = tx.receiver.trim().toLowerCase();
+    const candidate = accounts.find(
+      (a) =>
+        a.id !== senderAcc!.id &&
+        a.id !== (senderAcc!.parentAccountId || '') &&
+        a.name.trim().toLowerCase() === normPartner
     );
-    if (directVirtual && !virtualAccounts.some((v) => v.id === directVirtual.id)) {
-      virtualAccounts.push(directVirtual);
+    if (candidate) {
+      receiverAcc = resolveDeepestAccount(candidate.id, txCatId, accounts);
     }
   }
 
-  const accountMap = new Map<string, Account>();
-  if (primaryAccount) accountMap.set(primaryAccount.id, primaryAccount);
-  if (counterAccount) accountMap.set(counterAccount.id, counterAccount);
-  virtualAccounts.forEach((v) => accountMap.set(v.id, v));
+  if (!senderAcc && receiverAcc && (tx.issuer || tx.sender)) {
+    const normPartner = (tx.issuer || tx.sender || '').trim().toLowerCase();
+    const candidate = accounts.find(
+      (a) =>
+        a.id !== receiverAcc!.id &&
+        a.id !== (receiverAcc!.parentAccountId || '') &&
+        a.name.trim().toLowerCase() === normPartner
+    );
+    if (candidate) {
+      senderAcc = resolveDeepestAccount(candidate.id, txCatId, accounts);
+    }
+  }
+
+  const includedIds = new Set<string>();
+  if (senderAcc) includedIds.add(senderAcc.id);
+  if (receiverAcc) includedIds.add(receiverAcc.id);
 
   return {
-    primaryAccount,
-    counterAccount,
-    virtualAccounts,
-    allAccounts: Array.from(accountMap.values()),
+    senderAccountId: senderAcc?.id,
+    receiverAccountId: receiverAcc?.id,
+    includedAccountIds: Array.from(includedIds),
   };
 }
 
@@ -195,7 +188,6 @@ export function hasDirectCounterpart(
     }
 
     const otherInfo = getTransactionAccountInfo(other, accounts);
-    if (otherInfo.primaryAccount?.id !== counterAccount.id) return false;
 
     // Bei gerichteten Transaktionen: Absender & Empfänger identisch
     const normOtherSender = normalizeIban(other.senderIban);
@@ -211,21 +203,27 @@ export function hasDirectCounterpart(
       return true;
     }
 
-    // 1. Explizite Gegenkonto-Zuordnung
-    if (otherInfo.counterAccount?.id === primaryAccount.id) return true;
-
-    // 2. IBAN-Übereinstimmung (Gegen-IBAN von other matcht primaryAccount, oder tx.iban matcht other.accountIban)
+    // 1. Beide Konten sind an dieser Gegenbuchung beteiligt
+    const counterRelevant = [counterAccount.id, ...getSubAccountIds(counterAccount, accounts)];
+    const primaryRelevant = [primaryAccount.id, ...getSubAccountIds(primaryAccount, accounts)];
     if (
-      (primaryAccount.iban && normalizeIban(other.iban) === normalizeIban(primaryAccount.iban)) ||
-      (other.accountIban &&
-        primaryAccount.iban &&
-        normalizeIban(other.accountIban) === normalizeIban(primaryAccount.iban)) ||
+      otherInfo.includedAccountIds.some((id) => counterRelevant.includes(id)) &&
+      otherInfo.includedAccountIds.some((id) => primaryRelevant.includes(id))
+    ) {
+      return true;
+    }
+
+    // 2. IBAN-Übereinstimmung
+    if (
+      (primaryAccount.iban &&
+        ((other.senderIban &&
+          normalizeIban(other.senderIban) === normalizeIban(primaryAccount.iban)) ||
+          (other.receiverIban &&
+            normalizeIban(other.receiverIban) === normalizeIban(primaryAccount.iban)))) ||
       (counterAccount.iban &&
-        tx.iban &&
-        normalizeIban(tx.iban) === normalizeIban(counterAccount.iban)) ||
-      (tx.accountIban &&
-        counterAccount.iban &&
-        normalizeIban(tx.accountIban) === normalizeIban(counterAccount.iban))
+        ((tx.senderIban && normalizeIban(tx.senderIban) === normalizeIban(counterAccount.iban)) ||
+          (tx.receiverIban &&
+            normalizeIban(tx.receiverIban) === normalizeIban(counterAccount.iban))))
     ) {
       return true;
     }
@@ -256,26 +254,8 @@ export function hasDirectCounterpart(
  * @returns {boolean} true, falls sowohl Absender- als auch Empfängerkonto registrierte Nutzerkonten sind
  */
 export function isInternalTransfer(tx: Transaction, accounts: Account[]): boolean {
-  const normSenderIban = normalizeIban(tx.senderIban);
-  const normReceiverIban = normalizeIban(tx.receiverIban);
-
-  if (normSenderIban && normReceiverIban) {
-    const hasSender = accounts.some(
-      (a) =>
-        a.accountType !== 'virtual' &&
-        Boolean((a.iban && normalizeIban(a.iban) === normSenderIban) || a.id === tx.senderIban)
-    );
-    const hasReceiver = accounts.some(
-      (a) =>
-        a.accountType !== 'virtual' &&
-        Boolean((a.iban && normalizeIban(a.iban) === normReceiverIban) || a.id === tx.receiverIban)
-    );
-    if (hasSender && hasReceiver) return true;
-  }
-
-  // Fallback über Account-Info
   const info = getTransactionAccountInfo(tx, accounts);
-  return Boolean(info.primaryAccount && info.counterAccount);
+  return Boolean(info.senderAccountId && info.receiverAccountId);
 }
 
 /**
@@ -294,22 +274,18 @@ export function getEffectiveTransactionPartner(
     const normAccIban = normalizeIban(currentAccount.iban);
     const isSender = Boolean(
       (normAccIban && tx.senderIban && normAccIban === normalizeIban(tx.senderIban)) ||
-      currentAccount.id === tx.senderIban ||
-      (currentAccount.iban &&
-        tx.accountIban &&
-        normalizeIban(currentAccount.iban) === normalizeIban(tx.accountIban) &&
-        tx.value < 0)
+      currentAccount.id === tx.senderIban
     );
 
     if (isSender) {
       return {
         name: tx.receiver || tx.issuer || 'Unbekannter Empfänger',
-        iban: tx.receiverIban || tx.iban,
+        iban: tx.receiverIban,
       };
     } else {
       return {
         name: tx.sender || tx.issuer || 'Unbekannter Absender',
-        iban: tx.senderIban || tx.iban,
+        iban: tx.senderIban,
       };
     }
   }
@@ -322,9 +298,12 @@ export function getEffectiveTransactionPartner(
     };
   }
 
+  const isOutflow = tx.value < 0;
   return {
-    name: tx.receiver || tx.issuer || tx.sender || 'Unbekannt',
-    iban: tx.receiverIban || tx.senderIban || tx.iban,
+    name: isOutflow
+      ? tx.receiver || tx.issuer || 'Unbekannter Empfänger'
+      : tx.sender || tx.issuer || tx.receiver || 'Unbekannter Absender',
+    iban: isOutflow ? tx.receiverIban : tx.senderIban,
   };
 }
 
@@ -359,7 +338,7 @@ export function getTransactionEffectiveValueForAccount(
   // 1. Virtuelle Unterkonten
   if (targetAccount.accountType === 'virtual') {
     const info = getTransactionAccountInfo(tx, accounts);
-    if (!info.virtualAccounts.some((v) => v.id === targetAccount.id)) {
+    if (!info.includedAccountIds.includes(targetAccount.id)) {
       return null;
     }
 
@@ -409,20 +388,23 @@ export function getTransactionEffectiveValueForAccount(
         }
 
         const otherInfo = getTransactionAccountInfo(other, accounts);
-        if (!otherInfo.virtualAccounts.some((v) => v.id === targetAccount.id)) return false;
+        if (!otherInfo.includedAccountIds.includes(targetAccount.id)) return false;
 
-        // Wenn other direkt auf dem übergeordneten Konto gebucht wurde (bessere Primärquelle)
-        const otherAccountIban = normalizeIban(other.accountIban);
-        const thisAccountIban = normalizeIban(tx.accountIban);
-        if (
-          normParentIban &&
-          otherAccountIban === normParentIban &&
-          thisAccountIban !== normParentIban
-        ) {
+        // Wenn other direkt aus dem Auszug des übergeordneten Kontos stammt (eigene Buchung), aber tx nicht -> tx unterdrücken
+        if (isParentSender && other.value < 0 && tx.value > 0) {
           return true;
         }
-        // Bei gleichem Buchungskonto: deterministischer Tie-Breaker (nach ID)
-        if (otherAccountIban === thisAccountIban && other.id < tx.id) {
+        if (isParentReceiver && other.value > 0 && tx.value < 0) {
+          return true;
+        }
+
+        // Bei gleichem Buchungskonto / Betrag: deterministischer Tie-Breaker (nach ID)
+        if (
+          ((isParentSender && other.value < 0 && tx.value < 0) ||
+            (isParentReceiver && other.value > 0 && tx.value > 0) ||
+            other.value === tx.value) &&
+          other.id < tx.id
+        ) {
           return true;
         }
         return false;
@@ -446,13 +428,13 @@ export function getTransactionEffectiveValueForAccount(
       return amount;
     }
 
-    // Fallback für Legacy-Transaktionen ohne explizite senderIban / receiverIban
-    if (info.primaryAccount && info.primaryAccount.id === parentId) {
-      return tx.value;
+    // Fallback über info.senderAccountId / receiverAccountId
+    if (info.senderAccountId === parentId) {
+      return -amount;
     }
 
-    if (info.counterAccount && info.counterAccount.id === parentId) {
-      return -tx.value;
+    if (info.receiverAccountId === parentId) {
+      return amount;
     }
 
     return tx.value;
@@ -491,7 +473,6 @@ export function getTransactionEffectiveValueForAccount(
 
     if (isInternal) {
       const txTime = new Date(tx.date).getTime();
-      const normThisAccountIban = normalizeIban(tx.accountIban);
       const hasDirectStatementBooking = allTransactions.some((other) => {
         if (other.id === tx.id) return false;
         const otherAmount = other.amount !== undefined ? other.amount : Math.abs(other.value);
@@ -504,28 +485,30 @@ export function getTransactionEffectiveValueForAccount(
 
         const otherSenderIban = normalizeIban(other.senderIban);
         const otherReceiverIban = normalizeIban(other.receiverIban);
-        const otherAccountIban = normalizeIban(other.accountIban);
 
         const isSameTransfer =
-          (normSenderIban &&
-            normReceiverIban &&
-            otherSenderIban === normSenderIban &&
-            otherReceiverIban === normReceiverIban) ||
-          (otherAccountIban &&
-            (otherAccountIban === normSenderIban || otherAccountIban === normReceiverIban));
+          normSenderIban &&
+          normReceiverIban &&
+          otherSenderIban === normSenderIban &&
+          otherReceiverIban === normReceiverIban;
 
         if (!isSameTransfer) return false;
 
-        // Wenn other direkt aus dem Auszug von targetAccount stammt, aber tx nicht -> tx unterdrücken
-        if (
-          normTargetIban &&
-          otherAccountIban === normTargetIban &&
-          normThisAccountIban !== normTargetIban
-        ) {
+        // Wenn other direkt aus dem Auszug von targetAccount stammt (eigene Buchung), aber tx nicht -> tx unterdrücken
+        if (isSender && other.value < 0 && tx.value > 0) {
           return true;
         }
-        // Wenn beide aus demselben Auszug stammen oder kein Auszug unterscheidbar ist: Tie-Breaker
-        if (otherAccountIban === normThisAccountIban && other.id < tx.id) {
+        if (isReceiver && other.value > 0 && tx.value < 0) {
+          return true;
+        }
+
+        // Deterministischer Tie-Breaker (nach ID) wenn beide aus gleichem Typ oder gleichem Vorzeichen stammen
+        if (
+          ((isSender && other.value < 0 && tx.value < 0) ||
+            (isReceiver && other.value > 0 && tx.value > 0) ||
+            other.value === tx.value) &&
+          other.id < tx.id
+        ) {
           return true;
         }
         return false;
@@ -545,35 +528,26 @@ export function getTransactionEffectiveValueForAccount(
     return amount;
   }
 
-  // 3. Fallback für Transaktionen ohne explizite senderIban / receiverIban (Legacy-Modus)
+  // 3. Fallback über getTransactionAccountInfo
   const info = getTransactionAccountInfo(tx, accounts);
 
-  // Direktes Buchungskonto (Hauptkonto)
-  if (info.primaryAccount && info.primaryAccount.id === targetAccount.id) {
-    return tx.value;
+  if (info.senderAccountId === targetAccount.id) {
+    return -amount;
   }
-
-  // Gegenkonto (Hauptkonto war Sender oder Empfänger einer Umbuchung)
-  if (info.counterAccount && info.counterAccount.id === targetAccount.id) {
-    if (
-      allTransactions &&
-      info.primaryAccount &&
-      hasDirectCounterpart(tx, info.primaryAccount, info.counterAccount, allTransactions, accounts)
-    ) {
-      return null;
-    }
-    return -tx.value;
+  if (info.receiverAccountId === targetAccount.id) {
+    return amount;
   }
 
   // 4. Echtes Hauptkonto mit Buchung auf einem seiner virtuellen Unterkonten
-  if (info.virtualAccounts.some((v) => v.parentAccountId === targetAccount.id)) {
-    if (info.counterAccount && info.counterAccount.id === targetAccount.id) {
+  const subIds = getSubAccountIds(targetAccount, accounts);
+  if (info.includedAccountIds.some((id) => subIds.includes(id))) {
+    if (info.receiverAccountId && subIds.includes(info.receiverAccountId)) {
       return amount;
     }
-    if (info.primaryAccount && info.primaryAccount.id === targetAccount.id) {
-      return tx.value;
+    if (info.senderAccountId && subIds.includes(info.senderAccountId)) {
+      return -amount;
     }
-    return tx.value < 0 ? amount : -amount;
+    return tx.value;
   }
 
   return null;
@@ -596,46 +570,37 @@ export function isTransactionMatchingAccount(
 ): boolean {
   if (accountId === 'all') return true;
   const targetAcc = accounts.find((a) => a.id === accountId);
-  if (!targetAcc) {
-    const info = getTransactionAccountInfo(tx, accounts);
-    return info.allAccounts.some((a) => a.id === accountId);
-  }
-
   const info = getTransactionAccountInfo(tx, accounts);
 
-  // 1. Direktes Buchungskonto
-  if (info.primaryAccount?.id === targetAcc.id) {
-    return true;
+  if (!targetAcc) {
+    return info.includedAccountIds.includes(accountId);
   }
 
-  // 2. Gegenkonto bei Umbuchungen
-  if (info.counterAccount?.id === targetAcc.id) {
-    return true;
-  }
-
-  // 3. Virtuelles Unterkonto: matcht, wenn tx diesem Unterkonto zugeordnet ist
+  // 1. Virtuelles Unterkonto: matcht, wenn seine ID in includedAccountIds enthalten ist
   if (targetAcc.accountType === 'virtual') {
-    if (info.virtualAccounts.some((v) => v.id === targetAcc.id)) {
-      return true;
-    }
-    if (tx.senderIban === targetAcc.id || tx.receiverIban === targetAcc.id) {
+    if (info.includedAccountIds.includes(targetAcc.id)) {
+      if (allTransactions) {
+        return (
+          getTransactionEffectiveValueForAccount(tx, targetAcc, accounts, allTransactions) !== null
+        );
+      }
       return true;
     }
     return false;
   }
 
-  // 4. Echtes Hauptkonto: matcht auch alle Transaktionen, die seinen virtuellen Unterkonten zugeordnet sind
-  if (info.virtualAccounts.some((v) => v.parentAccountId === targetAcc.id)) {
-    return true;
-  }
-  if (info.counterAccount && info.counterAccount.parentAccountId === targetAcc.id) {
-    return true;
+  // 2. Echtes Hauptkonto: matcht, wenn seine eigene ID ODER die ID eines seiner Unterkonten enthalten ist
+  const subIds = getSubAccountIds(targetAcc, accounts);
+  const relevantIds = [targetAcc.id, ...subIds];
+  const isIncluded = info.includedAccountIds.some((id) => relevantIds.includes(id));
+
+  if (!isIncluded) return false;
+
+  if (allTransactions) {
+    return (
+      getTransactionEffectiveValueForAccount(tx, targetAcc, accounts, allTransactions) !== null
+    );
   }
 
-  // 5. Direktes Matching über den effektiven Kontowert (Fallback)
-  if (getTransactionEffectiveValueForAccount(tx, targetAcc, accounts, allTransactions) !== null) {
-    return true;
-  }
-
-  return false;
+  return true;
 }

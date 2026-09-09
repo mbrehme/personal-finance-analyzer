@@ -14,6 +14,7 @@ export interface CsvImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   accounts?: Account[];
+  initialAccountId?: string;
   onImport: (transactions: Transaction[]) => Promise<number>;
 }
 
@@ -21,18 +22,39 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
   isOpen,
   onClose,
   accounts = [],
+  initialAccountId,
   onImport,
 }) => {
   const [fileName, setFileName] = useState<string>('');
   const [parseResult, setParseResult] = useState<CsvParseResult | null>(null);
   const [mapping, setMapping] = useState<CsvColumnMapping | null>(null);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+
+  // Virtuelle Konten dürfen beim CSV-Import nicht als Zielkonto gewählt werden
+  const realAccounts = React.useMemo(
+    () => accounts.filter((acc) => acc.accountType !== 'virtual'),
+    [accounts]
+  );
+
+  const getEffectiveInitialAccountId = React.useCallback((): string => {
+    if (initialAccountId && realAccounts.some((a) => a.id === initialAccountId)) {
+      return initialAccountId;
+    }
+    return '';
+  }, [initialAccountId, realAccounts]);
+
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(getEffectiveInitialAccountId);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importedCount, setImportedCount] = useState<number | null>(null);
 
-  // Virtuelle Konten dürfen beim CSV-Import nicht als Zielkonto gewählt werden
-  const realAccounts = accounts.filter((acc) => acc.accountType !== 'virtual');
+  const prevIsOpenRef = React.useRef(isOpen);
+  React.useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
+      const initId = getEffectiveInitialAccountId();
+      setSelectedAccountId(initId);
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, getEffectiveInitialAccountId]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -57,7 +79,10 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
               acc.id === parsed.detectedAccountIban
           );
           if (matched) {
-            setSelectedAccountId(matched.id);
+            // Nur automatisch setzen, wenn der Nutzer noch kein Konto ausgewählt hatte
+            if (!selectedAccountId) {
+              setSelectedAccountId(matched.id);
+            }
           }
         }
 
@@ -118,7 +143,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
     setFileName('');
     setParseResult(null);
     setMapping(null);
-    setSelectedAccountId('');
+    setSelectedAccountId(getEffectiveInitialAccountId());
     setError(null);
     setImportedCount(null);
     onClose();
@@ -236,13 +261,35 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
                       ))}
                     </select>
                     {parseResult?.detectedAccountIban && (
-                      <p className="text-[11px] text-emerald-700">
-                        IBAN in CSV-Kopfzeilen erkannt:{' '}
-                        <span className="font-mono font-semibold">
-                          {parseResult.detectedAccountIban}
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-emerald-700">
+                        <span>
+                          IBAN in CSV-Kopfzeilen erkannt:{' '}
+                          <span className="font-mono font-semibold">
+                            {parseResult.detectedAccountIban}
+                          </span>
+                          {selectedAccountId ? ' (erkannt)' : ' (Konto automatisch vorausgewählt)'}
                         </span>
-                        {selectedAccountId ? ' (Konto automatisch vorausgewählt)' : ''}
-                      </p>
+                        {(() => {
+                          const normDetected = normalizeIban(parseResult.detectedAccountIban);
+                          const matched = realAccounts.find(
+                            (acc) =>
+                              (acc.iban && normalizeIban(acc.iban) === normDetected) ||
+                              acc.id === parseResult.detectedAccountIban
+                          );
+                          if (matched && matched.id !== selectedAccountId) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAccountId(matched.id)}
+                                className="font-semibold text-blue-600 underline hover:text-blue-800"
+                              >
+                                Zu &apos;{matched.name}&apos; wechseln
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
                     )}
                     {realAccounts.length === 0 && (
                       <p className="text-[11px] text-amber-700">

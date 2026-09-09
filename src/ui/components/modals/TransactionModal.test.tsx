@@ -20,13 +20,13 @@ describe('TransactionModal', () => {
 
   const mockTransaction: Transaction = {
     id: 'tx-1',
-    accountIban: 'DE12345',
+    senderIban: 'DE12345',
+    receiverIban: 'DE8937040044',
     date: '2026-09-01',
     issuer: '',
     receiver: 'REWE Markt GmbH',
     subject: 'REWE SAG DANKE FILIALE 1234',
     type: 'outbound',
-    iban: 'DE8937040044',
     value: -100,
     assignmentSource: 'unassigned',
     origin: 'imported',
@@ -34,8 +34,8 @@ describe('TransactionModal', () => {
     originalValue: -100,
     originalSubject: 'REWE SAG DANKE FILIALE 1234',
     originalReceiver: 'REWE Markt GmbH',
-    originalAccountIban: 'DE12345',
-    originalIban: 'DE8937040044',
+    originalSenderIban: 'DE12345',
+    originalReceiverIban: 'DE8937040044',
   };
 
   const onSave = vi.fn();
@@ -76,7 +76,7 @@ describe('TransactionModal', () => {
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        accountIban: 'DE12345',
+        senderIban: 'DE12345',
         subject: 'Bargeld Einkauf',
         value: -45,
       })

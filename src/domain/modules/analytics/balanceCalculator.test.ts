@@ -524,4 +524,61 @@ describe('balanceCalculator', () => {
     expect(row.periods['2026-01'].endBalance).toBe(7500);
     expect(row.latestBalance).toBe(7500);
   });
+
+  it('correctly calculates balance with checkpoint and multiple distinct transfers of the same amount', () => {
+    const tgAccount: Account = {
+      id: 'acc-tg',
+      name: 'Tagesgeld',
+      iban: 'DE80120300001027106861',
+      accountType: 'real',
+      categoryIds: [],
+      balanceEntries: [{ id: 'cp-2023', date: '2023-12-31', amount: 16930.02 }],
+    };
+
+    const giroAccount: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      iban: 'DE89120300001083850147',
+      accountType: 'real',
+      categoryIds: [],
+      balanceEntries: [],
+    };
+
+    // Zwei Eingänge am selben Tag mit jeweils 250 €
+    const txs: Transaction[] = [
+      {
+        id: 'tx-urlaub',
+        date: '2026-09-07',
+        senderIban: giroAccount.iban,
+        receiverIban: tgAccount.iban,
+        issuer: 'Denise',
+        receiver: 'Martin',
+        amount: 250,
+        value: 250,
+        subject: 'Rücklage: Urlaub',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+      {
+        id: 'tx-geschenke',
+        date: '2026-09-07',
+        senderIban: giroAccount.iban,
+        receiverIban: tgAccount.iban,
+        issuer: 'Denise',
+        receiver: 'Martin',
+        amount: 250,
+        value: 250,
+        subject: 'Geschenke',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      },
+    ];
+
+    const result = calculateAllBalances([tgAccount, giroAccount], txs, 'monthly', 'acc-tg');
+    const row = result.rows[0];
+    expect(row.periods['2026-09'].startBalance).toBe(16930.02);
+    expect(row.periods['2026-09'].cashflow).toBe(500);
+    expect(row.periods['2026-09'].endBalance).toBe(17430.02);
+    expect(row.latestBalance).toBe(17430.02);
+  });
 });

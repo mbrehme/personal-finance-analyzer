@@ -398,15 +398,6 @@ export function getTransactionEffectiveValueForAccount(
           return true;
         }
 
-        // Bei gleichem Buchungskonto / Betrag: deterministischer Tie-Breaker (nach ID)
-        if (
-          ((isParentSender && other.value < 0 && tx.value < 0) ||
-            (isParentReceiver && other.value > 0 && tx.value > 0) ||
-            other.value === tx.value) &&
-          other.id < tx.id
-        ) {
-          return true;
-        }
         return false;
       });
 
@@ -502,15 +493,6 @@ export function getTransactionEffectiveValueForAccount(
           return true;
         }
 
-        // Deterministischer Tie-Breaker (nach ID) wenn beide aus gleichem Typ oder gleichem Vorzeichen stammen
-        if (
-          ((isSender && other.value < 0 && tx.value < 0) ||
-            (isReceiver && other.value > 0 && tx.value > 0) ||
-            other.value === tx.value) &&
-          other.id < tx.id
-        ) {
-          return true;
-        }
         return false;
       });
 

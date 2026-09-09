@@ -350,6 +350,45 @@ describe('accountService', () => {
         getTransactionEffectiveValueForAccount(txFromGiro, virtualBuffer, allAccounts, bothTxs)
       ).toBeNull();
     });
+
+    it('does not suppress distinct transactions with the same amount and same sign within the counterpart window', () => {
+      const txUrlaub: Transaction = {
+        id: 'tx-urlaub-1',
+        date: '2026-09-07',
+        senderIban: giroAccount.iban,
+        receiverIban: tagesgeldAccount.iban,
+        issuer: 'Denise',
+        receiver: 'Martin',
+        amount: 250,
+        value: 250,
+        subject: 'Rücklage: Urlaub',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      };
+
+      const txGeschenke: Transaction = {
+        id: 'tx-geschenke-2',
+        date: '2026-09-07',
+        senderIban: giroAccount.iban,
+        receiverIban: tagesgeldAccount.iban,
+        issuer: 'Denise',
+        receiver: 'Martin',
+        amount: 250,
+        value: 250,
+        subject: 'Geschenke',
+        categoryId: null,
+        assignmentSource: 'unassigned',
+      };
+
+      const allTxs = [txUrlaub, txGeschenke];
+
+      expect(
+        getTransactionEffectiveValueForAccount(txUrlaub, tagesgeldAccount, allAccounts, allTxs)
+      ).toBe(250);
+      expect(
+        getTransactionEffectiveValueForAccount(txGeschenke, tagesgeldAccount, allAccounts, allTxs)
+      ).toBe(250);
+    });
   });
 
   describe('isTransactionMatchingAccount', () => {

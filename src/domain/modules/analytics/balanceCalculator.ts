@@ -16,7 +16,6 @@ import {
 import {
   getPeriodKey,
   getCurrentPeriodKey,
-  fillPeriodKeyRange,
   getPeriodKeysBetween,
   getPeriodDateRange,
   getDayBefore,
@@ -218,26 +217,58 @@ export function calculateAllBalances(
   selectedAccountId?: string | null,
   options?: BalanceCalculatorOptions
 ): BalanceAnalysisResult {
-  let periodKeys: string[];
-  if (options?.startDate && options?.endDate) {
-    periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
-  } else {
-    const allDates: ISODateString[] = transactions
-      .map((tx) => (tx.date || '') as ISODateString)
-      .filter(Boolean);
-    accounts.forEach((acc) => {
-      acc.balanceEntries.forEach((be) => {
-        if (be.date) allDates.push(be.date as ISODateString);
-      });
+  const hasStartDate = Boolean(options?.startDate && options.startDate.trim() !== '');
+  const hasEndDate = Boolean(options?.endDate && options.endDate.trim() !== '');
+
+  // Alle relevanten Stichtage und Transaktionsdaten ermitteln
+  const allDates: ISODateString[] = transactions
+    .map((tx) => (tx.date || '') as ISODateString)
+    .filter(Boolean);
+  accounts.forEach((acc) => {
+    acc.balanceEntries.forEach((be) => {
+      if (be.date) allDates.push(be.date as ISODateString);
     });
-    const rawPeriodKeys = Array.from(
-      new Set(allDates.map((d) => getPeriodKey(d, granularity)))
-    ).sort();
-    const currentPeriodKey = getCurrentPeriodKey(granularity);
-    periodKeys =
-      rawPeriodKeys.length > 0
-        ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentPeriodKey)
-        : [currentPeriodKey];
+  });
+
+  const rawPeriodKeys = Array.from(
+    new Set(allDates.map((d) => getPeriodKey(d, granularity)))
+  ).sort();
+  const currentPeriodKey = getCurrentPeriodKey(granularity);
+
+  // Natürliche Start- und End-Perioden berechnen
+  const earliestDataPeriodKey = rawPeriodKeys.length > 0 ? rawPeriodKeys[0] : currentPeriodKey;
+  const latestDataPeriodKey =
+    rawPeriodKeys.length > 0 ? rawPeriodKeys[rawPeriodKeys.length - 1] : currentPeriodKey;
+  const defaultEndPeriodKey =
+    latestDataPeriodKey > currentPeriodKey ? latestDataPeriodKey : currentPeriodKey;
+
+  const defaultStartDate = getPeriodDateRange(earliestDataPeriodKey, granularity).startDate;
+  const defaultEndDate = getPeriodDateRange(defaultEndPeriodKey, granularity).endDate;
+
+  let effectiveStartDate = hasStartDate ? options!.startDate! : defaultStartDate;
+  let effectiveEndDate = hasEndDate ? options!.endDate! : defaultEndDate;
+
+  // Falls Startdatum nach dem defaultEndDate liegt (z. B. Filter in der Zukunft)
+  if (hasStartDate && !hasEndDate && effectiveStartDate > effectiveEndDate) {
+    const startPeriodKey = getPeriodKey(effectiveStartDate as ISODateString, granularity);
+    effectiveEndDate = getPeriodDateRange(startPeriodKey, granularity).endDate;
+  }
+
+  // Falls Enddatum vor dem defaultStartDate liegt (z. B. Filter in der fernen Vergangenheit)
+  if (hasEndDate && !hasStartDate && effectiveEndDate < effectiveStartDate) {
+    const endPeriodKey = getPeriodKey(effectiveEndDate as ISODateString, granularity);
+    effectiveStartDate = getPeriodDateRange(endPeriodKey, granularity).startDate;
+  }
+
+  let periodKeys: string[];
+  if (effectiveStartDate > effectiveEndDate) {
+    periodKeys = [];
+  } else {
+    periodKeys = getPeriodKeysBetween(effectiveStartDate, effectiveEndDate, granularity);
+  }
+
+  if (periodKeys.length === 0 && !hasStartDate && !hasEndDate) {
+    periodKeys = [currentPeriodKey];
   }
 
   const accountsToProcess = selectedAccountId

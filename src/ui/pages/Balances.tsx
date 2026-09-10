@@ -8,12 +8,14 @@
 import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFinance, calculateAllBalances } from '@/domain';
 import { IconRenderer } from '@/ui/components/IconRenderer';
-import { formatPeriodLabel, getCurrentPeriodKey } from '@/utils/dateUtils';
+import { formatPeriodLabel, getCurrentPeriodKey, getPeriodDateRange } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { useAnalyticsFilter } from '@/ui/pages/analytics';
+import { buildTransactionsUrl, useSafeNavigate } from '@/ui/pages/Transactions';
 import { Wallet, Landmark, ShieldCheck, Calendar, CornerDownRight } from 'lucide-react';
 
 export const Balances: React.FC = () => {
+  const navigate = useSafeNavigate();
   const { accounts, transactions } = useFinance();
   const { granularity, selectedAccountId, startDate, endDate } = useAnalyticsFilter();
 
@@ -188,14 +190,31 @@ export const Balances: React.FC = () => {
                           endBalance: 0,
                         };
 
+                        const range = getPeriodDateRange(pKey, granularity);
+                        const cellUrl = buildTransactionsUrl({
+                          accountId: row.account.id,
+                          startDate: range.startDate,
+                          endDate: range.endDate,
+                        });
+                        const periodLabel = formatPeriodLabel(pKey, granularity);
+
                         return (
                           <td
                             key={pKey}
-                            className={`whitespace-nowrap px-4 py-3 text-right font-mono transition-colors ${
+                            className={`group/cell cursor-pointer whitespace-nowrap px-4 py-3 text-right font-mono transition-colors hover:bg-blue-100/70 focus:bg-blue-100/70 focus:outline-none ${
                               isCurrent ? 'bg-blue-50/60 font-semibold text-blue-950' : ''
                             }`}
+                            tabIndex={0}
+                            title={`Buchungen für "${row.account.name}" im Zeitraum ${periodLabel} anzeigen`}
+                            onClick={() => navigate(cellUrl)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                navigate(cellUrl);
+                              }
+                            }}
                           >
-                            <div className="font-bold text-slate-900">
+                            <div className="font-bold text-slate-900 group-hover/cell:text-blue-700">
                               {formatMoney(pData.endBalance)}
                             </div>
                             {pData.cashflow !== 0 && (
@@ -234,14 +253,34 @@ export const Balances: React.FC = () => {
                   {balanceMatrix.periodKeys.map((pKey) => {
                     const isCurrent = pKey === currentPeriodKey;
                     const endBal = balanceMatrix.totalRow.periods[pKey]?.endBalance || 0;
+                    const range = getPeriodDateRange(pKey, granularity);
+                    const cellUrl = buildTransactionsUrl({
+                      accountId:
+                        selectedAccountId && selectedAccountId !== 'all'
+                          ? selectedAccountId
+                          : undefined,
+                      startDate: range.startDate,
+                      endDate: range.endDate,
+                    });
+                    const periodLabel = formatPeriodLabel(pKey, granularity);
+
                     return (
                       <td
                         key={pKey}
-                        className={`px-4 py-3.5 text-right font-mono font-bold transition-colors ${
+                        className={`cursor-pointer px-4 py-3.5 text-right font-mono font-bold transition-colors hover:bg-blue-200/70 focus:bg-blue-200/70 focus:outline-none ${
                           isCurrent
                             ? 'bg-blue-100/90 font-extrabold text-blue-950'
                             : 'text-slate-900'
                         }`}
+                        tabIndex={0}
+                        title={`Alle Buchungen im Zeitraum ${periodLabel} anzeigen`}
+                        onClick={() => navigate(cellUrl)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            navigate(cellUrl);
+                          }
+                        }}
                       >
                         {formatMoney(endBal)}
                       </td>

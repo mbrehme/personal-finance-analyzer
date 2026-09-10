@@ -98,6 +98,54 @@ describe('balanceCalculator', () => {
     expect(result.rows[0].account.id).toBe('acc-giro');
   });
 
+  it('correctly applies date filter when only startDate is provided (open-ended to latest)', () => {
+    const result = calculateAllBalances([account], transactions, 'monthly', undefined, {
+      startDate: '2026-09-01',
+      endDate: undefined,
+    });
+
+    expect(result.periodKeys).toEqual(['2026-09']);
+    const giroRow = result.rows[0];
+    expect(giroRow.periods['2026-09'].startBalance).toBe(3000);
+    expect(giroRow.periods['2026-09'].cashflow).toBe(-800);
+    expect(giroRow.periods['2026-09'].endBalance).toBe(2200);
+  });
+
+  it('correctly applies date filter when only endDate is provided (open-ended from earliest)', () => {
+    const result = calculateAllBalances([account], transactions, 'monthly', undefined, {
+      startDate: undefined,
+      endDate: '2026-08-31',
+    });
+
+    expect(result.periodKeys).toEqual(['2026-08']);
+    const giroRow = result.rows[0];
+    expect(giroRow.periods['2026-08'].startBalance).toBe(2000);
+    expect(giroRow.periods['2026-08'].cashflow).toBe(1000);
+    expect(giroRow.periods['2026-08'].endBalance).toBe(3000);
+  });
+
+  it('handles future startDate without endDate gracefully', () => {
+    const result = calculateAllBalances([account], transactions, 'monthly', undefined, {
+      startDate: '2027-01-01',
+    });
+
+    expect(result.periodKeys).toEqual(['2027-01']);
+    const giroRow = result.rows[0];
+    expect(giroRow.periods['2027-01'].startBalance).toBe(2200);
+    expect(giroRow.periods['2027-01'].cashflow).toBe(0);
+    expect(giroRow.periods['2027-01'].endBalance).toBe(2200);
+  });
+
+  it('handles past endDate without startDate gracefully', () => {
+    const result = calculateAllBalances([account], transactions, 'monthly', undefined, {
+      endDate: '2025-12-31',
+    });
+
+    expect(result.periodKeys).toEqual(['2025-12']);
+    const giroRow = result.rows[0];
+    expect(giroRow.periods['2025-12'].endBalance).toBe(2000);
+  });
+
   it('calculates virtual subaccount balance based on category filter and does not double-count in totalRow', () => {
     const realAccount: Account = {
       id: 'acc-real-1',

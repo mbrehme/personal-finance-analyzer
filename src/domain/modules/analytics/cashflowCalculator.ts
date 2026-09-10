@@ -13,12 +13,14 @@ import {
   isTransactionMatchingAccount,
   getTransactionEffectiveValueForAccount,
   isInternalTransfer,
+  getActiveCategoryBudgetForDate,
 } from '@/types/finance';
 import {
   fillPeriodKeyRange,
   getCurrentPeriodKey,
   getPeriodKey,
   getPeriodKeysBetween,
+  getPeriodDateRange,
   normalizeBudgetToGranularity,
 } from '@/utils/dateUtils';
 import { roundToTwoDecimals } from '@/utils/moneyUtils';
@@ -264,13 +266,14 @@ export function calculateCashflowMatrix(
     options?.selectedCategoryIds !== undefined ? new Set(options.selectedCategoryIds) : null;
 
   /**
-   * Rekursive Berechnung des effektiven Budgets:
-   * 1. Hat die Kategorie Kinder -> Reines Rollup der AUSGEWÄHLTEN Kinder (Elternkategorien dürfen keine eigenen Werte haben).
-   * 2. Ist es eine Blatt-Kategorie (keine Kinder) -> eigenes targetBudget verwenden, sofern ausgewählt.
+   * Rekursive Berechnung des effektiven Budgets für einen bestimmten Zeitraum / Stichtag:
+   * 1. Hat die Kategorie Kinder -> Reines Rollup der AUSGEWÄHLTEN Kinder für diesen Zeitraum.
+   * 2. Ist es eine Blatt-Kategorie (keine Kinder) -> aktives Budget zum Stichtag verwenden, sofern ausgewählt.
    * 3. Ansonsten undefined.
    */
   const getEffectiveCategoryBudget = (
-    cId: string
+    cId: string,
+    targetDate: string
   ): { amount: number; isRollup: boolean } | undefined => {
     const c = categories.find((item) => item.id === cId);
     if (!c) return undefined;
@@ -290,7 +293,7 @@ export function calculateCashflowMatrix(
           !allowedCategories || childSubtree.some((id) => allowedCategories.has(id));
 
         if (childIsActive) {
-          const childRes = getEffectiveCategoryBudget(child.id);
+          const childRes = getEffectiveCategoryBudget(child.id, targetDate);
           if (childRes !== undefined) {
             sum += childRes.amount;
             hasAnyChildBudget = true;
@@ -313,13 +316,10 @@ export function calculateCashflowMatrix(
       return undefined;
     }
 
-    if (c.targetBudget) {
+    const activeBudget = getActiveCategoryBudgetForDate(c, targetDate);
+    if (activeBudget) {
       return {
-        amount: normalizeBudgetToGranularity(
-          c.targetBudget.amount,
-          c.targetBudget.period,
-          granularity
-        ),
+        amount: normalizeBudgetToGranularity(activeBudget.amount, activeBudget.period, granularity),
         isRollup: false,
       };
     }
@@ -341,8 +341,13 @@ export function calculateCashflowMatrix(
     let totalInbound = 0;
     let totalOutbound = 0;
 
-    // Effektives Budget (eigenes manuelles Budget oder Rollup aus Kind-Elementen)
-    const effectiveBudgetInfo = getEffectiveCategoryBudget(category.id);
+    // Referenzdatum für das Zeilen-Budget: späteste Periode oder heute
+    const referencePeriodKey =
+      periodKeys.length > 0 ? periodKeys[periodKeys.length - 1] : getCurrentPeriodKey(granularity);
+    const referenceEndDate = getPeriodDateRange(referencePeriodKey, granularity).endDate;
+
+    // Effektives Budget der Zeile (zum Referenz-Zeitraum)
+    const effectiveBudgetInfo = getEffectiveCategoryBudget(category.id, referenceEndDate);
     const budgetAmount = effectiveBudgetInfo?.amount;
     const isBudgetRollup = effectiveBudgetInfo?.isRollup ?? false;
 
@@ -350,6 +355,9 @@ export function calculateCashflowMatrix(
     const effectiveSubtreeIds = allowedCategories
       ? subtreeIds.filter((id) => allowedCategories.has(id))
       : subtreeIds;
+
+    let sumBudget = 0;
+    let hasAnyPeriodBudget = false;
 
     periodKeys.forEach((pKey) => {
       let inbound = 0;
@@ -367,20 +375,30 @@ export function calculateCashflowMatrix(
       totalInbound += inbound;
       totalOutbound += outbound;
 
+      const pEndDate = getPeriodDateRange(pKey, granularity).endDate;
+      const periodBudgetInfo = getEffectiveCategoryBudget(category.id, pEndDate);
+      const periodBudgetAmount = periodBudgetInfo?.amount;
+
+      if (periodBudgetAmount !== undefined) {
+        sumBudget += periodBudgetAmount;
+        hasAnyPeriodBudget = true;
+      }
+
       const actualAmount = Math.abs(net);
-      const diffToBudget = budgetAmount !== undefined ? actualAmount - budgetAmount : undefined;
+      const diffToBudget =
+        periodBudgetAmount !== undefined ? actualAmount - periodBudgetAmount : undefined;
 
       periods[pKey] = {
         inbound,
         outbound,
         net,
-        budget: budgetAmount,
+        budget: periodBudgetAmount,
         diffToBudget,
       };
     });
 
     const totalNet = totalInbound + totalOutbound;
-    const totalBudget = budgetAmount !== undefined ? budgetAmount * periodKeys.length : undefined;
+    const totalBudget = hasAnyPeriodBudget ? roundToTwoDecimals(sumBudget) : undefined;
 
     rows.push({
       category,

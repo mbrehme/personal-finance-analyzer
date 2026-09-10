@@ -7,8 +7,13 @@
 
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '@/domain';
-import { Category } from '@/types/finance';
-import { normalizeBudgetToGranularity } from '@/utils/dateUtils';
+import {
+  Category,
+  getCategoryBudgets,
+  getActiveCategoryBudgetForDate,
+  ISODateString,
+} from '@/types/finance';
+import { normalizeBudgetToGranularity, formatDate } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/ui/components/IconRenderer';
 import { CategoryModal } from '@/ui/components/modals/CategoryModal';
@@ -239,8 +244,10 @@ export const CategoriesConfig: React.FC = () => {
     const children = childrenMap.get(categoryId) || [];
     if (children.length === 0) {
       const c = categories.find((item) => item.id === categoryId);
-      if (!c?.targetBudget) return 0;
-      return normalizeBudgetToGranularity(c.targetBudget.amount, c.targetBudget.period, 'monthly');
+      if (!c) return 0;
+      const activeBudget = getActiveCategoryBudgetForDate(c, new Date().toISOString().slice(0, 10));
+      if (!activeBudget) return 0;
+      return normalizeBudgetToGranularity(activeBudget.amount, activeBudget.period, 'monthly');
     }
     return children.reduce((sum, child) => sum + getSubtreeMonthlyBudget(child.id), 0);
   };
@@ -342,16 +349,60 @@ export const CategoriesConfig: React.FC = () => {
           </td>
 
           {/* Soll-Budget */}
-          <td className="w-[180px] shrink-0 whitespace-nowrap px-4 py-3 text-xs text-slate-700">
-            {category.targetBudget ? (
-              <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 font-semibold text-blue-700">
-                {formatMoney(category.targetBudget.amount)} /{' '}
-                {category.targetBudget.period === 'monthly'
-                  ? 'Monat'
-                  : category.targetBudget.period}
-              </span>
-            ) : hasChildren ? (
-              (() => {
+          <td className="w-[220px] shrink-0 whitespace-nowrap px-4 py-3 text-xs text-slate-700">
+            {(() => {
+              const allBudgets = getCategoryBudgets(category);
+              if (allBudgets.length > 0) {
+                const todayIso = new Date().toISOString().slice(0, 10);
+                const activeBudget = getActiveCategoryBudgetForDate(category, todayIso);
+                const futureBudgets = allBudgets.filter(
+                  (b) => b.validFrom && b.validFrom > todayIso
+                );
+
+                const getPeriodLabel = (p: string) => {
+                  switch (p) {
+                    case 'monthly':
+                      return 'Monat';
+                    case 'quarterly':
+                      return 'Quartal';
+                    case 'halfYearly':
+                      return 'Halbjahr';
+                    case 'yearly':
+                      return 'Jahr';
+                    default:
+                      return p;
+                  }
+                };
+
+                return (
+                  <div className="flex flex-col items-start gap-1">
+                    {activeBudget ? (
+                      <span className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
+                        <span>
+                          {formatMoney(activeBudget.amount)} / {getPeriodLabel(activeBudget.period)}
+                        </span>
+                        {activeBudget.validFrom && (
+                          <span className="text-[10px] font-normal text-blue-600">
+                            (ab {formatDate(activeBudget.validFrom as ISODateString)})
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] italic text-slate-400">
+                        Aktuell kein Budget aktiv
+                      </span>
+                    )}
+                    {futureBudgets.length > 0 && (
+                      <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                        +{futureBudgets.length} geplant (ab{' '}
+                        {formatDate(futureBudgets[0].validFrom as ISODateString)})
+                      </span>
+                    )}
+                  </div>
+                );
+              }
+
+              if (hasChildren) {
                 const subtreeMonthly = getSubtreeMonthlyBudget(category.id);
                 return subtreeMonthly > 0 ? (
                   <span className="rounded border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
@@ -360,10 +411,10 @@ export const CategoriesConfig: React.FC = () => {
                 ) : (
                   <span className="text-slate-400">Kein Budget</span>
                 );
-              })()
-            ) : (
-              <span className="text-slate-400">Kein Budget</span>
-            )}
+              }
+
+              return <span className="text-slate-400">Kein Budget</span>;
+            })()}
           </td>
 
           {/* Aktionen: Neue Unterkategorie anlegen */}

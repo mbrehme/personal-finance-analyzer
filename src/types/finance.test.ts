@@ -14,7 +14,10 @@ import {
   getTransactionEffectiveValueForAccount,
   getTransactionOrigin,
   normalizeIban,
+  getCategoryBudgets,
+  getActiveCategoryBudgetForDate,
   Account,
+  Category,
   Transaction,
 } from './finance';
 
@@ -681,6 +684,81 @@ describe('finance domain helpers', () => {
       const sorted = sortTransactionsDesc([txDay2, txYesterday, txDay0, txDay1]);
 
       expect(sorted.map((t) => t.id)).toEqual(['tx-d0', 'tx-d1', 'tx-d2', 'tx-yesterday']);
+    });
+  });
+
+  describe('category target budget helpers', () => {
+    it('returns targetBudgets array or falls back to targetBudget', () => {
+      const catWithLegacy: Category = {
+        id: 'cat-1',
+        name: 'Food',
+        parentId: null,
+        targetBudget: { amount: 300, period: 'monthly' },
+      };
+      expect(getCategoryBudgets(catWithLegacy)).toEqual([{ amount: 300, period: 'monthly' }]);
+
+      const catWithList: Category = {
+        id: 'cat-2',
+        name: 'Travel',
+        parentId: null,
+        targetBudgets: [
+          { amount: 200, period: 'monthly', validFrom: '2025-01-01' },
+          { amount: 400, period: 'monthly', validFrom: '2027-01-01' },
+        ],
+      };
+      expect(getCategoryBudgets(catWithList)).toHaveLength(2);
+
+      const catEmpty: Category = {
+        id: 'cat-3',
+        name: 'Empty',
+        parentId: null,
+      };
+      expect(getCategoryBudgets(catEmpty)).toEqual([]);
+    });
+
+    it('determines active budget for date correctly with validFrom and fallback', () => {
+      const category: Category = {
+        id: 'cat-rent',
+        name: 'Miete',
+        parentId: null,
+        targetBudgets: [
+          { id: 'b1', amount: 800, period: 'monthly', validFrom: null }, // Baseline
+          { id: 'b2', amount: 950, period: 'monthly', validFrom: '2026-07-01' },
+          { id: 'b3', amount: 1100, period: 'monthly', validFrom: '2027-01-01' }, // Future planning
+        ],
+      };
+
+      // In 2025: only baseline b1 is eligible
+      expect(getActiveCategoryBudgetForDate(category, '2025-12-31')?.amount).toBe(800);
+
+      // In June 2026: before b2 start -> baseline b1
+      expect(getActiveCategoryBudgetForDate(category, '2026-06-30')?.amount).toBe(800);
+
+      // In July 2026: b2 became active
+      expect(getActiveCategoryBudgetForDate(category, '2026-07-31')?.amount).toBe(950);
+
+      // In December 2026: b2 is still active
+      expect(getActiveCategoryBudgetForDate(category, '2026-12-31')?.amount).toBe(950);
+
+      // In January 2027: future budget b3 activates
+      expect(getActiveCategoryBudgetForDate(category, '2027-01-31')?.amount).toBe(1100);
+    });
+
+    it('returns undefined if all budgets have validFrom in the future and no baseline exists', () => {
+      const category: Category = {
+        id: 'cat-future-car',
+        name: 'Auto Zukunft',
+        parentId: null,
+        targetBudgets: [
+          { id: 'b-future', amount: 400, period: 'monthly', validFrom: '2027-01-01' },
+        ],
+      };
+
+      // Past period: no budget active yet
+      expect(getActiveCategoryBudgetForDate(category, '2026-09-30')).toBeUndefined();
+
+      // From 2027-01-01 onwards: active
+      expect(getActiveCategoryBudgetForDate(category, '2027-01-01')?.amount).toBe(400);
     });
   });
 });

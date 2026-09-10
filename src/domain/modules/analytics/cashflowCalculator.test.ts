@@ -583,4 +583,104 @@ describe('cashflowCalculator', () => {
       expect(chartResult.totalRow.periods['2026-08'].net).toBe(2000);
     });
   });
+
+  describe('historized target budgets with validFrom', () => {
+    it('applies period-specific budgets across past, present, and future periods', () => {
+      const categoryWithFutureBudget: Category = {
+        id: 'cat-groceries',
+        name: 'Lebensmittel',
+        parentId: null,
+        targetBudgets: [
+          { id: 'b1', amount: 300, period: 'monthly', validFrom: null }, // Baseline
+          { id: 'b2', amount: 450, period: 'monthly', validFrom: '2027-01-01' }, // Future planning
+        ],
+      };
+
+      const result = calculateCashflowMatrix([categoryWithFutureBudget], [], 'monthly', undefined, {
+        startDate: '2026-12-01',
+        endDate: '2027-02-28',
+      });
+
+      const row = result.rows[0];
+      expect(row).toBeDefined();
+
+      // December 2026: baseline budget of 300 applies
+      expect(row.periods['2026-12'].budget).toBe(300);
+
+      // January 2027: future budget of 450 activates
+      expect(row.periods['2027-01'].budget).toBe(450);
+
+      // February 2027: future budget of 450 remains active
+      expect(row.periods['2027-02'].budget).toBe(450);
+
+      // totalBudget is sum of period budgets: 300 + 450 + 450 = 1200
+      expect(row.totalBudget).toBe(1200);
+    });
+
+    it('leaves past periods without budget when category only has a future validFrom budget', () => {
+      const categoryWithOnlyFuture: Category = {
+        id: 'cat-invest',
+        name: 'Investments',
+        parentId: null,
+        targetBudgets: [
+          { id: 'b-future', amount: 500, period: 'monthly', validFrom: '2027-01-01' },
+        ],
+      };
+
+      const result = calculateCashflowMatrix([categoryWithOnlyFuture], [], 'monthly', undefined, {
+        startDate: '2026-11-01',
+        endDate: '2027-01-31',
+      });
+
+      const row = result.rows[0];
+      // November & December 2026: no budget defined
+      expect(row.periods['2026-11'].budget).toBeUndefined();
+      expect(row.periods['2026-11'].diffToBudget).toBeUndefined();
+      expect(row.periods['2026-12'].budget).toBeUndefined();
+
+      // January 2027: budget 500 is active
+      expect(row.periods['2027-01'].budget).toBe(500);
+      expect(row.periods['2027-01'].diffToBudget).toBe(-500); // 0 actual - 500 budget = -500
+    });
+
+    it('rolls up child category budgets dynamically per period based on respective validFrom', () => {
+      const parentCat: Category = {
+        id: 'p-living',
+        name: 'Wohnen & Leben',
+        parentId: null,
+      };
+
+      const childAlways: Category = {
+        id: 'c-rent',
+        name: 'Miete',
+        parentId: 'p-living',
+        targetBudget: { amount: 800, period: 'monthly' }, // always active
+      };
+
+      const childFuture: Category = {
+        id: 'c-cleaning',
+        name: 'Reinigung',
+        parentId: 'p-living',
+        targetBudgets: [{ id: 'b-clean', amount: 150, period: 'monthly', validFrom: '2027-01-01' }],
+      };
+
+      const result = calculateCashflowMatrix(
+        [parentCat, childAlways, childFuture],
+        [],
+        'monthly',
+        undefined,
+        {
+          startDate: '2026-12-01',
+          endDate: '2027-01-31',
+        }
+      );
+
+      const parentRow = result.rows.find((r) => r.category.id === 'p-living');
+      // In December 2026: only rent (800) is active
+      expect(parentRow?.periods['2026-12'].budget).toBe(800);
+
+      // In January 2027: rent (800) + cleaning (150) = 950
+      expect(parentRow?.periods['2027-01'].budget).toBe(950);
+    });
+  });
 });

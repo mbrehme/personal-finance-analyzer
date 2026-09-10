@@ -4,11 +4,12 @@
  * @module pages/configuration/CategoriesConfig.test
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CategoriesConfig } from './CategoriesConfig';
 import { FinanceProvider } from '@/domain';
+import * as FinanceContextModule from '@/domain';
 
 describe('CategoriesConfig Subpage', () => {
   it('renders category tree table and drag handles', async () => {
@@ -45,5 +46,31 @@ describe('CategoriesConfig Subpage', () => {
 
     await user.click(subcategoryBtns[0]);
     expect(screen.getByText('Neue Kategorie anlegen')).toBeInTheDocument();
+  });
+
+  it('renders active budget and planned future budgets badge', () => {
+    vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+      categories: [
+        {
+          id: 'cat-plan',
+          name: 'Haushalt',
+          parentId: null,
+          order: 0,
+          targetBudgets: [
+            { id: 'b1', amount: 200, period: 'monthly' },
+            { id: 'b2', amount: 300, period: 'monthly', validFrom: '2099-01-01' },
+          ],
+        },
+      ],
+      addCategory: vi.fn(),
+      updateCategory: vi.fn(),
+      deleteCategory: vi.fn(),
+      reorderCategories: vi.fn(),
+    } as any);
+
+    render(<CategoriesConfig />);
+
+    expect(screen.getByText(/200,00.*Monat/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+1 geplant \(ab 01\.01\.2099\)/i)).toBeInTheDocument();
   });
 });

@@ -6,13 +6,26 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Category, PeriodGranularity } from '@/types/finance';
+import {
+  Category,
+  PeriodGranularity,
+  ISODateString,
+  getCategoryBudgets,
+  getActiveCategoryBudgetForDate,
+} from '@/types/finance';
 import { normalizeBudgetToGranularity } from '@/utils/dateUtils';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '../IconRenderer';
 import { EntityVisualFields } from '../EntityVisualFields';
 import { MoneyInput } from '../MoneyInput';
-import { X, AlertCircle, Trash2 } from 'lucide-react';
+import { X, AlertCircle, Trash2, Plus } from 'lucide-react';
+
+interface BudgetFormEntry {
+  id: string;
+  amount: number;
+  period: PeriodGranularity;
+  validFrom: string;
+}
 
 export interface CategoryModalProps {
   isOpen: boolean;
@@ -41,8 +54,9 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   const [color, setColor] = useState('#3b82f6');
   const [icon, setIcon] = useState('Folder');
   const [hasBudget, setHasBudget] = useState(false);
-  const [budgetAmount, setBudgetAmount] = useState<number>(100);
-  const [budgetPeriod, setBudgetPeriod] = useState<PeriodGranularity>('monthly');
+  const [budgets, setBudgets] = useState<BudgetFormEntry[]>([
+    { id: 'b-init', amount: 100, period: 'monthly', validFrom: '' },
+  ]);
   const [regexError, setRegexError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -55,12 +69,21 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setRegexPattern(currentCategory.regexPattern || '');
       setColor(currentCategory.color || '#3b82f6');
       setIcon(currentCategory.icon || 'Folder');
-      if (currentCategory.targetBudget) {
+
+      const existingBudgets = getCategoryBudgets(currentCategory);
+      if (existingBudgets.length > 0) {
         setHasBudget(true);
-        setBudgetAmount(currentCategory.targetBudget.amount);
-        setBudgetPeriod(currentCategory.targetBudget.period);
+        setBudgets(
+          existingBudgets.map((b, idx) => ({
+            id: b.id || `b-${idx}-${Date.now()}`,
+            amount: b.amount,
+            period: b.period,
+            validFrom: b.validFrom || '',
+          }))
+        );
       } else {
         setHasBudget(false);
+        setBudgets([{ id: `b-${Date.now()}`, amount: 100, period: 'monthly', validFrom: '' }]);
       }
     } else {
       setName('');
@@ -70,11 +93,31 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setColor('#3b82f6');
       setIcon('Folder');
       setHasBudget(false);
-      setBudgetAmount(100);
-      setBudgetPeriod('monthly');
+      setBudgets([{ id: `b-${Date.now()}`, amount: 100, period: 'monthly', validFrom: '' }]);
     }
     setRegexError(null);
   }, [currentCategory, isOpen, initialParentId]);
+
+  const addBudgetEntry = () => {
+    const last = budgets[budgets.length - 1];
+    setBudgets((prev) => [
+      ...prev,
+      {
+        id: `b-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        amount: last?.amount ?? 100,
+        period: last?.period ?? 'monthly',
+        validFrom: '',
+      },
+    ]);
+  };
+
+  const removeBudgetEntry = (id: string) => {
+    setBudgets((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  const updateBudgetEntry = (id: string, patch: Partial<BudgetFormEntry>) => {
+    setBudgets((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  };
 
   // Prüfen, ob die aktuelle Kategorie Kinder hat (dann darf sie selbst kein Regex haben)
   const isParentWithChildren = currentCategory
@@ -98,12 +141,13 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       const children = childrenMap.get(cId) || [];
       if (children.length === 0) {
         const c = existingCategories.find((item) => item.id === cId);
-        if (!c?.targetBudget) return 0;
-        return normalizeBudgetToGranularity(
-          c.targetBudget.amount,
-          c.targetBudget.period,
-          'monthly'
+        if (!c) return 0;
+        const activeBudget = getActiveCategoryBudgetForDate(
+          c,
+          new Date().toISOString().slice(0, 10)
         );
+        if (!activeBudget) return 0;
+        return normalizeBudgetToGranularity(activeBudget.amount, activeBudget.period, 'monthly');
       }
       return children.reduce((sum, child) => sum + getChildrenBudget(child.id), 0);
     };
@@ -132,6 +176,26 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
 
     try {
       setSaving(true);
+      const cleanedBudgets =
+        !isParentWithChildren && hasBudget
+          ? budgets
+              .filter((b) => b.amount > 0)
+              .map((b) => ({
+                ...(b.id && !b.id.startsWith('b-') ? { id: b.id } : {}),
+                amount: Math.abs(b.amount),
+                period: b.period,
+                ...(b.validFrom ? { validFrom: b.validFrom as ISODateString } : {}),
+              }))
+          : [];
+
+      // Un-dated budgets first, then sorted by validFrom ascending
+      cleanedBudgets.sort((a, b) => {
+        if (!a.validFrom && !b.validFrom) return 0;
+        if (!a.validFrom) return -1;
+        if (!b.validFrom) return 1;
+        return a.validFrom.localeCompare(b.validFrom);
+      });
+
       const payload = {
         ...(currentCategory
           ? { id: currentCategory.id, manualTransactionIds: currentCategory.manualTransactionIds }
@@ -142,13 +206,8 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
         regexPattern: isParentWithChildren ? undefined : regexPattern.trim() || undefined,
         color,
         icon,
-        targetBudget:
-          !isParentWithChildren && hasBudget
-            ? {
-                amount: Math.abs(budgetAmount),
-                period: budgetPeriod,
-              }
-            : undefined,
+        targetBudget: cleanedBudgets.length > 0 ? cleanedBudgets[0] : undefined,
+        targetBudgets: cleanedBudgets.length > 0 ? cleanedBudgets : undefined,
       };
 
       await onSave(payload as any);
@@ -304,35 +363,84 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                 </div>
 
                 {hasBudget && (
-                  <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
-                          Zielbetrag
-                        </label>
-                        <MoneyInput
-                          value={budgetAmount}
-                          onChange={setBudgetAmount}
-                          min={0}
-                          placeholder="0.00"
-                        />
+                  <div className="space-y-3">
+                    {budgets.map((b, idx) => (
+                      <div
+                        key={b.id}
+                        className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-600">
+                            Budget {budgets.length > 1 ? `#${idx + 1}` : ''}
+                          </span>
+                          {budgets.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeBudgetEntry(b.id)}
+                              className="p-1 text-xs text-red-500 hover:text-red-700"
+                              title="Budget entfernen"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                          <div>
+                            <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
+                              Zielbetrag
+                            </label>
+                            <MoneyInput
+                              value={b.amount}
+                              onChange={(val) => updateBudgetEntry(b.id, { amount: val })}
+                              min={0}
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
+                              Zyklus
+                            </label>
+                            <select
+                              value={b.period}
+                              onChange={(e) =>
+                                updateBudgetEntry(b.id, {
+                                  period: e.target.value as PeriodGranularity,
+                                })
+                              }
+                              className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="monthly">Monatlich</option>
+                              <option value="quarterly">Quartal</option>
+                              <option value="halfYearly">Halbjahr</option>
+                              <option value="yearly">Jährlich</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
+                              Gültig ab (optional)
+                            </label>
+                            <input
+                              type="date"
+                              value={b.validFrom}
+                              onChange={(e) =>
+                                updateBudgetEntry(b.id, { validFrom: e.target.value })
+                              }
+                              aria-label="Gültig ab"
+                              className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
-                          Zyklus
-                        </label>
-                        <select
-                          value={budgetPeriod}
-                          onChange={(e) => setBudgetPeriod(e.target.value as PeriodGranularity)}
-                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="monthly">Monatlich</option>
-                          <option value="quarterly">Quartal</option>
-                          <option value="halfYearly">Halbjahr</option>
-                          <option value="yearly">Jährlich</option>
-                        </select>
-                      </div>
-                    </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={addBudgetEntry}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-blue-400 hover:bg-blue-50/50 hover:text-blue-600"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Weiteres Budget hinzufügen
+                    </button>
                   </div>
                 )}
               </>

@@ -12,6 +12,7 @@ import {
   getSubAccountIds,
   getTransactionEffectiveValueForAccount,
   isTransactionMatchingAccount,
+  matchesTransactionFlowType,
 } from './accountService';
 
 describe('accountService', () => {
@@ -619,6 +620,168 @@ describe('accountService', () => {
       // Gesamtansicht: Zeigt von -> zu
       const partnerAll = getEffectiveTransactionPartner(directedTx);
       expect(partnerAll.name).toBe('Martin Brehme → Martin Brehme Tagesgeld');
+    });
+  });
+
+  describe('matchesTransactionFlowType', () => {
+    const accGiro: Account = {
+      id: 'acc-giro',
+      name: 'Girokonto',
+      accountType: 'real',
+      iban: 'DE11112222',
+      color: '#3b82f6',
+      icon: 'Landmark',
+      categoryIds: [],
+      balanceEntries: [],
+    };
+
+    const accSavings: Account = {
+      id: 'acc-savings',
+      name: 'Rücklagen',
+      accountType: 'real',
+      iban: 'DE33334444',
+      color: '#10b981',
+      icon: 'PiggyBank',
+      categoryIds: [],
+      balanceEntries: [],
+    };
+
+    const allAccounts = [accGiro, accSavings];
+
+    // Externe Ausgabe vom Girokonto (Rewe Einkauf)
+    const externalExpenseTx: Transaction = {
+      id: 'tx-expense',
+      date: '2026-09-01',
+      amount: 45,
+      senderIban: 'DE11112222',
+      receiverIban: 'DE99999999',
+      sender: 'Martin',
+      receiver: 'Rewe',
+      subject: 'Lebensmittel',
+      assignmentSource: 'unassigned',
+      issuer: 'Martin',
+      value: -45,
+    };
+
+    // Externe Einnahme auf Girokonto (Gehalt)
+    const externalIncomeTx: Transaction = {
+      id: 'tx-income',
+      date: '2026-09-01',
+      amount: 3000,
+      senderIban: 'DE88888888',
+      receiverIban: 'DE11112222',
+      sender: 'Arbeitgeber',
+      receiver: 'Martin',
+      subject: 'Gehalt',
+      assignmentSource: 'unassigned',
+      issuer: 'Arbeitgeber',
+      value: 3000,
+    };
+
+    // Interne Umbuchung: 500 € von Girokonto nach Rücklagen
+    const internalTransferTx: Transaction = {
+      id: 'tx-transfer',
+      date: '2026-09-02',
+      amount: 500,
+      senderIban: 'DE11112222',
+      receiverIban: 'DE33334444',
+      sender: 'Martin',
+      receiver: 'Martin Rücklagen',
+      subject: 'Sparübertrag',
+      assignmentSource: 'unassigned',
+      issuer: 'Martin',
+      value: -500,
+    };
+
+    it('always matches flowType "all"', () => {
+      expect(matchesTransactionFlowType(externalExpenseTx, 'all', undefined, allAccounts)).toBe(
+        true
+      );
+      expect(matchesTransactionFlowType(externalIncomeTx, 'all', accGiro, allAccounts)).toBe(true);
+      expect(matchesTransactionFlowType(internalTransferTx, 'all', accSavings, allAccounts)).toBe(
+        true
+      );
+    });
+
+    describe('when no account is selected (global perspective / all accounts)', () => {
+      it('correctly filters external income', () => {
+        expect(
+          matchesTransactionFlowType(externalIncomeTx, 'inbound', undefined, allAccounts)
+        ).toBe(true);
+        expect(
+          matchesTransactionFlowType(externalExpenseTx, 'inbound', undefined, allAccounts)
+        ).toBe(false);
+        // Interne Umbuchung ist im globalen Kontext KEINE Einnahme
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'inbound', undefined, allAccounts)
+        ).toBe(false);
+      });
+
+      it('correctly filters external expenses', () => {
+        expect(
+          matchesTransactionFlowType(externalExpenseTx, 'outbound', undefined, allAccounts)
+        ).toBe(true);
+        expect(
+          matchesTransactionFlowType(externalIncomeTx, 'outbound', undefined, allAccounts)
+        ).toBe(false);
+        // Interne Umbuchung ist im globalen Kontext KEINE Ausgabe
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'outbound', undefined, allAccounts)
+        ).toBe(false);
+      });
+
+      it('correctly filters internal transfers', () => {
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'transfer', undefined, allAccounts)
+        ).toBe(true);
+        expect(
+          matchesTransactionFlowType(externalExpenseTx, 'transfer', undefined, allAccounts)
+        ).toBe(false);
+        expect(
+          matchesTransactionFlowType(externalIncomeTx, 'transfer', undefined, allAccounts)
+        ).toBe(false);
+      });
+    });
+
+    describe('when a specific account is selected (account perspective)', () => {
+      it('evaluates flow direction from sender account perspective (Girokonto)', () => {
+        // Für Girokonto ist der Transfer ein Geldabgang (outbound)
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'outbound', accGiro, allAccounts)
+        ).toBe(true);
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'inbound', accGiro, allAccounts)
+        ).toBe(false);
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'transfer', accGiro, allAccounts)
+        ).toBe(true);
+
+        // Externe Buchungen auf Girokonto
+        expect(
+          matchesTransactionFlowType(externalExpenseTx, 'outbound', accGiro, allAccounts)
+        ).toBe(true);
+        expect(matchesTransactionFlowType(externalIncomeTx, 'inbound', accGiro, allAccounts)).toBe(
+          true
+        );
+      });
+
+      it('evaluates flow direction from receiver account perspective (Rücklagenkonto)', () => {
+        // Für Rücklagenkonto ist der Transfer ein Geldeingang (inbound), obwohl tx.value negativ ist!
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'inbound', accSavings, allAccounts)
+        ).toBe(true);
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'outbound', accSavings, allAccounts)
+        ).toBe(false);
+        expect(
+          matchesTransactionFlowType(internalTransferTx, 'transfer', accSavings, allAccounts)
+        ).toBe(true);
+
+        // Fremde Buchungen (Rewe Einkauf vom Girokonto betrifft Rücklagen gar nicht)
+        expect(
+          matchesTransactionFlowType(externalExpenseTx, 'outbound', accSavings, allAccounts)
+        ).toBe(false);
+      });
     });
   });
 });

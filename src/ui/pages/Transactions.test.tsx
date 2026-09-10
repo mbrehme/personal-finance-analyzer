@@ -1552,5 +1552,143 @@ describe('Transactions Page', () => {
 
       vi.restoreAllMocks();
     });
+
+    it('parses and serializes type=transfer in URL parameters', async () => {
+      const { parseTransactionFiltersFromParams, serializeTransactionFiltersToParams } =
+        await import('./Transactions');
+
+      const params = new URLSearchParams('type=transfer');
+      const parsed = parseTransactionFiltersFromParams(params);
+      expect(parsed.type).toBe('transfer');
+
+      const serialized = serializeTransactionFiltersToParams(parsed);
+      expect(serialized.get('type')).toBe('transfer');
+    });
+
+    it('filters internal transfers and respects account perspective for inbound/outbound', async () => {
+      const { MemoryRouter } = await import('react-router-dom');
+      const FinanceContextModule = await import('@/domain');
+
+      const testAccounts = [
+        {
+          id: 'acc-giro',
+          name: 'Girokonto',
+          accountType: 'real',
+          iban: 'DE11',
+          balanceEntries: [],
+        },
+        {
+          id: 'acc-savings',
+          name: 'Rücklagen',
+          accountType: 'real',
+          iban: 'DE22',
+          balanceEntries: [],
+        },
+      ];
+
+      const testTransactions = [
+        {
+          id: 'tx-ext-expense',
+          date: '2026-09-01',
+          value: -80,
+          amount: 80,
+          subject: 'Rewe Einkauf',
+          receiver: 'Rewe',
+          senderIban: 'DE11',
+          receiverIban: 'DE99',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-ext-income',
+          date: '2026-09-01',
+          value: 3000,
+          amount: 3000,
+          subject: 'Gehaltseingang',
+          receiver: 'Martin',
+          senderIban: 'DE88',
+          receiverIban: 'DE11',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+        {
+          id: 'tx-int-transfer',
+          date: '2026-09-02',
+          value: -500,
+          amount: 500,
+          subject: 'Umbuchung auf Rücklagen',
+          receiver: 'Martin Rücklagen',
+          senderIban: 'DE11',
+          receiverIban: 'DE22',
+          categoryId: null,
+          assignmentSource: 'unassigned',
+          origin: 'imported',
+        },
+      ];
+
+      vi.spyOn(FinanceContextModule, 'useFinance').mockReturnValue({
+        accounts: testAccounts as any,
+        categories: [],
+        transactions: testTransactions as any,
+        deletedTransactions: [],
+        loading: false,
+        assignTransactionCategoryBatch: vi.fn(),
+        assignTransactionCategory: vi.fn(),
+        deleteTransaction: vi.fn(),
+        resetTransaction: vi.fn(),
+      } as any);
+
+      // 1. Alle Konten + Typ: Umbuchungen
+      const { unmount } = render(
+        <MemoryRouter initialEntries={['/transactions?type=transfer']}>
+          <FinanceProvider>
+            <Transactions />
+          </FinanceProvider>
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByText('Umbuchung auf Rücklagen')).toBeInTheDocument();
+      expect(screen.queryByText('Rewe Einkauf')).not.toBeInTheDocument();
+      expect(screen.queryByText('Gehaltseingang')).not.toBeInTheDocument();
+
+      unmount();
+
+      // 2. Alle Konten + Typ: Einnahmen (externe) -> Umbuchung darf NICHT enthalten sein!
+      const render2 = render(
+        <MemoryRouter initialEntries={['/transactions?type=inbound']}>
+          <FinanceProvider>
+            <Transactions />
+          </FinanceProvider>
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByText('Gehaltseingang')).toBeInTheDocument();
+      expect(screen.queryByText('Rewe Einkauf')).not.toBeInTheDocument();
+      expect(screen.queryByText('Umbuchung auf Rücklagen')).not.toBeInTheDocument();
+
+      render2.unmount();
+
+      // 3. Konto Rücklagen + Typ: Geldeingänge -> Umbuchung MUSS enthalten sein (aus Sicht Rücklagen ist es +500 €)!
+      const render3 = render(
+        <MemoryRouter initialEntries={['/transactions?account=acc-savings&type=inbound']}>
+          <FinanceProvider>
+            <Transactions />
+          </FinanceProvider>
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByText('Umbuchung auf Rücklagen')).toBeInTheDocument();
+      expect(screen.queryByText('Rewe Einkauf')).not.toBeInTheDocument();
+      expect(screen.queryByText('Gehaltseingang')).not.toBeInTheDocument();
+
+      // Dropdown-Beschriftung auf Einzelkonto prüfen
+      expect(screen.getByRole('option', { name: 'Geldeingänge (+)' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Geldabgänge (-)' })).toBeInTheDocument();
+
+      render3.unmount();
+      vi.restoreAllMocks();
+    });
   });
 });

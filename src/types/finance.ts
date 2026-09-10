@@ -18,6 +18,7 @@ export {
   isTransactionMatchingAccount,
   isInternalTransfer,
   getEffectiveTransactionPartner,
+  matchesTransactionFlowType,
 } from '@/domain/modules/accounts/accountService';
 
 export {

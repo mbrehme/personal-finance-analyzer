@@ -5,7 +5,7 @@
  * @module domain/modules/accounts/accountService
  */
 
-import { Account, Transaction } from '@/types';
+import { Account, Transaction, TransactionFlowType } from '@/types';
 
 /**
  * Normalisiert eine IBAN durch Entfernen von Leerzeichen und Konvertierung in Großbuchstaben.
@@ -582,6 +582,76 @@ export function isTransactionMatchingAccount(
     return (
       getTransactionEffectiveValueForAccount(tx, targetAcc, accounts, allTransactions) !== null
     );
+  }
+
+  return true;
+}
+
+/**
+ * Prüft, ob eine Transaktion einem gewünschten Geldfluss-Typ ('inbound', 'outbound', 'transfer' oder 'all') entspricht.
+ * Berücksichtigt dynamisch die Kontoperspektive:
+ * - Bei ausgewähltem Konto (`selectedAccount`):
+ *   - 'transfer': Interne Umbuchung zwischen bekannten Nutzerkonten (`isInternalTransfer`).
+ *   - 'inbound': Effektiver Betrag aus Sicht dieses Kontos ist positiv (>= 0).
+ *   - 'outbound': Effektiver Betrag aus Sicht dieses Kontos ist negativ (< 0).
+ * - In der Gesamtansicht (`selectedAccount` nicht definiert oder alle Konten):
+ *   - 'transfer': Interne Umbuchung (`isInternalTransfer`).
+ *   - 'inbound': Nur echte externe Einnahmen (keine interne Umbuchung && tx.value >= 0).
+ *   - 'outbound': Nur echte externe Ausgaben (keine interne Umbuchung && tx.value < 0).
+ *
+ * @param {Transaction} tx - Die zu filternde Transaktion
+ * @param {TransactionFlowType | 'all'} flowType - Gewünschter Flusstyp
+ * @param {Account} [selectedAccount] - Das aktuell ausgewählte Konto (falls gefiltert)
+ * @param {Account[]} accounts - Alle registrierten Konten des Nutzers
+ * @param {Transaction[]} [allTransactions] - Optional: Alle Transaktionen (zur Gegenbuchungserkennung)
+ * @returns {boolean} true, falls die Transaktion zum Flusstyp passt
+ * @example
+ * matchesTransactionFlowType(tx, 'inbound', giroAccount, accounts);
+ */
+export function matchesTransactionFlowType(
+  tx: Transaction,
+  flowType: TransactionFlowType | 'all',
+  selectedAccount: Account | undefined,
+  accounts: Account[],
+  allTransactions?: Transaction[]
+): boolean {
+  if (flowType === 'all') return true;
+
+  const isTransfer = isInternalTransfer(tx, accounts);
+
+  if (flowType === 'transfer') {
+    return isTransfer;
+  }
+
+  // 1. Kontext: Einzelkonto ausgewählt
+  if (selectedAccount) {
+    const eff = getTransactionEffectiveValueForAccount(
+      tx,
+      selectedAccount,
+      accounts,
+      allTransactions
+    );
+    if (eff === null) return false;
+
+    if (flowType === 'inbound') {
+      return eff >= 0;
+    }
+    if (flowType === 'outbound') {
+      return eff < 0;
+    }
+  }
+
+  // 2. Kontext: Gesamtsicht (Alle Konten)
+  // Umbuchungen zwischen eigenen Konten sind vermögensneutral und zählen weder als externes Einkommen noch als externe Kosten.
+  if (isTransfer) {
+    return false;
+  }
+
+  if (flowType === 'inbound') {
+    return tx.value >= 0;
+  }
+  if (flowType === 'outbound') {
+    return tx.value < 0;
   }
 
   return true;

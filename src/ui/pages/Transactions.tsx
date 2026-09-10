@@ -14,19 +14,19 @@ import {
 } from 'react-router-dom';
 import { useFinance } from '@/domain';
 import {
-  TransactionType,
+  TransactionFlowType,
   ISODateString,
   buildCompoundSearchField,
   sortTransactionsDesc,
   getTransactionOrigin,
   isTransactionOverridden,
-  getTransactionType,
   Transaction,
   Account,
   getTransactionAccountInfo,
   isTransactionMatchingAccount,
   getTransactionEffectiveValueForAccount,
   getEffectiveTransactionPartner,
+  matchesTransactionFlowType,
 } from '@/types/finance';
 import { IconRenderer } from '@/ui/components/IconRenderer';
 import { DateRangePicker } from '@/ui/components/DateRangePicker';
@@ -66,8 +66,8 @@ export interface TransactionFiltersState {
   accountId: string;
   /** Liste gefilterter Kategorie-IDs (inkl. '__uncategorized__') oder null für alle */
   categoryIds: string[] | null;
-  /** Buchungstyp (Einnahme, Ausgabe oder alle) */
-  type: TransactionType | 'all';
+  /** Buchungstyp (Einnahme, Ausgabe, Umbuchung oder alle) */
+  type: TransactionFlowType | 'all';
   /** Herkunft der Buchung (Importiert, Split, Override, Gelöscht oder alle) */
   origin: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted';
   /** Startdatum des Zeitraums (ISO-Datum 'YYYY-MM-DD') */
@@ -116,8 +116,8 @@ export function parseTransactionFiltersFromParams(
       : null;
 
   const rawType = params.get('type');
-  const type: TransactionType | 'all' =
-    rawType === 'inbound' || rawType === 'outbound' ? rawType : 'all';
+  const type: TransactionFlowType | 'all' =
+    rawType === 'inbound' || rawType === 'outbound' || rawType === 'transfer' ? rawType : 'all';
 
   const rawOrigin = params.get('origin');
   const origin: 'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted' =
@@ -382,7 +382,7 @@ export const Transactions: React.FC = () => {
   const [inputCategoryIds, setInputCategoryIds] = useState<string[] | null>(
     initialFilters.categoryIds
   );
-  const [inputType, setInputType] = useState<TransactionType | 'all'>(initialFilters.type);
+  const [inputType, setInputType] = useState<TransactionFlowType | 'all'>(initialFilters.type);
   const [inputOrigin, setInputOrigin] = useState<
     'all' | 'imported' | 'split' | 'override' | 'manual' | 'deleted'
   >(initialFilters.origin);
@@ -473,6 +473,13 @@ export const Transactions: React.FC = () => {
     return map;
   }, [categories]);
 
+  // Aktives Filterkonto ermitteln (für korrekte Vorzeichenberechnung bei Umbuchungen und kontextsensitive Filter)
+  const selectedAccount = useMemo(() => {
+    return appliedFilters.accountId !== 'all'
+      ? accounts.find((a) => a.id === appliedFilters.accountId)
+      : undefined;
+  }, [accounts, appliedFilters.accountId]);
+
   // Gefilterte Transaktionen basierend auf angewandten Filtern
   const filteredTransactions = useMemo(() => {
     const { searchTerm, accountId, categoryIds, type, origin, startDate, endDate } = appliedFilters;
@@ -511,8 +518,11 @@ export const Transactions: React.FC = () => {
         }
       }
 
-      // 3. Typ Filter (virtuell basierend auf Betragsvorzeichen)
-      if (type !== 'all' && getTransactionType(tx) !== type) {
+      // 3. Typ Filter (kontextsensitiver Flusstyp mit Kontoperspektive und Umbuchungserkennung)
+      if (
+        type !== 'all' &&
+        !matchesTransactionFlowType(tx, type, selectedAccount, accounts, transactions)
+      ) {
         return false;
       }
 
@@ -548,14 +558,14 @@ export const Transactions: React.FC = () => {
     });
 
     return sortTransactionsDesc(matches);
-  }, [transactions, deletedTransactions, appliedFilters, accounts, categoryNameMap]);
-
-  // Aktives Filterkonto ermitteln (für korrekte Vorzeichenberechnung bei Umbuchungen)
-  const selectedAccount = useMemo(() => {
-    return appliedFilters.accountId !== 'all'
-      ? accounts.find((a) => a.id === appliedFilters.accountId)
-      : undefined;
-  }, [accounts, appliedFilters.accountId]);
+  }, [
+    transactions,
+    deletedTransactions,
+    appliedFilters,
+    accounts,
+    categoryNameMap,
+    selectedAccount,
+  ]);
 
   // Summe aller gefilterten Buchungen (unter Berücksichtigung des gewählten Kontos)
   const { filteredTotalSum, filteredInboundSum, filteredOutboundSum } = useMemo(() => {
@@ -751,7 +761,7 @@ export const Transactions: React.FC = () => {
   };
 
   // Typ-Auswahl ändern (wendet direkt an für flüssige Bedienung)
-  const handleTypeChange = (val: TransactionType | 'all') => {
+  const handleTypeChange = (val: TransactionFlowType | 'all') => {
     setInputType(val);
     updateFiltersAndUrl({ ...appliedFilters, type: val });
   };
@@ -1062,13 +1072,24 @@ export const Transactions: React.FC = () => {
           <div className="relative min-w-0">
             <select
               value={inputType}
-              onChange={(e) => handleTypeChange(e.target.value as TransactionType | 'all')}
+              onChange={(e) => handleTypeChange(e.target.value as TransactionFlowType | 'all')}
               className="h-9 w-full appearance-none rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-xs text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               aria-label="Buchungstyp filtern"
             >
               <option value="all">Typ: Alle</option>
-              <option value="inbound">Einnahmen (+)</option>
-              <option value="outbound">Ausgaben (-)</option>
+              {inputAccountId !== 'all' ? (
+                <>
+                  <option value="inbound">Geldeingänge (+)</option>
+                  <option value="outbound">Geldabgänge (-)</option>
+                  <option value="transfer">Umbuchungen (⇄)</option>
+                </>
+              ) : (
+                <>
+                  <option value="inbound">Einnahmen (+) (extern)</option>
+                  <option value="outbound">Ausgaben (-) (extern)</option>
+                  <option value="transfer">Umbuchungen (⇄)</option>
+                </>
+              )}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           </div>

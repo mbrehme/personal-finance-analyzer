@@ -61,3 +61,19 @@ Bei allen nicht-trivialen Aufgaben und neuen Features ist folgender Ablauf einzu
 | `pnpm commit`          | Interaktiver Commit-Assistent (Conventional Commits)                |
 | `pnpm release`         | Erstellt einen automatischen SemVer-Release inkl. `CHANGELOG.md`    |
 | `pnpm release:dry-run` | Vorschau der nächsten Version und Release Notes ohne Schreibzugriff |
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked as GitHub Issues in `mbrehme/personal-finance-analyzer` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo (`GLOSSARY.md` and `docs/adr/` at the repo root, created lazily as needed). See `docs/agents/domain.md`.

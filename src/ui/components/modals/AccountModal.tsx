@@ -7,14 +7,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  Account,
-  AccountType,
-  BalanceEntry,
-  Category,
-  ISODateString,
-  normalizeIban,
-} from '@/types/finance';
+import { Account, AccountType, BalanceEntry, Category, ISODateString } from '@/types';
+import { normalizeIban } from '@/domain';
 import { IconRenderer } from '../IconRenderer';
 import { EntityVisualFields } from '../EntityVisualFields';
 import { MoneyInput } from '../MoneyInput';

@@ -24,6 +24,40 @@ export interface TransactionAccountInfo {
   includedAccountIds: string[];
 }
 
+export const COUNTERPART_MAX_DIFF_DAYS = 4;
+export const COUNTERPART_AMOUNT_TOLERANCE = 0.005;
+
+/**
+ * Liefert den absoluten Betrag einer Transaktion.
+ */
+export function getTransactionAbsoluteAmount(tx: Transaction): number {
+  return tx.amount !== undefined && tx.amount > 0 ? tx.amount : Math.abs(tx.value);
+}
+
+/**
+ * Prüft, ob zwei Transaktionen innerhalb des Gegenbuchungs-Zeit- und Betragsfensters liegen
+ * (kaufmännische Cent-Toleranz und bis zu 4 Tage Valuta-Differenz).
+ */
+export function isWithinCounterpartWindow(
+  a: Transaction,
+  b: Transaction,
+  maxDays: number = COUNTERPART_MAX_DIFF_DAYS,
+  tolerance: number = COUNTERPART_AMOUNT_TOLERANCE
+): boolean {
+  const amtA = getTransactionAbsoluteAmount(a);
+  const amtB = getTransactionAbsoluteAmount(b);
+  if (Math.abs(amtA - amtB) > tolerance) return false;
+
+  const timeA = new Date(a.date).getTime();
+  const timeB = new Date(b.date).getTime();
+  if (!isNaN(timeA) && !isNaN(timeB)) {
+    const diffDays = Math.abs(timeA - timeB) / (1000 * 60 * 60 * 24);
+    if (diffDays > maxDays) return false;
+  }
+
+  return true;
+}
+
 /**
  * Liefert alle Unterkonto-IDs eines Kontos (für echte Konten die IDs ihrer virtuellen Unterkonten).
  *
@@ -171,21 +205,12 @@ export function hasDirectCounterpart(
   allTransactions: Transaction[],
   accounts: Account[]
 ): boolean {
-  const txTime = new Date(tx.date).getTime();
-  const txAmount = tx.amount !== undefined ? tx.amount : Math.abs(tx.value);
   const normTxSender = normalizeIban(tx.senderIban);
   const normTxReceiver = normalizeIban(tx.receiverIban);
 
   return allTransactions.some((other) => {
     if (other.id === tx.id) return false;
-    const otherAmount = other.amount !== undefined ? other.amount : Math.abs(other.value);
-    if (Math.abs(otherAmount - txAmount) > 0.005) return false;
-
-    // Datumstoleranz von bis zu 4 Tagen für bankübliche Wertstellungs-Laufzeiten
-    const otherTime = new Date(other.date).getTime();
-    if (!isNaN(txTime) && !isNaN(otherTime)) {
-      if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
-    }
+    if (!isWithinCounterpartWindow(tx, other)) return false;
 
     const otherInfo = getTransactionAccountInfo(other, accounts);
 
@@ -376,27 +401,15 @@ export function getTransactionEffectiveValueForAccount(
 
     // Gegenbuchungs-Deduplizierung bei Vorliegen von allTransactions
     if (allTransactions) {
-      const txTime = new Date(tx.date).getTime();
       const hasDirectVirtualBooking = allTransactions.some((other) => {
         if (other.id === tx.id) return false;
-        const otherAmount = other.amount !== undefined ? other.amount : Math.abs(other.value);
-        if (Math.abs(otherAmount - amount) > 0.005) return false;
-
-        const otherTime = new Date(other.date).getTime();
-        if (!isNaN(txTime) && !isNaN(otherTime)) {
-          if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
-        }
+        if (!isWithinCounterpartWindow(tx, other)) return false;
 
         const otherInfo = getTransactionAccountInfo(other, accounts);
         if (!otherInfo.includedAccountIds.includes(targetAccount.id)) return false;
 
-        // Wenn other direkt aus dem Auszug des übergeordneten Kontos stammt (eigene Buchung), aber tx nicht -> tx unterdrücken
-        if (isParentSender && other.value < 0 && tx.value > 0) {
-          return true;
-        }
-        if (isParentReceiver && other.value > 0 && tx.value < 0) {
-          return true;
-        }
+        if (isParentSender && other.value < 0 && tx.value > 0) return true;
+        if (isParentReceiver && other.value > 0 && tx.value < 0) return true;
 
         return false;
       });
@@ -463,16 +476,9 @@ export function getTransactionEffectiveValueForAccount(
     );
 
     if (isInternal) {
-      const txTime = new Date(tx.date).getTime();
       const hasDirectStatementBooking = allTransactions.some((other) => {
         if (other.id === tx.id) return false;
-        const otherAmount = other.amount !== undefined ? other.amount : Math.abs(other.value);
-        if (Math.abs(otherAmount - amount) > 0.005) return false;
-
-        const otherTime = new Date(other.date).getTime();
-        if (!isNaN(txTime) && !isNaN(otherTime)) {
-          if (Math.abs(otherTime - txTime) > 4 * 24 * 60 * 60 * 1000) return false;
-        }
+        if (!isWithinCounterpartWindow(tx, other)) return false;
 
         const otherSenderIban = normalizeIban(other.senderIban);
         const otherReceiverIban = normalizeIban(other.receiverIban);
@@ -485,13 +491,8 @@ export function getTransactionEffectiveValueForAccount(
 
         if (!isSameTransfer) return false;
 
-        // Wenn other direkt aus dem Auszug von targetAccount stammt (eigene Buchung), aber tx nicht -> tx unterdrücken
-        if (isSender && other.value < 0 && tx.value > 0) {
-          return true;
-        }
-        if (isReceiver && other.value > 0 && tx.value < 0) {
-          return true;
-        }
+        if (isSender && other.value < 0 && tx.value > 0) return true;
+        if (isReceiver && other.value > 0 && tx.value < 0) return true;
 
         return false;
       });
@@ -655,4 +656,106 @@ export function matchesTransactionFlowType(
   }
 
   return true;
+}
+
+/**
+ * Vorindizierter Resolver für Konto- und Geldfluss-Auflösung inkl. Gegenbuchungs-Deduplizierung.
+ * Verhindert wiederholte O(N)-Scans und erzwingt konsistente Perspektiven-Berechnung.
+ */
+export interface AccountFlowResolver {
+  getAccountInfo(tx: Transaction): TransactionAccountInfo;
+  getEffectiveValue(tx: Transaction, targetAccount: Account): number | null;
+  isMatchingAccount(tx: Transaction, accountId: string): boolean;
+  matchesFlowType(
+    tx: Transaction,
+    flowType: TransactionFlowType | 'all',
+    selectedAccount?: Account
+  ): boolean;
+  isInternalTransfer(tx: Transaction): boolean;
+}
+
+/**
+ * Erstellt einen vorindizierten {@link AccountFlowResolver} für einen festen Satz an Konten und Transaktionen.
+ *
+ * @param {Account[]} accounts - Alle registrierten Konten
+ * @param {Transaction[]} allTransactions - Alle Transaktionen zur Gegenbuchungserkennung
+ * @returns {AccountFlowResolver}
+ */
+export function createAccountFlowResolver(
+  accounts: Account[],
+  allTransactions: Transaction[]
+): AccountFlowResolver {
+  const txsByCentBucket = new Map<number, Transaction[]>();
+  for (const tx of allTransactions) {
+    const bucket = Math.round(getTransactionAbsoluteAmount(tx) * 100);
+    const list = txsByCentBucket.get(bucket);
+    if (list) {
+      list.push(tx);
+    } else {
+      txsByCentBucket.set(bucket, [tx]);
+    }
+  }
+
+  const accountInfoCache = new Map<string, TransactionAccountInfo>();
+  const effectiveValueCache = new Map<string, number | null>();
+
+  const getCandidatesFor = (tx: Transaction): Transaction[] => {
+    const bucket = Math.round(getTransactionAbsoluteAmount(tx) * 100);
+    const candidates: Transaction[] = [];
+    for (let b = bucket - 1; b <= bucket + 1; b++) {
+      const list = txsByCentBucket.get(b);
+      if (list) {
+        candidates.push(...list);
+      }
+    }
+    return candidates;
+  };
+
+  const getAccountInfo = (tx: Transaction): TransactionAccountInfo => {
+    const cached = accountInfoCache.get(tx.id);
+    if (cached) return cached;
+    const info = getTransactionAccountInfo(tx, accounts);
+    accountInfoCache.set(tx.id, info);
+    return info;
+  };
+
+  const getEffectiveValue = (tx: Transaction, targetAccount: Account): number | null => {
+    const cacheKey = `${tx.id}::${targetAccount.id}`;
+    if (effectiveValueCache.has(cacheKey)) {
+      return effectiveValueCache.get(cacheKey)!;
+    }
+    const candidates = getCandidatesFor(tx);
+    const val = getTransactionEffectiveValueForAccount(tx, targetAccount, accounts, candidates);
+    effectiveValueCache.set(cacheKey, val);
+    return val;
+  };
+
+  const isMatchingAccount = (tx: Transaction, accountId: string): boolean => {
+    if (accountId === 'all') return true;
+    const candidates = getCandidatesFor(tx);
+    return isTransactionMatchingAccount(tx, accountId, accounts, candidates);
+  };
+
+  const matchesFlowType = (
+    tx: Transaction,
+    flowType: TransactionFlowType | 'all',
+    selectedAccount?: Account
+  ): boolean => {
+    if (flowType === 'all') return true;
+    const candidates = getCandidatesFor(tx);
+    return matchesTransactionFlowType(tx, flowType, selectedAccount, accounts, candidates);
+  };
+
+  const checkInternalTransfer = (tx: Transaction): boolean => {
+    const info = getAccountInfo(tx);
+    return Boolean(info.senderAccountId && info.receiverAccountId);
+  };
+
+  return {
+    getAccountInfo,
+    getEffectiveValue,
+    isMatchingAccount,
+    matchesFlowType,
+    isInternalTransfer: checkInternalTransfer,
+  };
 }

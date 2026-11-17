@@ -14,6 +14,10 @@ import {
   getTransactionEffectiveValueForAccount,
   getTransactionOrigin,
   normalizeIban,
+  resetTransactionToOriginal,
+  isTransactionOverridden,
+} from '@/domain';
+import {
   getCategoryBudgets,
   getActiveCategoryBudgetForDate,
   Account,
@@ -254,9 +258,7 @@ describe('finance domain helpers', () => {
     expect(searchOutbound).toContain('[Ausgang]');
   });
 
-  it('resets a modified transaction back to original bank values and unassigns category', async () => {
-    const { resetTransactionToOriginal, isTransactionOverridden } = await import('./finance');
-
+  it('resets a modified transaction back to original bank values and unassigns category', () => {
     const modifiedTx: Transaction = {
       id: 'tx-override-1',
       senderIban: 'DE2222',
@@ -299,9 +301,7 @@ describe('finance domain helpers', () => {
     expect(isTransactionOverridden(restored)).toBe(false);
   });
 
-  it('detects transaction as overridden when category is manually assigned', async () => {
-    const { isTransactionOverridden } = await import('./finance');
-
+  it('detects transaction as overridden when category is manually assigned', () => {
     const txWithManualCat: Transaction = {
       id: 'tx-manual-cat',
       date: '2026-09-07',

@@ -5,12 +5,8 @@
  * @module domain/modules/matcher/regexMatcher
  */
 
-import {
-  Category,
-  Transaction,
-  buildCompoundSearchField,
-  CategoryAssignmentSource,
-} from '@/types/finance';
+import { Category, Transaction, CategoryAssignmentSource } from '@/types';
+import { buildCompoundSearchField } from '../categories/categoryService';
 
 export interface MatchResult {
   categoryId: string | null;

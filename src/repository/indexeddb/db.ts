@@ -14,10 +14,12 @@ import {
   DEFAULT_EXPORT_OPTIONS,
   ResetOptions,
   DEFAULT_RESET_OPTIONS,
+} from '@/types';
+import {
   sortTransactionsDesc,
   isTransactionOverridden,
   getTransactionType,
-} from '@/types/finance';
+} from '@/domain/modules/transactions/transactionService';
 
 const DB_NAME = 'personal_finance_analyzer_db';
 const DB_VERSION = 2;

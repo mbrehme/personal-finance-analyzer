@@ -7,8 +7,8 @@
  */
 
 import React, { useState } from 'react';
-import { useFinance } from '@/domain';
-import { ExportOptions, DEFAULT_EXPORT_OPTIONS, isTransactionOverridden } from '@/types/finance';
+import { useFinance, isTransactionOverridden } from '@/domain';
+import { ExportOptions, DEFAULT_EXPORT_OPTIONS } from '@/types';
 import { Download, X, Landmark, Layers, Receipt, Edit3, Trash2 } from 'lucide-react';
 
 export interface ExportModalProps {

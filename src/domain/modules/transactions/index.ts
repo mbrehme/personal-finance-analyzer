@@ -6,4 +6,5 @@
 
 export * from './transactionService';
 export * from './transactionDeduplication';
+export * from './transactionQuery';
 export * from './useTransactions';

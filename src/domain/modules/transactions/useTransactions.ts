@@ -15,7 +15,7 @@ import {
   SplitInput,
 } from './transactionService';
 import { findMatchingTransaction, mergeTransactions } from './transactionDeduplication';
-import { matchTransaction } from '../categories/categoryService';
+import { matchTransaction } from '../matcher/regexMatcher';
 
 export interface UseTransactionsResult {
   transactions: Transaction[];
@@ -33,6 +33,7 @@ export interface UseTransactionsResult {
   deleteTransaction: (id: string) => Promise<void>;
   restoreTransaction: (id: string) => Promise<void>;
   emptyTrash: () => Promise<void>;
+  clearTransactions: () => Promise<void>;
   splitTransaction: (
     originalId: string,
     splitAmount: number,
@@ -162,42 +163,110 @@ export function useTransactions(
   };
 
   const deleteTransaction = async (id: string): Promise<void> => {
-    const txToDelete = transactions.find((t) => t.id === id);
-    if (!txToDelete) return;
+    const tx = transactions.find((t) => t.id === id);
+    if (!tx) return;
 
-    if (txToDelete.origin === 'override' && !txToDelete.originalDate) {
+    let updatedCategories = [...categories];
+
+    // Fall 1: Gelöschte Buchung ist ein Split-Kind (`splitFromId` vorhanden)
+    if (tx.splitFromId) {
+      const parentTx = transactions.find((t) => t.id === tx.splitFromId);
       await transactionRepo.delete(id);
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
-      return;
+
+      updatedCategories = updatedCategories.map((c) => ({
+        ...c,
+        manualTransactionIds: (c.manualTransactionIds || []).filter((mid) => mid !== id),
+      }));
+
+      if (parentTx) {
+        const childAbs = Math.abs(tx.value);
+        const parentCurrentAbs = Math.abs(parentTx.value);
+        const newAbs = Math.round((parentCurrentAbs + childAbs) * 100) / 100;
+        const sign = parentTx.value < 0 ? -1 : 1;
+
+        const updatedParent: Transaction = {
+          ...parentTx,
+          value: sign * newAbs,
+        };
+
+        await transactionRepo.save(updatedParent);
+        await categoryRepo.saveAll(updatedCategories);
+        setCategories(updatedCategories);
+
+        setTransactions((prev) =>
+          sortTransactionsDesc(
+            prev.filter((t) => t.id !== id).map((t) => (t.id === parentTx.id ? updatedParent : t))
+          )
+        );
+        return;
+      }
     }
 
+    // Fall 2: Gelöschte Buchung ist eine Parent-Buchung mit vorhandenen Split-Kindern
+    const children = transactions.filter((t) => t.splitFromId === id);
+    const childIds = new Set(children.map((c) => c.id));
+    for (const child of children) {
+      await transactionRepo.delete(child.id);
+      updatedCategories = updatedCategories.map((c) => ({
+        ...c,
+        manualTransactionIds: (c.manualTransactionIds || []).filter((mid) => mid !== child.id),
+      }));
+    }
+
+    const isManual = tx.origin === 'override' && !tx.originalDate;
     const deletedTx: Transaction = {
-      ...txToDelete,
+      ...tx,
       deletedAt: new Date().toISOString(),
     };
 
+    if (!isManual) {
+      await transactionRepo.saveDeleted([deletedTx]);
+    }
     await transactionRepo.delete(id);
-    await transactionRepo.saveDeleted([deletedTx]);
 
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-    setDeletedTransactions((prev) => [deletedTx, ...prev]);
+    updatedCategories = updatedCategories.map((c) => ({
+      ...c,
+      manualTransactionIds: (c.manualTransactionIds || []).filter((mid) => mid !== id),
+    }));
+
+    await categoryRepo.saveAll(updatedCategories);
+    setCategories(updatedCategories);
+
+    setTransactions((prev) => prev.filter((t) => t.id !== id && !childIds.has(t.id)));
+    if (!isManual) {
+      setDeletedTransactions((prev) => sortTransactionsDesc([...prev, deletedTx]));
+    }
   };
 
   const restoreTransaction = async (id: string): Promise<void> => {
     const txToRestore = deletedTransactions.find((t) => t.id === id);
     if (!txToRestore) return;
 
-    const { deletedAt: _deletedAt, ...restoredTx } = txToRestore;
+    const { deletedAt: _deletedAt, splitFromId: _splitFromId, ...withoutMetadata } = txToRestore;
+    const match = matchTransaction(withoutMetadata as Transaction, categories);
+    const restoredTx: Transaction = {
+      ...(withoutMetadata as Transaction),
+      categoryId: (withoutMetadata as Transaction).categoryId ?? match.categoryId,
+      assignmentSource: (withoutMetadata as Transaction).categoryId
+        ? (withoutMetadata as Transaction).assignmentSource
+        : match.assignmentSource,
+    };
+
+    await transactionRepo.save(restoredTx);
     await transactionRepo.deleteFromTrash(id);
-    await transactionRepo.save(restoredTx as Transaction);
 
     setDeletedTransactions((prev) => prev.filter((t) => t.id !== id));
-    setTransactions((prev) => sortTransactionsDesc([...prev, restoredTx as Transaction]));
+    setTransactions((prev) => sortTransactionsDesc([...prev, restoredTx]));
   };
 
   const emptyTrash = async (): Promise<void> => {
     await transactionRepo.clearDeleted();
     setDeletedTransactions([]);
+  };
+
+  const clearTransactions = async (): Promise<void> => {
+    await transactionRepo.clearAll();
+    setTransactions([]);
   };
 
   const splitTransaction = async (
@@ -517,6 +586,7 @@ export function useTransactions(
     deleteTransaction,
     restoreTransaction,
     emptyTrash,
+    clearTransactions,
     splitTransaction,
     updateSplitGroup,
     resetTransaction,

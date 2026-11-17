@@ -7,7 +7,11 @@
  */
 
 import { Account, Transaction } from '@/types';
-import { normalizeIban } from '../accounts/accountService';
+import {
+  normalizeIban,
+  isWithinCounterpartWindow,
+  COUNTERPART_MAX_DIFF_DAYS,
+} from '../accounts/accountService';
 
 export type TransactionMatchType = 'exact' | 'counterpart' | 'same_transfer';
 
@@ -36,25 +40,6 @@ function isTextSimilar(a?: string, b?: string): boolean {
     if (normA.includes(normB) || normB.includes(normA)) return true;
   }
   return false;
-}
-
-/**
- * Ermittelt den absoluten Geldbetrag einer Buchung.
- */
-function getAbsoluteAmount(tx: Transaction): number {
-  if (tx.amount !== undefined && tx.amount > 0) {
-    return tx.amount;
-  }
-  return Math.abs(tx.value);
-}
-
-/**
- * Prüft, ob zwei Buchungen betraglich übereinstimmen (kaufmännische Cent-Genauigkeit).
- */
-function isAmountMatching(a: Transaction, b: Transaction): boolean {
-  const amtA = getAbsoluteAmount(a);
-  const amtB = getAbsoluteAmount(b);
-  return Math.abs(amtA - amtB) < 0.005;
 }
 
 /**
@@ -105,10 +90,9 @@ export function findMatchingTransaction(
   // 2. Semantischer Match (Betrag identisch, Valuta-Toleranz bis 4 Tage)
   for (const cand of candidates) {
     if (matchedIds.has(cand.id)) continue;
-    if (!isAmountMatching(cand, incoming)) continue;
+    if (!isWithinCounterpartWindow(cand, incoming, COUNTERPART_MAX_DIFF_DAYS)) continue;
 
     const diffDays = getDateDiffDays(cand.date, incoming.date);
-    if (diffDays > 4) continue;
 
     const candNormSender = normalizeIban(cand.senderIban);
     const candNormReceiver = normalizeIban(cand.receiverIban);

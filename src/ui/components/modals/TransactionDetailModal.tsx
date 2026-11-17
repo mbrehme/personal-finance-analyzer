@@ -6,11 +6,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { Transaction, Account, Category, ISODateString } from '@/types';
 import {
-  Transaction,
-  Account,
-  Category,
-  ISODateString,
   buildCompoundSearchField,
   getTransactionAccountInfo,
   getTransactionOrigin,
@@ -18,7 +15,7 @@ import {
   resetTransactionToOriginal,
   isInternalTransfer,
   matchTransaction,
-} from '@/types/finance';
+} from '@/domain';
 import { formatMoney } from '@/utils/moneyUtils';
 import { IconRenderer } from '@/ui/components/IconRenderer';
 import {

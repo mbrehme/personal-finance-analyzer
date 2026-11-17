@@ -12,22 +12,18 @@ import {
   useNavigate,
   NavigateFunction,
 } from 'react-router-dom';
-import { useFinance } from '@/domain';
 import {
-  TransactionFlowType,
-  ISODateString,
-  buildCompoundSearchField,
-  sortTransactionsDesc,
+  useFinance,
   getTransactionOrigin,
   isTransactionOverridden,
-  Transaction,
-  Account,
-  getTransactionAccountInfo,
-  isTransactionMatchingAccount,
-  getTransactionEffectiveValueForAccount,
   getEffectiveTransactionPartner,
-  matchesTransactionFlowType,
-} from '@/types/finance';
+  createAccountFlowResolver,
+  queryTransactions,
+  sumTransactionsForAccount,
+  matchesSearch,
+} from '@/domain';
+export { matchesSearch };
+import { TransactionFlowType, Transaction, Account } from '@/types';
 import { IconRenderer } from '@/ui/components/IconRenderer';
 import { DateRangePicker } from '@/ui/components/DateRangePicker';
 import { CsvImportModal } from '@/ui/components/modals/CsvImportModal';
@@ -35,7 +31,7 @@ import { TransactionModal } from '@/ui/components/modals/TransactionModal';
 import { TransactionDetailModal } from '@/ui/components/modals/TransactionDetailModal';
 import { CategoryFilterDropdown } from '@/ui/components/analytics/CategoryFilterDropdown';
 import { formatDate } from '@/utils/dateUtils';
-import { formatMoney, roundToTwoDecimals } from '@/utils/moneyUtils';
+import { formatMoney } from '@/utils/moneyUtils';
 import {
   Receipt,
   Search,
@@ -238,59 +234,6 @@ function useSafeSearchParams(): [
 }
 
 /**
- * Prüft, ob eine Transaktion mit einem Suchbegriff übereinstimmt.
- * Durchsucht den Compound-Key, formatierte und rohe Beträge sowie den Kategorienamen.
- *
- * @param {Transaction} tx - Die zu prüfende Transaktion
- * @param {string} term - Der Suchbegriff
- * @param {Map<string, string>} [categoryNameMap] - Optionales Mapping von Kategorie-ID zu Kategoriename
- * @returns {boolean} true, falls der Suchbegriff gefunden wurde
- */
-export function matchesSearch(
-  tx: Transaction,
-  term: string,
-  categoryNameMap?: Map<string, string>
-): boolean {
-  if (!term) return true;
-  const normTerm = term.trim().toLowerCase();
-  if (!normTerm) return true;
-
-  // 1. Compound Search Key ([Typ] Partner: Zweck (IBAN))
-  const compound = buildCompoundSearchField(tx).toLowerCase();
-  if (compound.includes(normTerm)) return true;
-
-  // 2. Betragssuche (formatiert und roh)
-  const amt = tx.amount !== undefined ? tx.amount : Math.abs(tx.value);
-  const formattedValue = formatMoney(tx.value).toLowerCase();
-  const formattedAmount = formatMoney(amt).toLowerCase();
-  const rawValue = String(tx.value).toLowerCase();
-  const rawAmount = String(amt).toLowerCase();
-  const fixedAmount = amt.toFixed(2);
-  const germanFixedAmount = fixedAmount.replace('.', ',');
-
-  if (
-    formattedValue.includes(normTerm) ||
-    formattedAmount.includes(normTerm) ||
-    rawValue.includes(normTerm) ||
-    rawAmount.includes(normTerm) ||
-    fixedAmount.includes(normTerm) ||
-    germanFixedAmount.includes(normTerm)
-  ) {
-    return true;
-  }
-
-  // 3. Kategorie-Name
-  if (tx.categoryId && categoryNameMap) {
-    const catName = categoryNameMap.get(tx.categoryId);
-    if (catName && catName.toLowerCase().includes(normTerm)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
  * Kreisförmige Gauge (Radial-Fortschrittsanzeige)
  */
 export const CircularGauge: React.FC<{
@@ -365,7 +308,13 @@ export const Transactions: React.FC = () => {
     resetTransaction,
     deletedTransactions = [],
     restoreTransaction,
+    accountFlowResolver: contextFlowResolver,
   } = useFinance();
+
+  const flowResolver = useMemo(
+    () => contextFlowResolver ?? createAccountFlowResolver(accounts, transactions),
+    [contextFlowResolver, accounts, transactions]
+  );
 
   const [searchParams, setSearchParams] = useSafeSearchParams();
   const inRouter = useInRouterContext();
@@ -467,12 +416,6 @@ export const Transactions: React.FC = () => {
     };
   }, [transactions, deletedTransactions]);
 
-  const categoryNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    categories.forEach((c) => map.set(c.id, c.name));
-    return map;
-  }, [categories]);
-
   // Aktives Filterkonto ermitteln (für korrekte Vorzeichenberechnung bei Umbuchungen und kontextsensitive Filter)
   const selectedAccount = useMemo(() => {
     return appliedFilters.accountId !== 'all'
@@ -480,118 +423,24 @@ export const Transactions: React.FC = () => {
       : undefined;
   }, [accounts, appliedFilters.accountId]);
 
-  // Gefilterte Transaktionen basierend auf angewandten Filtern
-  const filteredTransactions = useMemo(() => {
-    const { searchTerm, accountId, categoryIds, type, origin, startDate, endDate } = appliedFilters;
-
-    // Papierkorb-Ansicht: gelöschte Transaktionen anzeigen
-    if (origin === 'deleted') {
-      const matches = deletedTransactions.filter((tx) =>
-        matchesSearch(tx, searchTerm.trim(), categoryNameMap)
-      );
-      return sortTransactionsDesc(matches);
-    }
-
-    const matches = transactions.filter((tx) => {
-      const txCatId = tx.categoryId ?? null;
-
-      // 1. Account Filter (prüft Buchungskonto, Gegenkonto bei Umbuchung und virtuelle Unterkonten)
-      if (accountId !== 'all' && !isTransactionMatchingAccount(tx, accountId, accounts)) {
-        return false;
-      }
-
-      // 2. Kategorie Filter (Multi-Select mit Hierarchie- und Unkategorisiert-Support)
-      if (categoryIds !== null) {
-        if (categoryIds.length === 0) {
-          return false;
-        }
-
-        const allowedSet = new Set(categoryIds);
-        if (!txCatId) {
-          if (!allowedSet.has('__uncategorized__')) {
-            return false;
-          }
-        } else {
-          if (!allowedSet.has(txCatId)) {
-            return false;
-          }
-        }
-      }
-
-      // 3. Typ Filter (kontextsensitiver Flusstyp mit Kontoperspektive und Umbuchungserkennung)
-      if (
-        type !== 'all' &&
-        !matchesTransactionFlowType(tx, type, selectedAccount, accounts, transactions)
-      ) {
-        return false;
-      }
-
-      // 4. Quelle Filter (Alle Quellen | Bank-Import | Splits | Overrides / Manuell)
-      if (origin !== 'all') {
-        const txOrigin = getTransactionOrigin(tx);
-        if (origin === 'imported' && txOrigin !== 'imported') {
-          return false;
-        }
-        if (origin === 'split' && txOrigin !== 'split') {
-          return false;
-        }
-        if ((origin === 'override' || origin === 'manual') && txOrigin !== 'override') {
-          return false;
-        }
-      }
-
-      // 5. Datum Filter (Wertstellungsdatum)
-      const txDate = tx.date;
-      if (startDate && txDate < (startDate as ISODateString)) {
-        return false;
-      }
-      if (endDate && txDate > (endDate as ISODateString)) {
-        return false;
-      }
-
-      // 6. Freitext- & Betragssuche
-      if (searchTerm.trim() && !matchesSearch(tx, searchTerm.trim(), categoryNameMap)) {
-        return false;
-      }
-
-      return true;
-    });
-
-    return sortTransactionsDesc(matches);
-  }, [
-    transactions,
-    deletedTransactions,
-    appliedFilters,
-    accounts,
-    categoryNameMap,
-    selectedAccount,
-  ]);
-
-  // Summe aller gefilterten Buchungen (unter Berücksichtigung des gewählten Kontos)
-  const { filteredTotalSum, filteredInboundSum, filteredOutboundSum } = useMemo(() => {
-    let total = 0;
-    let inbound = 0;
-    let outbound = 0;
-
-    for (const tx of filteredTransactions) {
-      const eff = selectedAccount
-        ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts) ?? tx.value)
-        : tx.value;
-
-      total += eff;
-      if (eff > 0) {
-        inbound += eff;
-      } else if (eff < 0) {
-        outbound += eff;
-      }
-    }
-
-    return {
-      filteredTotalSum: roundToTwoDecimals(total),
-      filteredInboundSum: roundToTwoDecimals(inbound),
-      filteredOutboundSum: roundToTwoDecimals(outbound),
-    };
-  }, [filteredTransactions, selectedAccount, accounts]);
+  // Gefilterte Transaktionen und Summen über die Domänen-Abfragefunktion
+  const {
+    transactions: filteredTransactions,
+    totalSum: filteredTotalSum,
+    inboundSum: filteredInboundSum,
+    outboundSum: filteredOutboundSum,
+  } = useMemo(
+    () =>
+      queryTransactions({
+        transactions,
+        deletedTransactions,
+        accounts,
+        categories,
+        filters: appliedFilters,
+        flowResolver,
+      }),
+    [transactions, deletedTransactions, accounts, categories, appliedFilters, flowResolver]
+  );
 
   // Reset Lazy Loading wenn angewandte Filter geändert werden
   useEffect(() => {
@@ -639,18 +488,9 @@ export const Transactions: React.FC = () => {
   // Summe aller aktuell per Checkbox ausgewählten Buchungen
   const selectedTotalSum = useMemo(() => {
     if (selectedTxIds.size === 0) return 0;
-    let total = 0;
-    for (const tx of filteredTransactions) {
-      if (selectedTxIds.has(tx.id)) {
-        const eff = selectedAccount
-          ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts, transactions) ??
-            tx.value)
-          : tx.value;
-        total += eff;
-      }
-    }
-    return roundToTwoDecimals(total);
-  }, [selectedTxIds, filteredTransactions, selectedAccount, accounts, transactions]);
+    const selected = filteredTransactions.filter((tx) => selectedTxIds.has(tx.id));
+    return sumTransactionsForAccount(selected, selectedAccount, flowResolver);
+  }, [selectedTxIds, filteredTransactions, selectedAccount, flowResolver]);
 
   // Prüfen, ob alle aktuell angezeigten Buchungen ausgewählt sind
   const isAllDisplayedSelected = useMemo(() => {
@@ -1195,10 +1035,9 @@ export const Transactions: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {displayedTransactions.length > 0 ? (
                 displayedTransactions.map((tx) => {
-                  const accountInfo = getTransactionAccountInfo(tx, accounts);
+                  const accountInfo = flowResolver.getAccountInfo(tx);
                   const effValue = selectedAccount
-                    ? (getTransactionEffectiveValueForAccount(tx, selectedAccount, accounts) ??
-                      tx.value)
+                    ? (flowResolver.getEffectiveValue(tx, selectedAccount) ?? tx.value)
                     : tx.value;
                   const isOutbound = effValue < 0;
                   const isSplitParent = splitParentIds.has(tx.id);

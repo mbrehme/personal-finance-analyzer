@@ -5,16 +5,23 @@
  */
 
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { FinanceProvider, useFinance } from './index';
+import { createInMemoryRepositories } from '@/repository/testing/inMemoryRepositories';
+import { Repositories } from '@/repository';
 import { Transaction, ISODateString } from '@/types/finance';
 
+let testRepos: Repositories;
+
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <FinanceProvider>{children}</FinanceProvider>
+  <FinanceProvider repositories={testRepos}>{children}</FinanceProvider>
 );
 
 describe('FinanceContext', () => {
+  beforeEach(() => {
+    testRepos = createInMemoryRepositories();
+  });
   it('initializes with seed accounts and categories', async () => {
     const { result } = renderHook(() => useFinance(), { wrapper });
 

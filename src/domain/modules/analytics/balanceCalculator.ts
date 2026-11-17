@@ -5,14 +5,13 @@
  * @module services/analytics/balanceCalculator
  */
 
+import { Account, BalanceEntry, ISODateString, PeriodGranularity, Transaction } from '@/types';
 import {
-  Account,
-  BalanceEntry,
-  ISODateString,
-  PeriodGranularity,
-  Transaction,
+  AccountFlowResolver,
+  createAccountFlowResolver,
   getTransactionEffectiveValueForAccount,
-} from '@/types/finance';
+} from '@/domain/modules/accounts/accountService';
+import { buildAccountHierarchy } from './analyticsHelpers';
 import {
   getPeriodKey,
   getCurrentPeriodKey,
@@ -63,7 +62,8 @@ export function calculateBalanceTimeline(
   periodKeys: string[],
   granularity: PeriodGranularity,
   parentAccount?: Account,
-  accounts?: Account[]
+  accounts?: Account[],
+  flowResolver?: AccountFlowResolver
 ): AccountBalanceRow {
   let contextAccounts = accounts;
   if (!contextAccounts || contextAccounts.length === 0) {
@@ -82,12 +82,9 @@ export function calculateBalanceTimeline(
   const relevantTxsWithDeltas: { tx: Transaction; delta: number }[] = [];
 
   transactions.forEach((tx) => {
-    const delta = getTransactionEffectiveValueForAccount(
-      tx,
-      targetAcc,
-      contextAccounts!,
-      transactions
-    );
+    const delta = flowResolver
+      ? flowResolver.getEffectiveValue(tx, targetAcc)
+      : getTransactionEffectiveValueForAccount(tx, targetAcc, contextAccounts!, transactions);
     if (delta !== null) {
       relevantTxsWithDeltas.push({ tx, delta });
     }
@@ -271,41 +268,21 @@ export function calculateAllBalances(
     periodKeys = [currentPeriodKey];
   }
 
-  const accountsToProcess = selectedAccountId
-    ? accounts.filter((a) => a.id === selectedAccountId || a.parentAccountId === selectedAccountId)
-    : accounts;
-
   // Konten hierarchisch anordnen: Echte Konten und direkt darunter ihre virtuellen Unterkonten
-  const realAccounts = accountsToProcess
-    .filter((a) => a.accountType !== 'virtual')
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const hierarchicalAccounts = buildAccountHierarchy(accounts, selectedAccountId ?? undefined);
 
-  const virtualAccounts = accountsToProcess
-    .filter((a) => a.accountType === 'virtual')
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-  const hierarchicalAccounts: { account: Account; parent?: Account }[] = [];
-  const assignedVirtualIds = new Set<string>();
-
-  realAccounts.forEach((realAcc) => {
-    hierarchicalAccounts.push({ account: realAcc });
-    const subs = virtualAccounts.filter((va) => va.parentAccountId === realAcc.id);
-    subs.forEach((sub) => {
-      hierarchicalAccounts.push({ account: sub, parent: realAcc });
-      assignedVirtualIds.add(sub.id);
-    });
-  });
-
-  // Eventuelle verwaiste virtuelle Konten anhängen
-  virtualAccounts.forEach((va) => {
-    if (!assignedVirtualIds.has(va.id)) {
-      const parent = accounts.find((a) => a.id === va.parentAccountId);
-      hierarchicalAccounts.push({ account: va, parent });
-    }
-  });
+  const flowResolver = createAccountFlowResolver(accounts, transactions);
 
   const rows: AccountBalanceRow[] = hierarchicalAccounts.map(({ account, parent }) =>
-    calculateBalanceTimeline(account, transactions, periodKeys, granularity, parent, accounts)
+    calculateBalanceTimeline(
+      account,
+      transactions,
+      periodKeys,
+      granularity,
+      parent,
+      accounts,
+      flowResolver
+    )
   );
 
   // Gesamtsummenzeile: Summiert primär echte Konten, um Doppelzählungen zu verhindern.

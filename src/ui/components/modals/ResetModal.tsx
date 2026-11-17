@@ -8,13 +8,8 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useFinance } from '@/domain';
-import {
-  ResetOptions,
-  ResetTarget,
-  DEFAULT_RESET_OPTIONS,
-  isTransactionOverridden,
-} from '@/types/finance';
+import { useFinance, isTransactionOverridden } from '@/domain';
+import { ResetOptions, ResetTarget, DEFAULT_RESET_OPTIONS } from '@/types';
 import {
   RotateCcw,
   X,

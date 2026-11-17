@@ -33,6 +33,7 @@ export function useAccounts(accountRepo: AccountRepository): UseAccountsResult {
       ...accountData,
       id,
       balanceEntries: accountData.balanceEntries || [],
+      categoryIds: accountData.categoryIds || [],
     };
 
     await accountRepo.save(newAccount);
@@ -41,8 +42,12 @@ export function useAccounts(accountRepo: AccountRepository): UseAccountsResult {
   };
 
   const updateAccount = async (updatedAccount: Account): Promise<void> => {
-    await accountRepo.save(updatedAccount);
-    setAccounts((prev) => prev.map((a) => (a.id === updatedAccount.id ? updatedAccount : a)));
+    const normalized: Account = {
+      ...updatedAccount,
+      categoryIds: updatedAccount.categoryIds || [],
+    };
+    await accountRepo.save(normalized);
+    setAccounts((prev) => prev.map((a) => (a.id === normalized.id ? normalized : a)));
   };
 
   const deleteAccount = async (id: string): Promise<void> => {
@@ -53,7 +58,7 @@ export function useAccounts(accountRepo: AccountRepository): UseAccountsResult {
   const reorderAccounts = async (reorderedAccounts: Account[]): Promise<void> => {
     const indexed = reorderedAccounts.map((acc, index) => ({
       ...acc,
-      order: index,
+      order: acc.order ?? index,
     }));
     await accountRepo.saveAll(indexed);
     setAccounts(indexed);

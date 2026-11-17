@@ -22,7 +22,7 @@ export interface UseCategoriesResult {
 
 export function useCategories(
   categoryRepo: CategoryRepository,
-  onHierarchyOrRuleChange?: () => void
+  onHierarchyOrRuleChange?: (updatedCategories: Category[]) => void | Promise<void>
 ): UseCategoriesResult {
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -35,66 +35,83 @@ export function useCategories(
     const newCategory: Category = {
       ...categoryData,
       id,
+      order: categoryData.order ?? categories.length,
     };
 
-    let updatedList = [...categories, newCategory];
+    const updatedList = [...categories, newCategory];
     const { categories: sanitizedList, hasChanges } = sanitizeParentCategoryRules(
       updatedList,
       newCategory.parentId
     );
 
+    const finalList = hasChanges ? sanitizedList : updatedList;
     if (hasChanges) {
-      await categoryRepo.saveAll(sanitizedList);
-      setCategories(sanitizedList);
+      await categoryRepo.saveAll(finalList);
     } else {
       await categoryRepo.save(newCategory);
-      setCategories(updatedList);
     }
+    setCategories(finalList);
 
-    if (newCategory.regexPattern && onHierarchyOrRuleChange) {
-      onHierarchyOrRuleChange();
+    if (onHierarchyOrRuleChange) {
+      await onHierarchyOrRuleChange(finalList);
     }
 
     return newCategory;
   };
 
   const updateCategory = async (updatedCategory: Category): Promise<void> => {
-    let updatedList = categories.map((c) => (c.id === updatedCategory.id ? updatedCategory : c));
+    const hasChildren = categories.some((c) => c.parentId === updatedCategory.id);
+    const sanitizedUpdated = hasChildren
+      ? { ...updatedCategory, regexPattern: undefined }
+      : updatedCategory;
+
+    const updatedList = categories.map((c) =>
+      c.id === sanitizedUpdated.id ? sanitizedUpdated : c
+    );
 
     const { categories: sanitizedList, hasChanges } = sanitizeParentCategoryRules(
       updatedList,
-      updatedCategory.parentId
+      sanitizedUpdated.parentId
     );
 
+    const finalList = hasChanges ? sanitizedList : updatedList;
     if (hasChanges) {
-      await categoryRepo.saveAll(sanitizedList);
-      setCategories(sanitizedList);
+      await categoryRepo.saveAll(finalList);
     } else {
-      await categoryRepo.save(updatedCategory);
-      setCategories(updatedList);
+      await categoryRepo.save(sanitizedUpdated);
     }
+    setCategories(finalList);
 
     if (onHierarchyOrRuleChange) {
-      onHierarchyOrRuleChange();
+      await onHierarchyOrRuleChange(finalList);
     }
   };
 
   const deleteCategory = async (id: string): Promise<void> => {
     await categoryRepo.delete(id);
-    setCategories((prev) => prev.filter((c) => c.id !== id));
+    const remaining = categories.filter((c) => c.id !== id);
+    setCategories(remaining);
 
     if (onHierarchyOrRuleChange) {
-      onHierarchyOrRuleChange();
+      await onHierarchyOrRuleChange(remaining);
     }
   };
 
   const reorderCategories = async (reorderedCategories: Category[]): Promise<void> => {
-    const indexed = reorderedCategories.map((cat, index) => ({
+    const parentIdsWithChildren = new Set(
+      reorderedCategories.map((c) => c.parentId).filter(Boolean) as string[]
+    );
+    const sanitized = reorderedCategories.map((cat, index) => ({
       ...cat,
-      order: index,
+      order: cat.order ?? index,
+      ...(parentIdsWithChildren.has(cat.id) && cat.regexPattern ? { regexPattern: undefined } : {}),
     }));
-    await categoryRepo.saveAll(indexed);
-    setCategories(indexed);
+    await categoryRepo.saveAll(sanitized);
+    setCategories(sanitized);
+
+    if (onHierarchyOrRuleChange) {
+      await onHierarchyOrRuleChange(sanitized);
+    }
   };
 
   const updateCategoryRules = async (

@@ -6,8 +6,14 @@
  */
 
 import React, { useState } from 'react';
-import { Account, Transaction, normalizeIban } from '@/types/finance';
-import { parseRawCsv, convertRowsToTransactions, CsvColumnMapping, CsvParseResult } from '@/domain';
+import { Account, Transaction } from '@/types';
+import {
+  normalizeIban,
+  parseRawCsv,
+  convertRowsToTransactions,
+  CsvColumnMapping,
+  CsvParseResult,
+} from '@/domain';
 import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, Landmark } from 'lucide-react';
 
 export interface CsvImportModalProps {

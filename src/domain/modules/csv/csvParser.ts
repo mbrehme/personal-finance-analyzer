@@ -5,7 +5,9 @@
  * @module domain/modules/csv/csvParser
  */
 
-import { ISODateString, Transaction, getTransactionType, normalizeIban } from '@/types/finance';
+import { ISODateString, Transaction } from '@/types';
+import { normalizeIban } from '@/domain/modules/accounts/accountService';
+import { getTransactionType } from '@/domain/modules/transactions/transactionService';
 import { toISODateString } from '@/utils/dateUtils';
 import { roundToTwoDecimals, parseCurrencyValue } from '@/utils/moneyUtils';
 

@@ -189,3 +189,51 @@ export function calculateSingleSplit(
 
   return { updatedRootTx, newSplitTx };
 }
+
+/**
+ * Normalisiert eine potenziell ältere (Legacy-)Transaktion auf das gerichtete Geldfluss-Schema.
+ */
+export function normalizeLegacyTransaction(t: Transaction): Transaction {
+  const raw = t as unknown as Record<string, unknown>;
+  const {
+    type: _discardedType,
+    accountIban: _legacyAccIban,
+    iban: _legacyIban,
+    originalAccountIban: _legacyOrigAccIban,
+    originalIban: _legacyOrigIban,
+    ...rest
+  } = raw;
+  const value = t.value ?? 0;
+  const amount = t.amount !== undefined ? t.amount : Math.abs(value);
+  const isOutflow = value < 0;
+
+  let senderIban = t.senderIban;
+  let receiverIban = t.receiverIban;
+  let sender = t.sender;
+  let receiver = t.receiver;
+
+  if (!senderIban && !receiverIban) {
+    const normAccIban =
+      typeof _legacyAccIban === 'string'
+        ? _legacyAccIban.trim().toUpperCase().replace(/\s+/g, '')
+        : '';
+    const normTxIban =
+      typeof _legacyIban === 'string' ? _legacyIban.trim().toUpperCase().replace(/\s+/g, '') : '';
+    senderIban = isOutflow ? normAccIban : normTxIban;
+    receiverIban = isOutflow ? normTxIban : normAccIban;
+  }
+
+  if (!sender && !receiver) {
+    sender = isOutflow ? t.issuer : t.issuer || t.receiver;
+    receiver = isOutflow ? t.receiver || t.issuer : t.receiver;
+  }
+
+  return {
+    ...(rest as unknown as Omit<Transaction, 'type'>),
+    amount,
+    senderIban,
+    receiverIban,
+    sender: sender || '',
+    receiver: receiver || '',
+  } as Transaction;
+}

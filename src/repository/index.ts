@@ -42,15 +42,17 @@ export function getStorageBackend(): StorageBackendType {
   return currentBackend;
 }
 
-/**
- * Factory zur Instanziierung der aktiven Repositories.
- */
-export function createRepositories(backend: StorageBackendType = currentBackend): {
+export interface Repositories {
   accountRepository: AccountRepository;
   categoryRepository: CategoryRepository;
   transactionRepository: TransactionRepository;
   metaRepository: MetaRepository;
-} {
+}
+
+/**
+ * Factory zur Instanziierung der aktiven Repositories.
+ */
+export function createRepositories(backend: StorageBackendType = currentBackend): Repositories {
   if (backend === 'local_storage') {
     const accountRepository = new LocalAccountRepository();
     const categoryRepository = new LocalCategoryRepository();

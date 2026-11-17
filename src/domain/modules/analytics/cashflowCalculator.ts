@@ -10,17 +10,19 @@ import {
   Category,
   PeriodGranularity,
   Transaction,
-  isTransactionMatchingAccount,
-  getTransactionEffectiveValueForAccount,
-  isInternalTransfer,
   getActiveCategoryBudgetForDate,
-} from '@/types/finance';
+} from '@/types';
+import { createAccountFlowResolver } from '@/domain/modules/accounts/accountService';
 import {
-  fillPeriodKeyRange,
+  buildAccountHierarchy,
+  extractPeriodKeysFromTransactions,
+  filterAnalyticsTransactions,
+  resolveCashflowPeriodKeys,
+} from './analyticsHelpers';
+import {
   getCurrentPeriodKey,
-  getPeriodKey,
-  getPeriodKeysBetween,
   getPeriodDateRange,
+  getPeriodKey,
   normalizeBudgetToGranularity,
 } from '@/utils/dateUtils';
 import { roundToTwoDecimals } from '@/utils/moneyUtils';
@@ -90,20 +92,7 @@ export interface CashflowAnalysisResult {
 /**
  * Ermittelt alle eindeutigen, chronologisch sortierten Periodenschlüssel aus Transaktionen.
  */
-export function extractPeriodKeys(
-  transactions: Transaction[],
-  granularity: PeriodGranularity
-): string[] {
-  const keys = new Set<string>();
-  transactions.forEach((tx) => {
-    const d = tx.date || '';
-    if (d) {
-      keys.add(getPeriodKey(d, granularity));
-    }
-  });
-
-  return Array.from(keys).sort();
-}
+export const extractPeriodKeys = extractPeriodKeysFromTransactions;
 
 /**
  * Rekursive Berechnung der Kategorie-Hierarchie mit Summierung der Kinderelemente.
@@ -122,60 +111,24 @@ export function calculateCashflowMatrix(
     accounts?: Account[];
   }
 ): CashflowAnalysisResult {
+  const flowResolver = createAccountFlowResolver(options?.accounts || [], transactions);
+
   // 1. Transaktionen filtern (nach Konto, Datumsbereich und/oder Kategorien)
-  let filteredTx = selectedAccountId
-    ? transactions.filter((t) => {
-        if (options?.accounts) {
-          return isTransactionMatchingAccount(t, selectedAccountId, options.accounts, transactions);
-        }
-        return false;
-      })
-    : transactions;
-
-  if (options?.startDate || options?.endDate) {
-    filteredTx = filteredTx.filter((tx) => {
-      const txDate = tx.date || '';
-      if (options.startDate && txDate < options.startDate) return false;
-      if (options.endDate && txDate > options.endDate) return false;
-      return true;
-    });
-  }
-
-  if (options?.selectedCategoryIds !== undefined) {
-    const allowed = new Set(options.selectedCategoryIds);
-    const allowUncategorized = allowed.has('__uncategorized__');
-
-    filteredTx = filteredTx.filter((tx) => {
-      const catId = tx.categoryId;
-      if (!catId) {
-        return allowUncategorized;
-      }
-      return allowed.has(catId);
-    });
-  }
+  const filteredTx = filterAnalyticsTransactions(transactions, flowResolver, {
+    selectedAccountId,
+    hasAccounts: Boolean(options?.accounts),
+    startDate: options?.startDate,
+    endDate: options?.endDate,
+    selectedCategoryIds: options?.selectedCategoryIds,
+  });
 
   // 2. Periodenschlüssel ermitteln
-  let periodKeys: string[] = [];
-
-  if (options?.startDate && options?.endDate) {
-    // Wenn ein expliziter Bereich gewählt wurde: Immer alle Perioden dieses Bereichs generieren!
-    periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
-  } else {
-    // Sonst aus Transaktionen extrahieren und Lücken bis zum aktuellen Zeitraum schließen
-    const rawPeriodKeys = extractPeriodKeys(filteredTx, granularity);
-    const includeCurrent = options?.includeCurrentPeriod ?? false;
-    const currentKey = includeCurrent
-      ? getCurrentPeriodKey(granularity, options?.referenceDate)
-      : undefined;
-
-    if (rawPeriodKeys.length > 0) {
-      periodKeys = includeCurrent
-        ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentKey)
-        : rawPeriodKeys;
-    } else if (currentKey) {
-      periodKeys = [currentKey];
-    }
-  }
+  const periodKeys = resolveCashflowPeriodKeys(filteredTx, granularity, {
+    startDate: options?.startDate,
+    endDate: options?.endDate,
+    includeCurrentPeriod: options?.includeCurrentPeriod,
+    referenceDate: options?.referenceDate,
+  });
 
   // 3. Direkte Transaktions-Summen pro Kategorie und Periode berechnen
   const directSums = new Map<string, Record<string, { inbound: number; outbound: number }>>();
@@ -205,16 +158,11 @@ export function calculateCashflowMatrix(
 
   const getEffectiveValue = (tx: Transaction): number | null => {
     if (targetAccount && options?.accounts) {
-      return getTransactionEffectiveValueForAccount(
-        tx,
-        targetAccount,
-        options.accounts,
-        filteredTx
-      );
+      return flowResolver.getEffectiveValue(tx, targetAccount);
     }
     // In der Gesamtsicht ohne Kontofilter: Interne Umbuchungen zwischen eigenen Konten
     // heben sich gegenseitig auf und sind kein externes Haushaltseinkommen bzw. keine Ausgabe
-    if (options?.accounts && isInternalTransfer(tx, options.accounts)) {
+    if (options?.accounts && flowResolver.isInternalTransfer(tx)) {
       return null;
     }
     return tx.value;
@@ -517,127 +465,43 @@ export function calculateAccountCashflowMatrix(
     selectedCategoryIds?: string[];
   }
 ): AccountCashflowAnalysisResult {
+  const flowResolver = createAccountFlowResolver(accounts, transactions);
+
   // 1. Transaktionen filtern (nach Konto, Datumsbereich und/oder Kategorien)
-  let filteredTx = transactions;
-
-  if (selectedAccountId) {
-    filteredTx = filteredTx.filter((t) =>
-      isTransactionMatchingAccount(t, selectedAccountId, accounts)
-    );
-  }
-
-  if (options?.startDate || options?.endDate) {
-    filteredTx = filteredTx.filter((tx) => {
-      const txDate = tx.date || '';
-      if (options.startDate && txDate < options.startDate) return false;
-      if (options.endDate && txDate > options.endDate) return false;
-      return true;
-    });
-  }
-
-  if (options?.selectedCategoryIds !== undefined) {
-    const allowed = new Set(options.selectedCategoryIds);
-    const allowUncategorized = allowed.has('__uncategorized__');
-
-    filteredTx = filteredTx.filter((tx) => {
-      const catId = tx.categoryId;
-      if (!catId) {
-        return allowUncategorized;
-      }
-      return allowed.has(catId);
-    });
-  }
+  const filteredTx = filterAnalyticsTransactions(transactions, flowResolver, {
+    selectedAccountId,
+    hasAccounts: true,
+    startDate: options?.startDate,
+    endDate: options?.endDate,
+    selectedCategoryIds: options?.selectedCategoryIds,
+  });
 
   // 2. Periodenschlüssel ermitteln
-  let periodKeys: string[] = [];
-
-  if (options?.startDate && options?.endDate) {
-    periodKeys = getPeriodKeysBetween(options.startDate, options.endDate, granularity);
-  } else {
-    const rawPeriodKeys = extractPeriodKeys(filteredTx, granularity);
-    const includeCurrent = options?.includeCurrentPeriod ?? false;
-    const currentKey = includeCurrent
-      ? getCurrentPeriodKey(granularity, options?.referenceDate)
-      : undefined;
-
-    if (rawPeriodKeys.length > 0) {
-      periodKeys = includeCurrent
-        ? fillPeriodKeyRange(rawPeriodKeys, granularity, currentKey)
-        : rawPeriodKeys;
-    } else if (currentKey) {
-      periodKeys = [currentKey];
-    }
-  }
+  const periodKeys = resolveCashflowPeriodKeys(filteredTx, granularity, {
+    startDate: options?.startDate,
+    endDate: options?.endDate,
+    includeCurrentPeriod: options?.includeCurrentPeriod,
+    referenceDate: options?.referenceDate,
+  });
 
   // 3. Konten-Hierarchie aufbauen: Echte Konten mit ihren virtuellen Unterkonten
-  const accountsToProcess = selectedAccountId
-    ? accounts.filter((a) => a.id === selectedAccountId || a.parentAccountId === selectedAccountId)
-    : accounts;
-
-  const realAccounts = accountsToProcess
-    .filter((a) => a.accountType !== 'virtual')
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-  const virtualAccounts = accountsToProcess
-    .filter((a) => a.accountType === 'virtual')
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-  const rows: AccountCashflowRow[] = [];
-  const assignedVirtualIds = new Set<string>();
-
-  realAccounts.forEach((realAcc) => {
-    const subs = virtualAccounts.filter((va) => va.parentAccountId === realAcc.id);
-    const realRow: AccountCashflowRow = {
-      account: realAcc,
-      depth: 0,
-      hasChildren: subs.length > 0,
-      periods: {},
+  const hierarchyNodes = buildAccountHierarchy(accounts, selectedAccountId);
+  const rows: AccountCashflowRow[] = hierarchyNodes.map((node) => {
+    const periods: Record<string, { inbound: number; outbound: number; net: number }> = {};
+    periodKeys.forEach((k) => {
+      periods[k] = { inbound: 0, outbound: 0, net: 0 };
+    });
+    return {
+      account: node.account,
+      ...(node.depth === 1 && node.parent ? { parent: node.parent } : {}),
+      depth: node.depth,
+      hasChildren: node.hasChildren,
+      periods,
       totalInbound: 0,
       totalOutbound: 0,
       totalNet: 0,
     };
-    periodKeys.forEach((k) => {
-      realRow.periods[k] = { inbound: 0, outbound: 0, net: 0 };
-    });
-    rows.push(realRow);
-
-    subs.forEach((sub) => {
-      assignedVirtualIds.add(sub.id);
-      const subRow: AccountCashflowRow = {
-        account: sub,
-        parent: realAcc,
-        depth: 1,
-        hasChildren: false,
-        periods: {},
-        totalInbound: 0,
-        totalOutbound: 0,
-        totalNet: 0,
-      };
-      periodKeys.forEach((k) => {
-        subRow.periods[k] = { inbound: 0, outbound: 0, net: 0 };
-      });
-      rows.push(subRow);
-    });
   });
-
-  // Verwaiste virtuelle Konten anhängen
-  virtualAccounts
-    .filter((va) => !assignedVirtualIds.has(va.id))
-    .forEach((sub) => {
-      const subRow: AccountCashflowRow = {
-        account: sub,
-        depth: 0,
-        hasChildren: false,
-        periods: {},
-        totalInbound: 0,
-        totalOutbound: 0,
-        totalNet: 0,
-      };
-      periodKeys.forEach((k) => {
-        subRow.periods[k] = { inbound: 0, outbound: 0, net: 0 };
-      });
-      rows.push(subRow);
-    });
 
   // 4. Cashflow für jede Zeile berechnen
   rows.forEach((row) => {
@@ -648,7 +512,7 @@ export function calculateAccountCashflowMatrix(
       if (!p) return;
 
       // Auswertung des effektiven Betrags (berücksichtigt Buchungskonto, Gegenkonto bei Umbuchungen und Unterkonten)
-      const eff = getTransactionEffectiveValueForAccount(tx, row.account, accounts, transactions);
+      const eff = flowResolver.getEffectiveValue(tx, row.account);
       if (eff !== null) {
         if (eff >= 0) {
           p.inbound += eff;

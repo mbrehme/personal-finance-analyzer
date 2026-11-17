@@ -7,6 +7,7 @@
 
 export * from './modules/accounts';
 export * from './modules/categories';
+export * from './modules/matcher';
 export * from './modules/transactions';
 export * from './modules/analytics';
 export * from './modules/csv';

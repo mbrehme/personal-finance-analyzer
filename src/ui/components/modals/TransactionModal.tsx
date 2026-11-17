@@ -6,16 +6,12 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { Transaction, Account, Category, TransactionType, ISODateString } from '@/types';
 import {
-  Transaction,
-  Account,
-  Category,
-  TransactionType,
-  ISODateString,
   getTransactionAccountInfo,
   isTransactionOverridden,
   resetTransactionToOriginal,
-} from '@/types/finance';
+} from '@/domain';
 import { MoneyInput } from '../MoneyInput';
 import { formatMoney } from '@/utils/moneyUtils';
 import { X, AlertCircle, Scissors, Pencil, Plus, RotateCcw, Info } from 'lucide-react';

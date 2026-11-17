@@ -4,11 +4,19 @@
  * @module domain/modules/analytics/balanceCalculator.test
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { calculateAllBalances } from './balanceCalculator';
 import { Account, Transaction } from '@/types/finance';
 
 describe('balanceCalculator', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-15T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   const account: Account = {
     id: 'acc-giro',
     name: 'Girokonto',
